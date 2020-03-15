@@ -1,5 +1,8 @@
-class Machine {
+import Id from "./Id";
+
+class Machine extends Id {
     constructor(factory, craft) {
+        super();
         this.factory = factory;
         this.pause = false;
         this.craft = craft;

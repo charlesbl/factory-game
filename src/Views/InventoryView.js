@@ -3,7 +3,7 @@ import React from 'react';
 class InventoryView extends React.Component{
     renderItemStack(itemStack) {
         return (
-            <div>{itemStack.toString()}</div>
+            <div key={itemStack.id}>{itemStack.toString()}</div>
         );
     }
     render() {

@@ -1,5 +1,3 @@
-import ItemStack from "./ItemStack";
-
 class Craft {
     constructor(name, input, output, duration) {
         this.name = name;

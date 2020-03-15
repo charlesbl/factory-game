@@ -4,9 +4,9 @@ import { machineCrafts } from '../Game/Game'
 import MachineView from './MachineView';
 
 class FactoryView extends React.Component{
-    renderButton(craft) {
+    renderButton(name, craft) {
         return (
-            <button onClick={() => craft.tryCraft(this.props.factory)}>
+            <button key={name} onClick={() => craft.tryCraft(this.props.factory)}>
                 <div>Build {craft.name}</div>
                 {craft.input.map((itemStack) => itemStack.toString())}
             </button>
@@ -15,12 +15,12 @@ class FactoryView extends React.Component{
 
     renderMachine(machine) {
         return (
-            <MachineView machine={machine}/>
+            <MachineView key={machine.id} machine={machine}/>
         )
     }
 
     render() {
-        var buttons = Object.entries(machineCrafts).map(([name, craft]) => this.renderButton(craft));
+        var buttons = Object.entries(machineCrafts).map(([name, craft]) => this.renderButton(name, craft));
         var machines = this.props.factory.machines.map((machine) => this.renderMachine(machine))
         return (
             <div>
