@@ -1,9 +1,6 @@
 import React from 'react';
 
 class InventoryView extends React.Component{
-    constructor(props) {
-        super(props);
-    }
     renderItemStack(itemStack) {
         return (
             <div>{itemStack.toString()}</div>

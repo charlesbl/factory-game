@@ -9,25 +9,31 @@ const items = {
 }
 
 const crafts = {
-    ironIngot: new Craft([new ItemStack(items.ironOre, 5)], [new ItemStack(items.ironIngot, 1)], 2000),
-    ironOre: new Craft([], [new ItemStack(items.ironOre, 1)], 1000)
+    ironOre: new Craft("Iron Ore", [], [new ItemStack(items.ironOre, 1)], 1000),
+    ironIngot: new Craft("Iron Ingot", [new ItemStack(items.ironOre, 5)], [new ItemStack(items.ironIngot, 1)], 2500)
+}
+
+const machineCrafts = {
+    ironOreDrill: new Craft("Iron Ore Drill", [new ItemStack(items.ironIngot, 10)], crafts.ironOre, 5000),
+    ironFurnace: new Craft("Iron Furnace", [new ItemStack(items.ironIngot, 10)], crafts.ironIngot, 5000),
 }
 export {
     items,
     crafts,
+    machineCrafts
 }
 
 class Game {
     constructor() {
         this.factory = new Factory();
+        this.lastTime = new Date().getTime();
     }
+    update() {
+        var newTime = new Date().getTime();
+        var delta = newTime - this.lastTime;
+        this.lastTime = newTime;
 
-    buildDrill() {
-        this.factory.buildDrill();
-    }
-
-    buildFurnace() {
-        this.factory.buildFurnace();
+        this.factory.update(delta);
     }
 }
 

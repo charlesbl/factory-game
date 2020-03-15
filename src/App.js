@@ -3,6 +3,8 @@ import './App.css';
 import Game from './Game/Game'
 import GameView from './Views/GameView'
 
+const refreshRate = 50;
+
 class App extends React.Component {
     constructor() {
         super();
@@ -12,11 +14,10 @@ class App extends React.Component {
         };
     }
 
-
     componentDidMount() {
         this.timerID = setInterval(
             () => this.tick(),
-            50
+            refreshRate
         );
     }
 
@@ -25,6 +26,7 @@ class App extends React.Component {
     }
 
     tick() {
+        this.state.game.update();
         this.setState({
             game: this.state.game
         });
@@ -33,10 +35,7 @@ class App extends React.Component {
     render() {
         return (
         <div className="App">
-            <GameView 
-                game={this.state.game} 
-                buildDrill={() => this.state.game.factory.buildDrill()}
-            />
+            <GameView game={this.state.game} />
         </div>
         )
     }

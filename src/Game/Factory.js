@@ -1,19 +1,22 @@
-import { crafts } from './Game'
 import Machine from './Machine'
 import Inventory from './Inventory'
+import { items } from './Game';
 
 class Factory {
     constructor() {
         this.machines = [];
         this.inventory = new Inventory();
+        this.inventory[items.ironIngot.id].quantity = 20;
     }
 
-    buildDrill() {
-        this.machines.push(new Machine(this, crafts.ironOre));
+    buildMachine(craft) {
+        this.machines.push(new Machine(this, craft));
     }
 
-    buildFurnace() {
-        this.machines.push(new Machine(this, crafts.ironIngot));
+    update(delta) {
+        this.machines.forEach(machine => {
+            machine.update(delta);
+        });
     }
 }
 export default Factory;

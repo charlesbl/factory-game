@@ -1,15 +1,11 @@
 import React from 'react';
-import InventoryView from './InventoryView'
+import FactoryView from './FactoryView';
 
 class GameView extends React.Component{
-    constructor(props) {
-        super(props);
-    }
     render() {
         return (
             <div>
-                <button onClick={this.props.buildDrill}>Build drill</button>
-                <InventoryView inventory={this.props.game.factory.inventory}/>
+                <FactoryView factory={this.props.game.factory}/>
             </div>
         );
     }

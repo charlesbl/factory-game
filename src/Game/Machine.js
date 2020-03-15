@@ -3,17 +3,53 @@ class Machine {
         this.factory = factory;
         this.pause = false;
         this.craft = craft;
-        this.machineInterval = setInterval(() => this.tryCraft(), craft.duration);
+        this.currentCraftDuration = 0;
+        this.isCrafting = false;
     }
-    tryCraft () {
+
+    startCraft() {
+        this.craft.consume(this.factory);
+        this.isCrafting = true;
+    }
+
+    endCraft() {
+        this.craft.produce(this.factory);
+        if(this.craft.canCraft(this.factory)) {
+            this.startCraft();
+            this.currentCraftDuration -= this.craft.duration;
+        } else {
+            this.currentCraftDuration = 0;
+            this.isCrafting = false;
+        }
+    }
+
+    isCraftFinished() {
+        return this.currentCraftDuration >= this.craft.duration;
+    }
+
+    update(delta) {
         if(!this.pause) {
-            if (this.craft.canCraft(this.factory)) {
-                this.craft.craft(this.factory);
+
+            if(!this.isCrafting && this.craft.canCraft(this.factory)) {
+                this.startCraft();
             }
-            else {
-                console.log("Can't craft " + this.craft.output);
+
+            if(this.isCrafting) {
+                this.currentCraftDuration += delta;
+            }
+
+            while(1) {
+                if(this.isCraftFinished()) {
+                    this.endCraft();
+                } else {
+                    break;
+                }
             }
         }
-    };
+    }
+
+    getPercentage() {
+        return 100 * this.currentCraftDuration / this.craft.duration;
+    }
 }
 export default Machine;
