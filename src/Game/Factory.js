@@ -1,12 +1,13 @@
 import Machine from './Machine'
 import Inventory from './Inventory'
 import { items } from './Game';
+import Id from './Id';
 
-class Factory {
+class Factory extends Id{
     constructor() {
+        super();
         this.machines = [];
         this.inventory = new Inventory();
-        this.inventory[items.ironIngot.id].quantity = 20;
     }
 
     buildMachine(craft) {

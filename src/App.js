@@ -1,5 +1,5 @@
 import React from 'react';
-import './App.css';
+import './css/App.css';
 import Game from './Game/Game'
 import GameView from './Views/GameView'
 
@@ -34,9 +34,7 @@ class App extends React.Component {
     
     render() {
         return (
-        <div className="App">
             <GameView game={this.state.game} />
-        </div>
         )
     }
 }
