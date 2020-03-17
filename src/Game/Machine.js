@@ -1,8 +1,12 @@
 import Id from "./Id";
 
 class Machine extends Id {
-    constructor(factory, craft) {
+    constructor(name, factory, craft) {
         super();
+        console.log(name);
+        console.log(factory);
+        console.log(craft);
+        this.name = name;
         this.factory = factory;
         this.pause = false;
         this.craft = craft;
@@ -53,6 +57,13 @@ class Machine extends Id {
 
     getPercentage() {
         return 100 * this.currentCraftDuration / this.craft.duration;
+    }
+
+    destroy() {
+        this.factory.destroyMachine(this);
+    }
+    togglePause() {
+        this.pause = !this.pause;
     }
 }
 export default Machine;

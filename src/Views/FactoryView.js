@@ -16,7 +16,7 @@ class FactoryView extends React.Component{
 
     renderMachine(machine) {
         return (
-            <div  key={machine.id} className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-1 machine-container">
+            <div  key={machine.id} className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2 machine-container">
                 <MachineView machine={machine}/>
             </div>
         )

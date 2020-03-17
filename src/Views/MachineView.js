@@ -6,14 +6,15 @@ class MachineView extends React.Component{
         return (
             <div className="machine">
                 <progress className="progress" max={100} value={this.props.machine.getPercentage()}></progress>
-                <button className="btn-danger btn-delete">X</button>
-                <div className="name">{this.props.machine.craft.name}</div>
+                <button onClick={() => this.props.machine.destroy()} className="btn-danger btn-delete">X</button>
+                <button onClick={() => this.props.machine.togglePause()} className="btn-warning btn-pause">{this.props.machine.pause ? "start" : "pause"}</button>
+                <div className="name">{this.props.machine.name}</div>
                 <div>Optimisation: 83% (1 min)</div>
 
                 <div className="available-resources">
                     <div className="subtitle">Available resources</div>
                     <div className="row no-gutters">
-                        <div className="col-4 text-right">5/7</div>
+                        <div className="col-4 text-right">{5}/7</div>
                         <div className="col-8 text-left">
                             <span className="available-resources-name">Iron Plate</span>
                         </div>

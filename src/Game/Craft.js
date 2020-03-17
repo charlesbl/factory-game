@@ -24,7 +24,7 @@ class Craft {
                 factory.inventory.add(itemStack);
             });
         } else if (this.output instanceof Craft) {
-            factory.buildMachine(this.output);
+            factory.buildMachine(this);
         }
     }
 

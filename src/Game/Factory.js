@@ -10,8 +10,16 @@ class Factory extends Id{
         this.inventory = new Inventory();
     }
 
-    buildMachine(craft) {
-        this.machines.push(new Machine(this, craft));
+    buildMachine(machineCraft) {
+        var machine = new Machine(machineCraft.name, this, machineCraft.output);
+        this.machines.push(machine);
+        return machine;
+    }
+
+    destroyMachine(machine) {
+        this.machines = this.machines.filter((elem) => {
+            return elem != machine;
+        });
     }
 
     update(delta) {
