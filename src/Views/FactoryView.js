@@ -9,7 +9,7 @@ class FactoryView extends React.Component{
         return (
             <button className="btn btn-primary" key={name} onClick={() => craft.tryCraft(this.props.factory)}>
                 <div>{craft.name}</div>
-                {craft.input.map((itemStack) => <div>{itemStack.toString()}</div>)}
+                {craft.input.map((itemStack) => <div key={itemStack.id}>{itemStack.toString()}</div>)}
             </button>
         );
     }

@@ -3,26 +3,38 @@ import './css/App.css';
 import Game from './Game/Game'
 import GameView from './Views/GameView'
 
-const refreshRate = 50;
+const REFRESH_RATE = 50;
+const SAVE_RATE = 1000;
+const STORAGE_NAME = 'game';
 
 class App extends React.Component {
     constructor() {
         super();
+        
+        var game = this.loadGame();
+        if(game === null) {
+            game = new Game();
+        }
 
         this.state = {
-            game: new Game()
+            game: game
         };
     }
 
     componentDidMount() {
-        this.timerID = setInterval(
+        this.gameTimerID = setInterval(
             () => this.tick(),
-            refreshRate
+            REFRESH_RATE
+        );
+        this.saveTimerID = setInterval(
+            () => this.saveGame(),
+            SAVE_RATE
         );
     }
 
     componentWillUnmount() {
-        clearInterval(this.timerID);
+        clearInterval(this.gameTimerID);
+        clearInterval(this.saveTimerID);
     }
 
     tick() {
@@ -30,6 +42,23 @@ class App extends React.Component {
         this.setState({
             game: this.state.game
         });
+    }
+
+    saveGame() {
+        var save = this.state.game.getSave();
+        localStorage.setItem(STORAGE_NAME, JSON.stringify(save));
+    }
+
+    loadGame() {
+        var save = JSON.parse(localStorage.getItem(STORAGE_NAME));
+        if(save === null)
+            return null
+        var game = new Game(save);
+        return game;
+    }
+
+    clearGame() {
+        localStorage.clear(STORAGE_NAME);
     }
     
     render() {

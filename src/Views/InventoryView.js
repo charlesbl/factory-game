@@ -17,7 +17,7 @@ class InventoryView extends React.Component{
         );
     }
     render() {
-        var items = Object.entries(this.props.inventory).map(([id, itemStack]) => this.renderItemStack(itemStack));
+        var items = Object.entries(this.props.inventory.itemStacks).map(([id, itemStack]) => this.renderItemStack(itemStack));
         return (
             <div className="row no-gutters">
                 {items}

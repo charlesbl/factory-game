@@ -1,17 +1,33 @@
 import Id from "./Id";
+import Game from "./Game";
 
 class Machine extends Id {
-    constructor(name, factory, craft) {
+    constructor(name, craft, factory, save) {
         super();
-        console.log(name);
-        console.log(factory);
-        console.log(craft);
-        this.name = name;
         this.factory = factory;
-        this.pause = false;
-        this.craft = craft;
-        this.currentCraftDuration = 0;
-        this.isCrafting = false;
+        if(save === undefined) {
+            this.name = name;
+            this.pause = false;
+            this.craft = craft;
+            this.currentCraftDuration = 0;
+            this.isCrafting = false;
+        } else {
+            this.name = save.name;
+            this.pause = save.pause;
+            this.craft = Game.getCraftById(save.craftId);
+            this.currentCraftDuration = save.currentCraftDuration;
+            this.isCrafting = save.isCrafting;
+        }
+    }
+
+    getSave() {
+        return {
+            name: this.name,
+            pause: this.pause,
+            currentCraftDuration: this.currentCraftDuration,
+            isCrafting: this.isCrafting,
+            craftId: this.craft.id
+        };
     }
 
     startCraft() {
@@ -62,6 +78,7 @@ class Machine extends Id {
     destroy() {
         this.factory.destroyMachine(this);
     }
+
     togglePause() {
         this.pause = !this.pause;
     }

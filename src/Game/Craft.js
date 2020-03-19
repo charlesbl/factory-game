@@ -1,5 +1,6 @@
 class Craft {
-    constructor(name, input, output, duration) {
+    constructor(id, name, input, output, duration) {
+        this.id = id;
         this.name = name;
         this.input = input;
         this.output = output;

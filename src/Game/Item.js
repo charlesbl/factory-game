@@ -1,12 +1,7 @@
-import Id from "./Id";
-
-class Item extends Id{
-    constructor(name) {
-        super();
+class Item {
+    constructor(id, name) {
+        this.id = id;
         this.name = name;
-    }
-    toString() {
-        return this.name;
     }
 }
 export default Item;
