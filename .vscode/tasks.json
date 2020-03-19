@@ -8,7 +8,30 @@
             "args": [
                 "start"
             ],
-            "auto": true
+            "auto": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "yarn install",
+            "command": "yarn",
+            "type": "shell",
+            "args": [
+                "install"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "yarn build",
+            "type": "shell",
+            "command": "yarn",
+            "args": [
+                "build"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
         }
     ]
 }
