@@ -43,11 +43,11 @@ class Game {
     lastTime;
 
     constructor(save) {
-        if(save === undefined) {
+        if (save === undefined) {
             var factory = new Factory();
-            factory.buildMachine(machineCrafts.ironOreDrill).togglePause();
-            factory.buildMachine(machineCrafts.ironFurnace).togglePause();
-            factory.buildMachine(machineCrafts.ironPlating).togglePause();
+            factory.buildManualMachine(machineCrafts.ironOreDrill);
+            factory.buildManualMachine(machineCrafts.ironFurnace);
+            factory.buildManualMachine(machineCrafts.ironPlating);
             this.factories.push(factory);
         } else {
             this.factories = save.factories.map((factorySave) => new Factory(factorySave));
@@ -73,7 +73,7 @@ class Game {
 
     static getCraftById(id) {
         var req = Object.entries(crafts).filter(([name, craft]) => craft.id === id);
-        if(req.length !== 1) {
+        if (req.length !== 1) {
             throw new Error("Craft id: " + id + " not found");
         }
         return req[0][1];
@@ -81,7 +81,7 @@ class Game {
 
     static getItemById(id) {
         var req = Object.entries(items).filter(([name, item]) => item.id === id);
-        if(req.length !== 1) {
+        if (req.length !== 1) {
             throw new Error("Item id: " + id + " not found");
         }
         return req[0][1];

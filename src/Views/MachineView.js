@@ -17,24 +17,25 @@ class MachineView extends React.Component {
     }
 
     render() {
-        var availableResources;
-        if (this.props.machine.craft.input.length > 0) {
-            availableResources = (
-                <div className="available-resources">
-                    <div className="subtitle">Available resources</div>
-                    {this.props.machine.craft.input.map((itemStack => this.renderAvailableResources(itemStack)))}
-                </div>
-            );
-        }
+        var availableResources = this.props.machine.craft.input.length > 0 ?
+            <div className="available-resources">
+                <div className="subtitle">Available resources</div>
+                {this.props.machine.craft.input.map((itemStack => this.renderAvailableResources(itemStack)))}
+            </div> : "";
+        var destroyBtn = !this.props.machine.manual ? <button onClick={() => this.props.machine.destroy()} className="btn-danger btn-delete">X</button> : "";
+        var pauseBtn = !this.props.machine.manual ? <button onClick={() => this.props.machine.togglePause()} className="btn-warning btn-pause">{this.props.machine.pause ? "start" : "pause"}</button> : "";
+        var craftBtn = this.props.machine.manual ? <button onClick={() => this.props.machine.manualUpdate()} className="btn-warning btn-pause">Craft</button> : "";
         return (
             <div className="machine">
                 <progress className="progress" max={100} value={this.props.machine.getPercentage()}></progress>
-                <button onClick={() => this.props.machine.destroy()} className="btn-danger btn-delete">X</button>
-                <button onClick={() => this.props.machine.togglePause()} className="btn-warning btn-pause">{this.props.machine.pause ? "start" : "pause"}</button>
+                {destroyBtn}
+                {pauseBtn}
+                {craftBtn}
                 <div className="name">{this.props.machine.name}</div>
-                <div>Optimisation: 83% (1 min)</div>
 
                 {availableResources}
+                {/*
+                <div>Optimization: 83% (1 min)</div>
                 <div className="rate">
                     <div className="subtitle">Input rate</div>
                     <div className="row no-gutters">
@@ -66,6 +67,7 @@ class MachineView extends React.Component {
                         <div className="col-5 text-left">9/s</div>
                     </div>
                 </div>
+                */}
             </div>
         );
     }

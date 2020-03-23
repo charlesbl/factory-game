@@ -2,10 +2,10 @@ import Machine from './Machine'
 import Inventory from './Inventory'
 import Id from './Id';
 
-class Factory extends Id{
+class Factory extends Id {
     constructor(save) {
         super();
-        if(save === undefined) {
+        if (save === undefined) {
             this.machines = [];
             this.inventory = new Inventory();
         } else {
@@ -24,6 +24,12 @@ class Factory extends Id{
     buildMachine(machineCraft) {
         var machine = new Machine(machineCraft.name, machineCraft.output, this);
         this.machines.push(machine);
+        return machine;
+    }
+
+    buildManualMachine(machineCraft) {
+        var machine = this.buildMachine(machineCraft);
+        machine.manual = true;
         return machine;
     }
 

@@ -1,11 +1,15 @@
 import Id from "./Id";
 import Game from "./Game";
 
+const MANUAL_CRAFT_MIN = 500;
+const MANUAL_CRAFT_MAX = 1500;
+
 class Machine extends Id {
     constructor(name, craft, factory, save) {
         super();
         this.factory = factory;
-        if(save === undefined) {
+        this.manual = false;
+        if (save === undefined) {
             this.name = name;
             this.pause = false;
             this.craft = craft;
@@ -17,6 +21,7 @@ class Machine extends Id {
             this.craft = Game.getCraftById(save.craftId);
             this.currentCraftDuration = save.currentCraftDuration;
             this.isCrafting = save.isCrafting;
+            this.manual = save.manual;
         }
     }
 
@@ -26,7 +31,8 @@ class Machine extends Id {
             pause: this.pause,
             currentCraftDuration: this.currentCraftDuration,
             isCrafting: this.isCrafting,
-            craftId: this.craft.id
+            craftId: this.craft.id,
+            manual: this.manual
         };
     }
 
@@ -37,7 +43,7 @@ class Machine extends Id {
 
     endCraft() {
         this.craft.produce(this.factory);
-        if(this.craft.canCraft(this.factory)) {
+        if (this.craft.canCraft(this.factory)) {
             this.startCraft();
             this.currentCraftDuration -= this.craft.duration;
         } else {
@@ -51,22 +57,29 @@ class Machine extends Id {
     }
 
     update(delta) {
-        if(!this.pause) {
+        if (!this.manual && !this.pause) {
+            this.forward(delta);
+        }
+    }
 
-            if(!this.isCrafting && this.craft.canCraft(this.factory)) {
-                this.startCraft();
-            }
+    manualUpdate(delta) {
+        this.forward(Math.random() * (MANUAL_CRAFT_MAX - MANUAL_CRAFT_MIN) + MANUAL_CRAFT_MIN);
+    }
 
-            if(this.isCrafting) {
-                this.currentCraftDuration += delta;
-            }
+    forward(delta) {
+        if (!this.isCrafting && this.craft.canCraft(this.factory)) {
+            this.startCraft();
+        }
 
-            while(1) {
-                if(this.isCraftFinished()) {
-                    this.endCraft();
-                } else {
-                    break;
-                }
+        if (this.isCrafting) {
+            this.currentCraftDuration += delta;
+        }
+
+        while (1) {
+            if (this.isCraftFinished()) {
+                this.endCraft();
+            } else {
+                break;
             }
         }
     }
