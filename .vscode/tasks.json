@@ -8,8 +8,10 @@
             "args": [
                 "start"
             ],
-            "auto": true,
-            "problemMatcher": []
+            "problemMatcher": [],
+            "runOptions": {
+                "runOn": "folderOpen"
+            }
         },
         {
             "label": "yarn install",

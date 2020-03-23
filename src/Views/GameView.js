@@ -1,7 +1,7 @@
 import React from 'react';
 import FactoryView from './FactoryView';
 
-class GameView extends React.Component{
+class GameView extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
@@ -17,9 +17,7 @@ class GameView extends React.Component{
 
     render() {
         return (
-            <div className="container-fluid">
-                <FactoryView factory={this.props.game.factories[0]}/>
-            </div>
+            <FactoryView factory={this.props.game.factories[0]} />
         );
     }
 }

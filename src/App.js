@@ -10,9 +10,9 @@ const STORAGE_NAME = 'game';
 class App extends React.Component {
     constructor() {
         super();
-        
+
         var game = this.loadGame();
-        if(game === null) {
+        if (game === null) {
             game = new Game();
         }
 
@@ -51,19 +51,24 @@ class App extends React.Component {
 
     loadGame() {
         var save = JSON.parse(localStorage.getItem(STORAGE_NAME));
-        if(save === null)
+        if (save === null)
             return null
-        var game = new Game(save);
-        return game;
+        return new Game(save);
     }
 
     clearGame() {
         localStorage.clear(STORAGE_NAME);
+        this.setState({
+            game: new Game()
+        });
     }
-    
+
     render() {
         return (
-            <GameView game={this.state.game} />
+            <div className="container-fluid">
+                <button className="btn btn-primary">Clear save</button>
+                <GameView game={this.state.game} />
+            </div>
         )
     }
 }
