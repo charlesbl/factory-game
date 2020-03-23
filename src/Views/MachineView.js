@@ -1,8 +1,31 @@
 import React from 'react';
 import '../css/Machine.css'
 
-class MachineView extends React.Component{
+class MachineView extends React.Component {
+
+    renderAvailableResources(itemStack) {
+        var count = this.props.machine.factory.inventory.count(itemStack.item);
+        var maxedCount = count > itemStack.quantity ? itemStack.quantity : count;
+        return (
+            <div key={itemStack.id} className="row no-gutters">
+                <div className="col-4 text-right">{maxedCount}/{itemStack.quantity}</div>
+                <div className="col-8 text-left">
+                    <span className="available-resources-name">{itemStack.item.name}</span>
+                </div>
+            </div>
+        );
+    }
+
     render() {
+        var availableResources;
+        if (this.props.machine.craft.input.length > 0) {
+            availableResources = (
+                <div className="available-resources">
+                    <div className="subtitle">Available resources</div>
+                    {this.props.machine.craft.input.map((itemStack => this.renderAvailableResources(itemStack)))}
+                </div>
+            );
+        }
         return (
             <div className="machine">
                 <progress className="progress" max={100} value={this.props.machine.getPercentage()}></progress>
@@ -11,22 +34,7 @@ class MachineView extends React.Component{
                 <div className="name">{this.props.machine.name}</div>
                 <div>Optimisation: 83% (1 min)</div>
 
-                <div className="available-resources">
-                    <div className="subtitle">Available resources</div>
-                    <div className="row no-gutters">
-                        <div className="col-4 text-right">{5}/7</div>
-                        <div className="col-8 text-left">
-                            <span className="available-resources-name">Iron Plate</span>
-                        </div>
-                    </div>
-                    <div className="row no-gutters">
-                        <div className="col-4 text-right">0/8</div>
-                        <div className="col-8 text-left">
-                            <span className="available-resources-name">Iron Ingot</span>
-                        </div>
-                    </div>
-                </div>
-
+                {availableResources}
                 <div className="rate">
                     <div className="subtitle">Input rate</div>
                     <div className="row no-gutters">

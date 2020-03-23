@@ -7,13 +7,13 @@ class Inventory {
         Object.entries(items).forEach(([itemName, item]) => {
             this.itemStacks[item.id] = new ItemStack(item, 0);
         });
-        if(save !== undefined) {
+        if (save !== undefined) {
             save.itemStacks.forEach((itemStackSave) => {
                 this.add(new ItemStack(undefined, undefined, itemStackSave));
             });
         }
     }
-    
+
     getSave() {
         return {
             itemStacks: this.itemStacks.map((itemStack) => itemStack.getSave())
@@ -30,6 +30,10 @@ class Inventory {
 
     contains(itemStack) {
         return this.itemStacks[itemStack.item.id].quantity >= itemStack.quantity;
+    }
+
+    count(item) {
+        return this.itemStacks.filter((itemStack) => itemStack.item.id === item.id)[0].quantity;
     }
 }
 export default Inventory;

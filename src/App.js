@@ -66,7 +66,7 @@ class App extends React.Component {
     render() {
         return (
             <div className="container-fluid">
-                <button className="btn btn-primary">Clear save</button>
+                <button className="btn btn-primary" onClick={() => this.clearGame()}>Clear save</button>
                 <GameView game={this.state.game} />
             </div>
         )
