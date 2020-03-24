@@ -3,6 +3,8 @@ import Item from './Item'
 import ItemStack from './ItemStack'
 import Craft from './Craft'
 
+const MAX_TICK_TIME = 500;
+
 const items = {
     ironOre: new Item(0, "Iron Ore"),
     ironIngot: new Item(1, "Iron Ingot"),
@@ -50,7 +52,7 @@ class Game {
         } else {
             this.factories = save.factories.map((factorySave) => new Factory(factorySave));
         }
-        this.lastTime = new Date().getTime();
+        this.lastTime = Date.now();
     }
 
     getSave() {
@@ -60,10 +62,18 @@ class Game {
     }
 
     update() {
-        var newTime = new Date().getTime();
+        var newTime = Date.now();
         var delta = newTime - this.lastTime;
         this.lastTime = newTime;
 
+        while (delta > 0) {
+            var capedDelta = delta < MAX_TICK_TIME ? delta : MAX_TICK_TIME;
+            this.updateFactories(capedDelta);
+            delta -= MAX_TICK_TIME;
+        }
+    }
+
+    updateFactories(delta) {
         this.factories.forEach(factory => {
             factory.update(delta);
         });

@@ -6,10 +6,10 @@ class MachineTypeView extends React.Component {
 
     renderAvailableResources(itemStack) {
         var count = this.props.factory.inventory.count(itemStack.item);
-        var maxedCount = count > itemStack.quantity ? itemStack.quantity : count;
+        var capedCount = count > itemStack.quantity ? itemStack.quantity : count;
         return (
             <div key={itemStack.id} className="row no-gutters">
-                <div className="col-4 text-right">{maxedCount}/{itemStack.quantity}</div>
+                <div className="col-4 text-right">{capedCount}/{itemStack.quantity}</div>
                 <div className="col-8 text-left">
                     <span className="available-resources-name">{itemStack.item.name}</span>
                 </div>

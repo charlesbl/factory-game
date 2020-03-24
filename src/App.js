@@ -4,7 +4,7 @@ import Game from './Game/Game'
 import GameView from './Views/GameView'
 
 const REFRESH_RATE = 50;
-const SAVE_RATE = 1000;
+const TICK_BEETWEEN_SAVE = 20;
 const STORAGE_NAME = 'game';
 
 class App extends React.Component {
@@ -22,19 +22,27 @@ class App extends React.Component {
     }
 
     componentDidMount() {
-        this.gameTimerID = setInterval(
-            () => this.tick(),
-            REFRESH_RATE
-        );
-        this.saveTimerID = setInterval(
-            () => this.saveGame(),
-            SAVE_RATE
-        );
+        setTimeout(() => this.gameLoop());
     }
 
     componentWillUnmount() {
-        clearInterval(this.gameTimerID);
-        clearInterval(this.saveTimerID);
+        this.stop = true;
+    }
+
+    async gameLoop() {
+        var tickCount = 0;
+        while (!this.stop) {
+            var startTime = Date.now();
+            this.tick();
+            tickCount++;
+            if (tickCount >= TICK_BEETWEEN_SAVE) {
+                tickCount = 0;
+                this.saveGame();
+            }
+            var tickTime = Date.now() - startTime;
+            if (tickTime <= REFRESH_RATE)
+                await sleep(REFRESH_RATE - tickTime);
+        }
     }
 
     tick() {
@@ -71,5 +79,9 @@ class App extends React.Component {
             </div>
         );
     }
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 export default App;
