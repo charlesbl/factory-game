@@ -14,10 +14,10 @@ const items = {
 }
 
 const crafts = {
-    ironOre: new Craft(0, "Iron Ore", [], [new ItemStack(items.ironOre, 10)], 1000),
+    ironOre: new Craft(0, "Iron Ore", [], [new ItemStack(items.ironOre, 10)], 10000),
     ironIngot: new Craft(1, "Iron Ingot", [new ItemStack(items.ironOre, 5)], [new ItemStack(items.ironIngot, 1)], 2500),
-    ironPlate: new Craft(2, "Iron Plate", [new ItemStack(items.ironIngot, 2)], [new ItemStack(items.ironPlate, 1)], 1000),
-    copperOre: new Craft(3, "Copper Ore", [], [new ItemStack(items.copperOre, 10)], 1000),
+    ironPlate: new Craft(2, "Iron Plate", [new ItemStack(items.ironIngot, 4)], [new ItemStack(items.ironPlate, 2)], 2000),
+    copperOre: new Craft(3, "Copper Ore", [], [new ItemStack(items.copperOre, 10)], 10000),
     copperIngot: new Craft(4, "Copper Ingot", [new ItemStack(items.copperOre, 5)], [new ItemStack(items.copperIngot, 1)], 2500),
     copperPlate: new Craft(5, "Copper Plate", [new ItemStack(items.copperIngot, 1)], [new ItemStack(items.copperPlate, 2)], 3000),
     copperWire: new Craft(6, "Copper Wire", [new ItemStack(items.copperPlate, 1)], [new ItemStack(items.copperWire, 5)], 5000),
@@ -45,9 +45,7 @@ class Game {
     constructor(save) {
         if (save === undefined) {
             var factory = new Factory();
-            factory.buildManualMachine(machineCrafts.ironOreDrill);
-            factory.buildManualMachine(machineCrafts.ironFurnace);
-            factory.buildManualMachine(machineCrafts.ironPlating);
+            Object.entries(machineCrafts).forEach(([name, machineCraft]) => factory.buildManualMachine(machineCraft));
             this.factories.push(factory);
         } else {
             this.factories = save.factories.map((factorySave) => new Factory(factorySave));

@@ -69,7 +69,7 @@ class App extends React.Component {
                 <button className="btn btn-primary" onClick={() => this.clearGame()}>Clear save</button>
                 <GameView game={this.state.game} />
             </div>
-        )
+        );
     }
 }
 export default App;

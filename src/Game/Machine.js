@@ -2,7 +2,7 @@ import Id from "./Id";
 import Game from "./Game";
 
 const MANUAL_CRAFT_MIN = 500;
-const MANUAL_CRAFT_MAX = 1500;
+const MANUAL_CRAFT_MAX = 800;
 
 class Machine extends Id {
     constructor(name, craft, factory, save) {

@@ -44,5 +44,9 @@ class Factory extends Id {
             machine.update(delta);
         });
     }
+
+    getMachinesOfType(machineCraft) {
+        return this.machines.filter((machine) => machine.craft.id === machineCraft.id);
+    }
 }
 export default Factory;
