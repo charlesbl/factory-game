@@ -4,7 +4,7 @@ import Game from './Game/Game'
 import GameView from './Views/GameView'
 
 const REFRESH_RATE = 50;
-const TICK_BEETWEEN_SAVE = 20;
+const TICK_BETWEEN_SAVE = 20;
 const STORAGE_NAME = 'game';
 
 class App extends React.Component {
@@ -35,7 +35,7 @@ class App extends React.Component {
             var startTime = Date.now();
             this.tick();
             tickCount++;
-            if (tickCount >= TICK_BEETWEEN_SAVE) {
+            if (tickCount >= TICK_BETWEEN_SAVE) {
                 tickCount = 0;
                 this.saveGame();
             }
