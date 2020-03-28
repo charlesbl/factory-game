@@ -1,7 +1,7 @@
 import React from 'react';
 import '../css/Inventory.css'
 
-class InventoryView extends React.Component{
+class InventoryView extends React.Component {
     renderItemStack(itemStack) {
         return (
             <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-1" key={itemStack.id}>
@@ -17,7 +17,7 @@ class InventoryView extends React.Component{
         );
     }
     render() {
-        var items = Object.entries(this.props.inventory.itemStacks).map(([id, itemStack]) => this.renderItemStack(itemStack));
+        var items = Object.entries(this.props.inventory.itemStacks).filter(([id, itemStack]) => !itemStack.item.infinite).map(([id, itemStack]) => this.renderItemStack(itemStack));
         return (
             <div className="row no-gutters">
                 {items}
