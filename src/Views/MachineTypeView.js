@@ -37,7 +37,7 @@ class MachineTypeView extends React.Component {
                 <div className="add-machine">
                     <div className="subtitle">Cost</div>
                     {this.props.craft.input.map((itemStack => this.renderAvailableResources(itemStack)))}
-                    <button className="btn btn-success btn-machine" key={this.props.craft.id} onClick={() => this.props.craft.tryCraft(this.props.factory)}><i class="fas fa-hammer fa-2x"></i></button>
+                    <button className="btn btn-success btn-machine" key={this.props.craft.id} disabled={!this.props.craft.canCraft(this.props.factory)} onClick={() => this.props.craft.tryCraft(this.props.factory)}><i class="fas fa-hammer fa-2x"></i></button>
                 </div>
             </div>
         );
