@@ -5,6 +5,9 @@ import Craft from './Craft'
 
 const MAX_TICK_TIME = 500;
 
+//TODO Factory in Factory
+//TODO rework crafts
+//TODO add a json file for crafts
 const items = {
     ironOre: new Item(0, "Iron Ore"),
     ironIngot: new Item(1, "Iron Ingot"),
