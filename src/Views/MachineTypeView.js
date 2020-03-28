@@ -12,7 +12,7 @@ class MachineTypeView extends React.Component {
     }
 
     render() {
-        var machinesOfType = this.props.factory.getMachinesOfType(this.props.craft);
+        var machinesOfType = this.props.factory.getMachinesOfType(this.props.craft.output);
         return (
             <div className="machine-type">
                 <div className="machine-type-header">

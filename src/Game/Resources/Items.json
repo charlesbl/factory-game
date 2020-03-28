@@ -1,0 +1,35 @@
+[
+    {
+        "id": "ground",
+        "name": "Ground",
+        "infinite": true
+    },
+    {
+        "id": "ironOre",
+        "name": "Iron Ore"
+    },
+    {
+        "id": "ironIngot",
+        "name": "Iron Ingot"
+    },
+    {
+        "id": "ironPlate",
+        "name": "Iron Plate"
+    },
+    {
+        "id": "copperOre",
+        "name": "Copper Ore"
+    },
+    {
+        "id": "copperIngot",
+        "name": "Copper Ingot"
+    },
+    {
+        "id": "copperPlate",
+        "name": "Copper Plate"
+    },
+    {
+        "id": "copperWire",
+        "name": "Copper Wire"
+    }
+]

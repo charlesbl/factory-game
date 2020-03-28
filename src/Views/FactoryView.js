@@ -1,8 +1,8 @@
 import React from 'react';
 import InventoryView from './InventoryView'
-import { machineCrafts } from '../Game/Game'
 import MachineTypeView from './MachineTypeView';
 import '../css/Factory.css'
+import Game from '../Game/Game';
 
 class FactoryView extends React.Component {
     renderButton(craft) {
@@ -23,7 +23,7 @@ class FactoryView extends React.Component {
     }
 
     render() {
-        var machines = Object.entries(machineCrafts).map(([name, craft]) => this.renderMachine(craft));
+        var machines = Game.machineCrafts.map((craft) => this.renderMachine(craft));
         return (
             <div>
                 <InventoryView inventory={this.props.factory.inventory} />

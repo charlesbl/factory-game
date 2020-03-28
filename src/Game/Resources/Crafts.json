@@ -1,0 +1,121 @@
+[
+    {
+        "id": "ironOre",
+        "name": "Iron Ore",
+        "duration": 10000,
+        "input": [
+            {
+                "itemId": "ground",
+                "quantity": 0
+            }
+        ],
+        "output": [
+            {
+                "itemId": "ironOre",
+                "quantity": 10
+            }
+        ]
+    },
+    {
+        "id": "ironIngot",
+        "name": "Iron Ingot",
+        "duration": 2500,
+        "input": [
+            {
+                "itemId": "ironOre",
+                "quantity": 5
+            }
+        ],
+        "output": [
+            {
+                "itemId": "ironIngot",
+                "quantity": 1
+            }
+        ]
+    },
+    {
+        "id": "ironPlate",
+        "name": "Iron ironIngot",
+        "duration": 2000,
+        "input": [
+            {
+                "itemId": "ironIngot",
+                "quantity": 4
+            }
+        ],
+        "output": [
+            {
+                "itemId": "ironPlate",
+                "quantity": 2
+            }
+        ]
+    },
+    {
+        "id": "copperOre",
+        "name": "Copper Ore",
+        "duration": 10000,
+        "input": [
+            {
+                "itemId": "ground",
+                "quantity": 0
+            }
+        ],
+        "output": [
+            {
+                "itemId": "copperOre",
+                "quantity": 10
+            }
+        ]
+    },
+    {
+        "id": "copperIngot",
+        "name": "Copper Ingot",
+        "duration": 2500,
+        "input": [
+            {
+                "itemId": "copperOre",
+                "quantity": 5
+            }
+        ],
+        "output": [
+            {
+                "itemId": "copperIngot",
+                "quantity": 1
+            }
+        ]
+    },
+    {
+        "id": "copperPlate",
+        "name": "Copper Plate",
+        "duration": 3000,
+        "input": [
+            {
+                "itemId": "copperIngot",
+                "quantity": 1
+            }
+        ],
+        "output": [
+            {
+                "itemId": "copperPlate",
+                "quantity": 2
+            }
+        ]
+    },
+    {
+        "id": "copperWire",
+        "name": "Copper Wire",
+        "duration": 5000,
+        "input": [
+            {
+                "itemId": "copperPlate",
+                "quantity": 1
+            }
+        ],
+        "output": [
+            {
+                "itemId": "copperWire",
+                "quantity": 5
+            }
+        ]
+    }
+]

@@ -1,10 +1,10 @@
-import { items } from './Game'
+import Game from './Game'
 import ItemStack from './ItemStack'
 
 class Inventory {
     constructor(save) {
         this.itemStacks = [];
-        Object.entries(items).forEach(([itemName, item]) => {
+        Game.items.forEach((item) => {
             this.itemStacks[item.id] = new ItemStack(item, 0);
         });
         if (save !== undefined) {
@@ -33,7 +33,7 @@ class Inventory {
     }
 
     count(item) {
-        return this.itemStacks.filter((itemStack) => itemStack.item.id === item.id)[0].quantity;
+        return this.itemStacks[item.id].quantity;
     }
 }
 export default Inventory;
