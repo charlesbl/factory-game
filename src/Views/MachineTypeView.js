@@ -17,7 +17,7 @@ class MachineTypeView extends React.Component {
             <div className="machine-type">
                 <div className="machine-type-header">
                     <div className="name">{this.props.craft.name}</div>
-                    <div className="machine-count">x{machinesOfType.length}</div>
+                    <div className="machine-count">x{machinesOfType.length - 1}</div>
                 </div>
                 <CraftView craft={this.props.craft.output} inventory={this.props.factory.inventory} />
                 {machinesOfType.map((machine) => this.renderMachine(machine))}
