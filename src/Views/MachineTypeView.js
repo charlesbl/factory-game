@@ -24,16 +24,20 @@ class MachineTypeView extends React.Component {
     }
 
     render() {
+        var machinesOfType = this.props.factory.getMachinesOfType(this.props.craft);
         var availableResources = this.props.craft.output.input.length > 0 ?
             <div className="available-resources">
                 <div className="subtitle">Needed resources</div>
                 {this.props.craft.output.input.map((itemStack => this.renderAvailableResources(itemStack)))}
             </div> : "";
         return (
-            <div className="machineType">
-                <div className="name">{this.props.craft.name}</div>
+            <div className="machine-type">
+                <div className="machine-type-header">
+                    <div className="name">{this.props.craft.name}</div>
+                    <div className="machine-count">x{machinesOfType.length}</div>
+                </div>
                 {availableResources}
-                {this.props.factory.getMachinesOfType(this.props.craft).map((machine) => this.renderMachine(machine))}
+                {machinesOfType.map((machine) => this.renderMachine(machine))}
                 <div className="add-machine">
                     <div className="subtitle">Cost</div>
                     {this.props.craft.input.map((itemStack => this.renderAvailableResources(itemStack)))}
