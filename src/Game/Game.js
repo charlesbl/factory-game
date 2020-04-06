@@ -89,6 +89,14 @@ class Game {
         return req[0];
     }
 
+    static getMachineCraftById(id) {
+        var req = Game.machineCrafts.filter((craft) => craft.id === id);
+        if (req.length !== 1) {
+            throw new Error("MachineCraft id \"" + id + "\" found " + req.length + " times");
+        }
+        return req[0];
+    }
+
     static getItemById(id) {
         var req = Game.items.filter((item) => item.id === id);
         if (req.length !== 1) {

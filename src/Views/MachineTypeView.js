@@ -9,7 +9,7 @@ class MachineTypeView extends React.Component {
         var count = this.props.factory.inventory.count(itemStack.item);
         var capedCount = count > itemStack.quantity ? itemStack.quantity : count;
         return (
-            <div>
+            <div key={itemStack.id}>
                 {capedCount}/{itemStack.quantity} {itemStack.item.name}
             </div>
         );

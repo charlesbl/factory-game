@@ -3,17 +3,10 @@ import InventoryView from './InventoryView'
 import MachineTypeView from './MachineTypeView';
 import '../css/Factory.css'
 import Game from '../Game/Game';
+import PatternCreatorView from './PatternCreatorView';
+import PatternView from './PatternView';
 
 class FactoryView extends React.Component {
-    renderButton(craft) {
-        return (
-            <button className="btn btn-primary" key={craft.id} onClick={() => craft.tryCraft(this.props.factory)}>
-                <div>{craft.name}</div>
-                {craft.input.map((itemStack) => <div key={itemStack.id}>{itemStack.toString()}</div>)}
-            </button>
-        );
-    }
-
     renderMachine(craft) {
         return (
             <div key={craft.id} className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2 machine-container">
@@ -22,13 +15,22 @@ class FactoryView extends React.Component {
         );
     }
 
+    renderPattern(pattern) {
+        return (
+            <PatternView key={pattern.id} pattern={pattern} />
+        );
+    }
+
     render() {
         var machines = Game.machineCrafts.map((craft) => this.renderMachine(craft));
+        var patterns = this.props.factory.patterns.map((pattern) => this.renderPattern(pattern));
         return (
             <div>
+                <PatternCreatorView factory={this.props.factory} />
                 <InventoryView inventory={this.props.factory.inventory} />
                 <div className="row">
                     {machines}
+                    {patterns}
                 </div>
             </div>
         );
