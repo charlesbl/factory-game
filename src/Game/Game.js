@@ -12,6 +12,7 @@ const MAX_TICK_TIME = 500;
 //TODO rework crafts
 //TODO Download and load save
 //TODO Keep mouse button down during manual craft
+//TODO Energy system
 
 class Game {
     factories = [];
