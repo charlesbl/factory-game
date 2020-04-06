@@ -16,8 +16,12 @@ class Inventory {
 
     getSave() {
         return {
-            itemStacks: this.itemStacks.map((itemStack) => itemStack.getSave())
+            itemStacks: this.getItemStackList().map((itemStack) => itemStack.getSave())
         }
+    }
+
+    getItemStackList() {
+        return Object.entries(this.itemStacks).map(([id, itemStack]) => itemStack);
     }
 
     remove(itemStack) {
