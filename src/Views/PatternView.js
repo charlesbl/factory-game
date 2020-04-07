@@ -4,8 +4,9 @@ class PatternView extends React.Component {
     render() {
         return (
             <div>
-                {this.props.pattern.name}
-                {this.props.pattern.totalCost.itemStacks["ironPlate"].quantity}
+                <div>{this.props.pattern.name}</div>
+                <div>{this.props.pattern.totalCost.itemStacks["ironPlate"].quantity}</div>
+                <div>{this.props.pattern.id}</div>
             </div>
         );
     }

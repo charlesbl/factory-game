@@ -13,8 +13,7 @@ class Factory extends Id {
         } else {
             this.machines = save.machines.map((machineSave) => new Machine(undefined, undefined, this, machineSave));
             this.inventory = new Inventory(save.inventory);
-            if (save.patterns !== undefined)
-                this.patterns = save.patterns.map((patternSave) => new Pattern(patternSave));
+            this.patterns = save.patterns.map((patternSave) => new Pattern(this, patternSave));
         }
     }
 
@@ -56,6 +55,14 @@ class Factory extends Id {
 
     addPattern(pattern) {
         this.patterns.push(pattern);
+    }
+
+    getPatternById(id) {
+        var req = this.patterns.filter((pattern) => pattern.id === id);
+        if (req.length !== 1) {
+            throw new Error("Pattern id \"" + id + "\" found " + req.length + " times");
+        }
+        return req[0];
     }
 }
 export default Factory;

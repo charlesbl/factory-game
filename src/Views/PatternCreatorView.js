@@ -6,7 +6,7 @@ class PatternCreatorView extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            pattern: new Pattern()
+            pattern: new Pattern(this.props.factory)
         }
     }
 
@@ -19,6 +19,20 @@ class PatternCreatorView extends React.Component {
 
     removeMachine(craftId) {
         this.state.pattern.removeMachine(craftId);
+        this.setState({
+            pattern: this.state.pattern
+        });
+    }
+
+    addPattern(patternId) {
+        this.state.pattern.addPattern(patternId);
+        this.setState({
+            pattern: this.state.pattern
+        });
+    }
+
+    removePattern(patternId) {
+        this.state.pattern.removePattern(patternId);
         this.setState({
             pattern: this.state.pattern
         });
@@ -43,6 +57,17 @@ class PatternCreatorView extends React.Component {
         );
     }
 
+    renderPattern(pattern) {
+        return (
+            <div key={pattern.id}>
+                <button className="btn btn-primary" onClick={() => this.removePattern(pattern.id)}>-</button>
+                <span>{pattern.name}</span>
+                <button className="btn btn-primary" onClick={() => this.addPattern(pattern.id)}>+</button>
+                <span>{this.state.pattern.patterns[pattern.id]}</span>
+            </div>
+        );
+    }
+
     renderCost(itemStack) {
         return (
             <div key={itemStack.id}>
@@ -54,7 +79,7 @@ class PatternCreatorView extends React.Component {
     create() {
         this.props.factory.addPattern(this.state.pattern);
         this.setState({
-            pattern: new Pattern()
+            pattern: new Pattern(this.props.factory)
         })
     }
 
@@ -62,6 +87,7 @@ class PatternCreatorView extends React.Component {
         return (
             <div>
                 {Game.machineCrafts.map((machineCraft) => this.renderMachinePattern(machineCraft))}
+                {this.props.factory.patterns.map((pattern) => this.renderPattern(pattern))}
                 {this.state.pattern.totalCost.getItemStackList().filter((itemStack) => itemStack.quantity > 0).map((itemStack) => this.renderCost(itemStack))}
                 <input value={this.state.pattern.name} onChange={(e) => this.changeName(e.currentTarget.value)} />
                 <button className="btn btn-primary" onClick={() => this.create()}>Create pattern</button>

@@ -4,7 +4,7 @@ import FactoryView from './FactoryView';
 class GameView extends React.Component {
     render() {
         return (
-            <FactoryView factory={this.props.game.factories[0]} />
+            <FactoryView factory={this.props.game.factory} />
         );
     }
 }

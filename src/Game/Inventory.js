@@ -39,5 +39,13 @@ class Inventory {
     count(item) {
         return this.itemStacks[item.id].quantity;
     }
+
+    addInventory(inventory) {
+        inventory.getItemStackList().forEach((itemStack) => this.add(itemStack));
+    }
+
+    removeInventory(inventory) {
+        inventory.getItemStackList().forEach((itemStack) => this.remove(itemStack));
+    }
 }
 export default Inventory;

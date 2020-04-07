@@ -15,7 +15,7 @@ const MAX_TICK_TIME = 500;
 //TODO Energy system
 
 class Game {
-    factories = [];
+    factory
     lastTime;
     static items;
     static crafts;
@@ -24,18 +24,17 @@ class Game {
     constructor(save) {
         Game.initResources();
         if (save === undefined) {
-            var factory = new Factory();
-            Game.machineCrafts.forEach((machineCraft) => factory.buildManualMachine(machineCraft));
-            this.factories.push(factory);
+            this.factory = new Factory();
+            Game.machineCrafts.forEach((machineCraft) => this.factory.buildManualMachine(machineCraft));
         } else {
-            this.factories = save.factories.map((factorySave) => new Factory(factorySave));
+            this.factory = new Factory(save.factory);
         }
         this.lastTime = Date.now();
     }
 
     getSave() {
         return {
-            factories: this.factories.map((factory) => factory.getSave())
+            factory: this.factory.getSave()
         };
     }
 
@@ -71,15 +70,9 @@ class Game {
 
         while (delta > 0) {
             var capedDelta = delta < MAX_TICK_TIME ? delta : MAX_TICK_TIME;
-            this.updateFactories(capedDelta);
+            this.factory.update(capedDelta);
             delta -= MAX_TICK_TIME;
         }
-    }
-
-    updateFactories(delta) {
-        this.factories.forEach(factory => {
-            factory.update(delta);
-        });
     }
 
     static getCraftById(id) {
