@@ -7,7 +7,7 @@ class Craft {
         this.duration = duration;
     }
 
-    canCraft (factory) {
+    canCraft(factory) {
         return this.input.every(itemStack => {
             return factory.inventory.contains(itemStack);
         });
@@ -20,7 +20,7 @@ class Craft {
     }
 
     produce(factory) {
-        if(this.output instanceof Array) {
+        if (this.output instanceof Array) {
             this.output.forEach(itemStack => {
                 factory.inventory.add(itemStack);
             });
@@ -29,13 +29,13 @@ class Craft {
         }
     }
 
-    craft (factory) {
+    craft(factory) {
         this.consume(factory);
         this.produce(factory);
     }
 
     tryCraft(factory) {
-        if(this.canCraft(factory)) {
+        if (this.canCraft(factory)) {
             this.craft(factory);
             return true;
         } else {
