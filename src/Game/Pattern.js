@@ -3,13 +3,13 @@ import Inventory from "./Inventory";
 import Id from "./Id";
 
 class Pattern extends Id {
-    constructor(factory, save) {
+    constructor(game, save) {
         super();
-        this.factory = factory;
+        this.game = game;
         this.machines = [];
         this.patterns = [];
         Game.machineCrafts.forEach((machineCraft) => this.machines[machineCraft.id] = 0);
-        this.factory.patterns.forEach((pattern) => this.patterns[pattern.id] = 0);
+        this.game.patterns.forEach((pattern) => this.patterns[pattern.id] = 0);
         if (save !== undefined) {
             this.id = save.id;
             this.name = save.name;
@@ -45,13 +45,13 @@ class Pattern extends Id {
 
     addPattern(patternId) {
         this.patterns[patternId]++;
-        this.totalCost.addInventory(this.factory.getPatternById(patternId).totalCost);
+        this.totalCost.addInventory(this.game.getPatternById(patternId).totalCost);
     }
 
     removePattern(patternId) {
         if (this.patterns[patternId] > 0) {
             this.patterns[patternId]--;
-            this.totalCost.removeInventory(this.factory.getPatternById(patternId).totalCost);
+            this.totalCost.removeInventory(this.game.getPatternById(patternId).totalCost);
         }
     }
 
@@ -66,7 +66,7 @@ class Pattern extends Id {
             }
         });
         Object.entries(this.patterns).forEach(([id, count]) => {
-            var pattern = this.factory.getPatternById(id);
+            var pattern = this.game.getPatternById(id);
             pattern.updateTotalCost();
             this.totalCost.addInventory(pattern.totalCost, count);
         });

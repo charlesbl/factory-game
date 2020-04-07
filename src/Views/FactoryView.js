@@ -10,7 +10,7 @@ class FactoryView extends React.Component {
     renderMachine(craft) {
         return (
             <div key={craft.id} className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2 machine-container">
-                <MachineTypeView craft={craft} factory={this.props.factory} />
+                <MachineTypeView craft={craft} factory={this.props.game.factory} />
             </div>
         );
     }
@@ -23,11 +23,11 @@ class FactoryView extends React.Component {
 
     render() {
         var machines = Game.machineCrafts.map((craft) => this.renderMachine(craft));
-        var patterns = this.props.factory.patterns.map((pattern) => this.renderPattern(pattern));
+        var patterns = this.props.game.patterns.map((pattern) => this.renderPattern(pattern));
         return (
             <div>
-                <PatternCreatorView factory={this.props.factory} />
-                <InventoryView inventory={this.props.factory.inventory} />
+                <PatternCreatorView game={this.props.game} />
+                <InventoryView inventory={this.props.game.factory.inventory} />
                 <div className="row">
                     {machines}
                     {patterns}

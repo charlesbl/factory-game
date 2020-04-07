@@ -5,6 +5,7 @@ import Craft from './Craft'
 import rawItems from './Resources/Items.json'
 import rawCrafts from './Resources/Crafts.json'
 import rawMachineCrafts from './Resources/MachineCrafts.json'
+import Pattern from './Pattern';
 
 const MAX_TICK_TIME = 500;
 
@@ -15,28 +16,57 @@ const MAX_TICK_TIME = 500;
 //TODO Energy system
 
 class Game {
-    factory
+    factory;
     lastTime;
+    patterns;
     static items;
     static crafts;
     static machineCrafts;
 
     constructor(save) {
         Game.initResources();
+        this.patterns = [];
         if (save === undefined) {
             this.factory = new Factory();
             Game.machineCrafts.forEach((machineCraft) => this.factory.buildManualMachine(machineCraft));
         } else {
             this.factory = new Factory(save.factory);
+            this.patterns = save.patterns.map((patternSave) => new Pattern(this, patternSave));
         }
         this.lastTime = Date.now();
     }
 
     getSave() {
         return {
-            factory: this.factory.getSave()
+            factory: this.factory.getSave(),
+            patterns: this.patterns.map((pattern) => pattern.getSave())
         };
     }
+
+    update() {
+        var newTime = Date.now();
+        var delta = newTime - this.lastTime;
+        this.lastTime = newTime;
+
+        while (delta > 0) {
+            var capedDelta = delta < MAX_TICK_TIME ? delta : MAX_TICK_TIME;
+            this.factory.update(capedDelta);
+            delta -= MAX_TICK_TIME;
+        }
+    }
+
+    addPattern(pattern) {
+        this.patterns.push(pattern);
+    }
+
+    getPatternById(id) {
+        var req = this.patterns.filter((pattern) => pattern.id === id);
+        if (req.length !== 1) {
+            throw new Error("Pattern id \"" + id + "\" found " + req.length + " times");
+        }
+        return req[0];
+    }
+
 
     static initResources() {
         if (Game.items === undefined) {
@@ -61,18 +91,6 @@ class Game {
             }
             return new Craft(rawCraft.id, rawCraft.name, input, output, rawCraft.duration);
         });
-    }
-
-    update() {
-        var newTime = Date.now();
-        var delta = newTime - this.lastTime;
-        this.lastTime = newTime;
-
-        while (delta > 0) {
-            var capedDelta = delta < MAX_TICK_TIME ? delta : MAX_TICK_TIME;
-            this.factory.update(capedDelta);
-            delta -= MAX_TICK_TIME;
-        }
     }
 
     static getCraftById(id) {
