@@ -5,24 +5,15 @@ const MANUAL_CRAFT_MIN = 500;
 const MANUAL_CRAFT_MAX = 800;
 
 class Machine extends Id {
-    constructor(name, craft, factory, save) {
+    constructor(name, craft, factory) {
         super();
+        this.name = name;
+        this.craft = craft;
         this.factory = factory;
+        this.pause = false;
+        this.currentCraftDuration = 0;
+        this.isCrafting = false;
         this.manual = false;
-        if (save === undefined) {
-            this.name = name;
-            this.pause = false;
-            this.craft = craft;
-            this.currentCraftDuration = 0;
-            this.isCrafting = false;
-        } else {
-            this.name = save.name;
-            this.pause = save.pause;
-            this.craft = Game.getCraftById(save.craftId);
-            this.currentCraftDuration = save.currentCraftDuration;
-            this.isCrafting = save.isCrafting;
-            this.manual = save.manual;
-        }
     }
 
     getSave() {
@@ -34,6 +25,15 @@ class Machine extends Id {
             craftId: this.craft.id,
             manual: this.manual
         };
+    }
+
+    static fromSave(factory, save) {
+        var machine = new Machine(save.name, Game.getCraftById(save.craftId), factory);
+        machine.pause = save.pause;
+        machine.currentCraftDuration = save.currentCraftDuration;
+        machine.isCrafting = save.isCrafting;
+        machine.manual = save.manual;
+        return machine;
     }
 
     startCraft() {

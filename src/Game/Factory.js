@@ -4,18 +4,10 @@ import Id from './Id';
 import Pattern from './Pattern';
 
 class Factory extends Id {
-    constructor(save) {
+    constructor() {
         super();
         this.machines = [];
-        if (save === undefined) {
-            this.inventory = new Inventory();
-        } else if (typeof save === Pattern) {
-
-        }
-        else {
-            this.machines = save.machines.map((machineSave) => new Machine(undefined, undefined, this, machineSave));
-            this.inventory = new Inventory(save.inventory);
-        }
+        this.inventory = new Inventory();
     }
 
     getSave() {
@@ -23,6 +15,13 @@ class Factory extends Id {
             inventory: this.inventory.getSave(),
             machines: this.machines.map((machine) => machine.getSave())
         };
+    }
+
+    static fromSave(save) {
+        var factory = new Factory();
+        factory.machines = save.machines.map((machineSave) => Machine.fromSave(factory, machineSave));
+        factory.inventory = Inventory.fromSave(save.inventory);
+        return factory;
     }
 
     buildMachine(machineCraft) {

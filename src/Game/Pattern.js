@@ -3,23 +3,25 @@ import Inventory from "./Inventory";
 
 class Pattern {
     static latestId = 0;
-    constructor(game, save) {
+    constructor(game) {
         this.game = game;
         this.machines = [];
         this.patterns = [];
         Game.machineCrafts.forEach((machineCraft) => this.machines[machineCraft.id] = 0);
         this.game.patterns.forEach((pattern) => this.patterns[pattern.id] = 0);
-        if (save !== undefined) {
-            this.setId(save.id);
-            this.name = save.name;
-            save.machines.forEach(([id, count]) => this.machines[id] = count);
-            this.updateTotalCost();
-            save.patterns.forEach(([id, count]) => this.patterns[id] = count);
-        } else {
-            this.setId();
-            this.name = "Pattern name";
-            this.totalCost = new Inventory();
-        }
+        this.setId();
+        this.name = "Pattern name";
+        this.totalCost = new Inventory();
+    }
+
+    static fromSave(game, save) {
+        var pattern = new Pattern(game);
+        pattern.setId(save.id);
+        pattern.name = save.name;
+        save.machines.forEach(([id, count]) => pattern.machines[id] = count);
+        pattern.updateTotalCost();
+        save.patterns.forEach(([id, count]) => pattern.patterns[id] = count);
+        return pattern;
     }
 
     getSave() {

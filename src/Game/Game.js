@@ -14,6 +14,7 @@ const MAX_TICK_TIME = 500;
 //TODO Download and load save
 //TODO Keep mouse button down during manual craft
 //TODO Energy system
+//TODO config menu
 
 class Game {
     factory;
@@ -23,17 +24,20 @@ class Game {
     static crafts;
     static machineCrafts;
 
-    constructor(save) {
+    constructor(initManualMachine = true) {
         Game.initResources();
         this.patterns = [];
-        if (save === undefined) {
-            this.factory = new Factory();
+        this.factory = new Factory();
+        if (initManualMachine)
             Game.machineCrafts.forEach((machineCraft) => this.factory.buildManualMachine(machineCraft));
-        } else {
-            this.factory = new Factory(save.factory);
-            this.patterns = save.patterns.map((patternSave) => new Pattern(this, patternSave));
-        }
         this.lastTime = Date.now();
+    }
+
+    static fromSave(save) {
+        var game = new Game(false);
+        game.factory = Factory.fromSave(save.factory);
+        game.patterns = save.patterns.map((patternSave) => Pattern.fromSave(game, patternSave));
+        return game;
     }
 
     getSave() {

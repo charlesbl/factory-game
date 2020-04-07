@@ -2,22 +2,25 @@ import Game from './Game'
 import ItemStack from './ItemStack'
 
 class Inventory {
-    constructor(save) {
+    constructor() {
         this.itemStacks = [];
         Game.items.forEach((item) => {
             this.itemStacks[item.id] = new ItemStack(item, 0);
         });
-        if (save !== undefined) {
-            save.itemStacks.forEach((itemStackSave) => {
-                this.add(new ItemStack(undefined, undefined, itemStackSave));
-            });
-        }
     }
 
     getSave() {
         return {
             itemStacks: this.getItemStackList().map((itemStack) => itemStack.getSave())
         }
+    }
+
+    static fromSave(save) {
+        var inventory = new Inventory();
+        save.itemStacks.forEach((itemStackSave) => {
+            inventory.add(ItemStack.fromSave(itemStackSave));
+        });
+        return inventory;
     }
 
     getItemStackList() {

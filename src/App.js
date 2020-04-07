@@ -61,7 +61,7 @@ class App extends React.Component {
         var save = JSON.parse(localStorage.getItem(STORAGE_NAME));
         if (save === null)
             return null
-        return new Game(save);
+        return Game.fromSave(save);
     }
 
     clearGame() {
