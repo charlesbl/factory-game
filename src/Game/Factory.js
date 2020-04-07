@@ -1,6 +1,7 @@
 import Machine from './Machine'
 import Inventory from './Inventory'
 import Id from './Id';
+import Pattern from './Pattern';
 
 class Factory extends Id {
     constructor(save) {
@@ -8,7 +9,10 @@ class Factory extends Id {
         this.machines = [];
         if (save === undefined) {
             this.inventory = new Inventory();
-        } else {
+        } else if (typeof save === Pattern) {
+
+        }
+        else {
             this.machines = save.machines.map((machineSave) => new Machine(undefined, undefined, this, machineSave));
             this.inventory = new Inventory(save.inventory);
         }

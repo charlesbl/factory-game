@@ -4,9 +4,9 @@ class Id {
     }
 
     static incrementId() {
-        if (typeof this.latestId === 'undefined') 
+        if (this.latestId === undefined)
             this.latestId = 0;
-        else 
+        else
             this.latestId++;
         return this.latestId;
     }

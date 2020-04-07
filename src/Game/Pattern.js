@@ -1,22 +1,22 @@
 import Game from "./Game";
 import Inventory from "./Inventory";
-import Id from "./Id";
 
-class Pattern extends Id {
+class Pattern {
+    static latestId = 0;
     constructor(game, save) {
-        super();
         this.game = game;
         this.machines = [];
         this.patterns = [];
         Game.machineCrafts.forEach((machineCraft) => this.machines[machineCraft.id] = 0);
         this.game.patterns.forEach((pattern) => this.patterns[pattern.id] = 0);
         if (save !== undefined) {
-            this.id = save.id;
+            this.setId(save.id);
             this.name = save.name;
             save.machines.forEach(([id, count]) => this.machines[id] = count);
             this.updateTotalCost();
             save.patterns.forEach(([id, count]) => this.patterns[id] = count);
         } else {
+            this.setId();
             this.name = "Pattern name";
             this.totalCost = new Inventory();
         }
@@ -29,6 +29,16 @@ class Pattern extends Id {
             machines: Object.entries(this.machines).filter(([id, quantity]) => quantity > 0),
             patterns: Object.entries(this.patterns).filter(([id, quantity]) => quantity > 0),
         };
+    }
+
+    setId(id) {
+        if (id !== undefined) {
+            Pattern.latestId = id;
+            this.id = id;
+        } else {
+            Pattern.latestId++;
+            this.id = Pattern.latestId;
+        }
     }
 
     addMachine(craftId) {
