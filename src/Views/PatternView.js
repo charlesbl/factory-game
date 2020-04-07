@@ -2,7 +2,7 @@ import React from 'react';
 
 class PatternView extends React.Component {
     build() {
-
+        this.props.factory.buildSubFactory(this.props.pattern);
     }
 
     render() {

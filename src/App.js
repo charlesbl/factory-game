@@ -66,9 +66,7 @@ class App extends React.Component {
 
     clearGame() {
         localStorage.clear(STORAGE_NAME);
-        this.setState({
-            game: new Game()
-        });
+        window.location.reload();
     }
 
     render() {

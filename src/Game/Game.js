@@ -27,16 +27,16 @@ class Game {
     constructor(initManualMachine = true) {
         Game.initResources();
         this.patterns = [];
-        this.factory = new Factory();
+        this.factory = new Factory(this);
         if (initManualMachine)
-            Game.machineCrafts.forEach((machineCraft) => this.factory.buildManualMachine(machineCraft));
+            Game.machineCrafts.forEach((machineCraft) => this.factory.buildMachine(machineCraft, true));
         this.lastTime = Date.now();
     }
 
     static fromSave(save) {
         var game = new Game(false);
-        game.factory = Factory.fromSave(save.factory);
         game.patterns = save.patterns.map((patternSave) => Pattern.fromSave(game, patternSave));
+        game.factory = Factory.fromSave(game, save.factory);
         return game;
     }
 
@@ -64,6 +64,7 @@ class Game {
     }
 
     getPatternById(id) {
+        id = parseInt(id);
         var req = this.patterns.filter((pattern) => pattern.id === id);
         if (req.length !== 1) {
             throw new Error("Pattern id \"" + id + "\" found " + req.length + " times");

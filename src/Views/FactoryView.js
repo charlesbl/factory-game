@@ -17,7 +17,7 @@ class FactoryView extends React.Component {
 
     renderPattern(pattern) {
         return (
-            <PatternView key={pattern.id} pattern={pattern} />
+            <PatternView key={pattern.id} pattern={pattern} factory={this.props.game.factory} />
         );
     }
 
