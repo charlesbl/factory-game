@@ -1,44 +1,51 @@
 import React from 'react';
 import Game from '../Game/Game';
 import Pattern from '../Game/Pattern';
+import IBaseProps from './IBaseProps';
+import Craft from '../Game/Craft';
+import ItemStack from '../Game/ItemStack';
 
-class PatternCreatorView extends React.Component {
-    constructor(props) {
+interface IPatternCreatorState {
+    pattern: Pattern;
+}
+
+class PatternCreatorView extends React.Component<IBaseProps, IPatternCreatorState> {
+    constructor(props: IBaseProps) {
         super(props);
         this.state = {
             pattern: new Pattern(this.props.game)
         }
     }
 
-    addMachine(craftId) {
+    addMachine(craftId: number) {
         this.state.pattern.addMachine(craftId);
         this.setState({
             pattern: this.state.pattern
         });
     }
 
-    removeMachine(craftId) {
+    removeMachine(craftId: number) {
         this.state.pattern.removeMachine(craftId);
         this.setState({
             pattern: this.state.pattern
         });
     }
 
-    addPattern(patternId) {
+    addPattern(patternId: number) {
         this.state.pattern.addPattern(patternId);
         this.setState({
             pattern: this.state.pattern
         });
     }
 
-    removePattern(patternId) {
+    removePattern(patternId: number) {
         this.state.pattern.removePattern(patternId);
         this.setState({
             pattern: this.state.pattern
         });
     }
 
-    changeName(newName) {
+    changeName(newName: string) {
         var pattern = this.state.pattern;
         pattern.name = newName;
         this.setState({
@@ -53,29 +60,29 @@ class PatternCreatorView extends React.Component {
         })
     }
 
-    renderMachinePattern(craft) {
+    renderMachinePattern(craft: Craft) {
         return (
             <div key={craft.id}>
                 <button className="btn btn-primary" onClick={() => this.removeMachine(craft.id)}>-</button>
                 <span>{craft.name}</span>
                 <button className="btn btn-primary" onClick={() => this.addMachine(craft.id)}>+</button>
-                <span>{this.state.pattern.machines[craft.id]}</span>
+                <span>{this.state.pattern.machinesCount[craft.id]}</span>
             </div>
         );
     }
 
-    renderPattern(pattern) {
+    renderPattern(pattern: Pattern) {
         return (
             <div key={pattern.id}>
                 <button className="btn btn-primary" onClick={() => this.removePattern(pattern.id)}>-</button>
                 <span>{pattern.name}</span>
                 <button className="btn btn-primary" onClick={() => this.addPattern(pattern.id)}>+</button>
-                <span>{this.state.pattern.patterns[pattern.id]}</span>        {pattern.id}
+                <span>{this.state.pattern.patternsCount[pattern.id]}</span>        {pattern.id}
             </div>
         );
     }
 
-    renderCost(itemStack) {
+    renderCost(itemStack: ItemStack) {
         return (
             <div key={itemStack.id}>
                 {itemStack.quantity} {itemStack.item.name}

@@ -1,11 +1,30 @@
 import Id from "./Id";
 import Game from "./Game";
+import Craft from "./Craft";
+import Factory from "./Factory";
 
 const MANUAL_CRAFT_MIN = 500;
 const MANUAL_CRAFT_MAX = 800;
 
-class Machine extends Id {
-    constructor(name, craft, factory) {
+export interface IMachineSave {
+    name: string;
+    pause: boolean;
+    currentCraftDuration: number;
+    isCrafting: boolean;
+    craftId: number;
+    manual: boolean;
+}
+
+export default class Machine extends Id {
+    manual: boolean;
+    name: string;
+    craft: Craft;
+    factory: Factory;
+    pause: boolean;
+    currentCraftDuration: number;
+    isCrafting: boolean;
+    
+    constructor(name: string, craft: Craft, factory: Factory) {
         super();
         this.name = name;
         this.craft = craft;
@@ -16,7 +35,7 @@ class Machine extends Id {
         this.manual = false;
     }
 
-    getSave() {
+    getSave(): IMachineSave {
         return {
             name: this.name,
             pause: this.pause,
@@ -27,7 +46,7 @@ class Machine extends Id {
         };
     }
 
-    static fromSave(factory, save) {
+    static fromSave(factory: Factory, save: IMachineSave) {
         var machine = new Machine(save.name, Game.getCraftById(save.craftId), factory);
         machine.pause = save.pause;
         machine.currentCraftDuration = save.currentCraftDuration;
@@ -52,21 +71,21 @@ class Machine extends Id {
         }
     }
 
-    isCraftFinished() {
+    isCraftFinished(): boolean {
         return this.currentCraftDuration >= this.craft.duration;
     }
 
-    update(delta) {
+    update(delta: number) {
         if (!this.manual && !this.pause) {
             this.forward(delta);
         }
     }
 
-    manualUpdate(delta) {
+    manualUpdate() {
         this.forward(Math.random() * (MANUAL_CRAFT_MAX - MANUAL_CRAFT_MIN) + MANUAL_CRAFT_MIN);
     }
 
-    forward(delta) {
+    forward(delta: number) {
         if (!this.isCrafting && this.craft.canCraft(this.factory)) {
             this.startCraft();
         }
@@ -84,7 +103,7 @@ class Machine extends Id {
         }
     }
 
-    getPercentage() {
+    getPercentage(): number {
         return 100 * this.currentCraftDuration / this.craft.duration;
     }
 
@@ -96,4 +115,3 @@ class Machine extends Id {
         this.pause = !this.pause;
     }
 }
-export default Machine;

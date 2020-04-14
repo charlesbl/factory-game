@@ -1,5 +1,13 @@
+import ItemStack from "./ItemStack";
+import Factory from "./Factory";
+
 class Craft {
-    constructor(id, name, input, output, duration) {
+    id: number;
+    name: string;
+    input: ItemStack[];
+    output: ItemStack[];
+    duration: number;
+    constructor(id: number, name: string, input: ItemStack[], output: ItemStack[], duration: number) {
         this.id = id;
         this.name = name;
         this.input = input;
@@ -7,34 +15,30 @@ class Craft {
         this.duration = duration;
     }
 
-    canCraft(factory) {
+    canCraft(factory: Factory) {
         return this.input.every(itemStack => {
             return factory.inventory.contains(itemStack);
         });
     }
 
-    consume(factory) {
+    consume(factory: Factory) {
         this.input.forEach(itemStack => {
             factory.inventory.remove(itemStack);
         });
     }
 
-    produce(factory) {
-        if (this.output instanceof Array) {
-            this.output.forEach(itemStack => {
-                factory.inventory.add(itemStack);
-            });
-        } else if (this.output instanceof Craft) {
-            factory.buildMachine(this);
-        }
+    produce(factory: Factory) {
+        this.output.forEach(itemStack => {
+            factory.inventory.add(itemStack);
+        });
     }
 
-    craft(factory) {
+    craft(factory: Factory) {
         this.consume(factory);
         this.produce(factory);
     }
 
-    tryCraft(factory) {
+    tryCraft(factory: Factory) {
         if (this.canCraft(factory)) {
             this.craft(factory);
             return true;

@@ -1,7 +1,12 @@
 import React from 'react';
 import '../css/Machine.css'
+import Machine from '../Game/Machine';
 
-class MachineView extends React.Component {
+interface IMachineProps {
+    machine: Machine
+}
+
+class MachineView extends React.Component<IMachineProps> {
     render() {
         var canCraft = this.props.machine.craft.canCraft(this.props.machine.factory) || this.props.machine.isCrafting;
         var craftBtn = this.props.machine.manual ? <button onClick={() => this.props.machine.manualUpdate()} className="btn btn-warning btn-side" disabled={!canCraft}><i className="fas fa-hammer fa-xs"></i></button> : "";

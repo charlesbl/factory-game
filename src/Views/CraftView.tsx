@@ -1,10 +1,18 @@
 import React from 'react';
 import '../css/CraftView.css'
+import ItemStack from '../Game/ItemStack';
+import Inventory from '../Game/Inventory';
+import Craft from '../Game/Craft';
 
-class CraftView extends React.Component {
+interface CraftProps {
+    inventory: Inventory;
+    craft: Craft;
+}
 
-    renderInput(itemStack) {
-        var count = this.props.inventory.count(itemStack.item);
+export default class CraftView extends React.Component<CraftProps> {
+
+    renderInput(itemStack: ItemStack) {
+        var count = this.props.inventory.getQuantity(itemStack.item);
         var capedCount = count > itemStack.quantity ? itemStack.quantity : count;
         var content = itemStack.item.name;
         if (!itemStack.item.infinite) {
@@ -17,7 +25,7 @@ class CraftView extends React.Component {
         );
     }
 
-    renderOutput(itemStack) {
+    renderOutput(itemStack: ItemStack) {
         return (
             <div key={itemStack.id} className="output">
                 {itemStack.quantity} {itemStack.item.name}
@@ -38,4 +46,3 @@ class CraftView extends React.Component {
         );
     }
 }
-export default CraftView;

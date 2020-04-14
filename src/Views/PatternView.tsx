@@ -1,6 +1,13 @@
 import React from 'react';
+import Factory from '../Game/Factory';
+import Pattern from '../Game/Pattern';
 
-class PatternView extends React.Component {
+interface PatternProps {
+    factory: Factory,
+    pattern: Pattern
+}
+
+class PatternView extends React.Component<PatternProps> {
     build() {
         this.props.factory.buildSubFactory(this.props.pattern);
     }

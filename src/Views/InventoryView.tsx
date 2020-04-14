@@ -1,8 +1,14 @@
 import React from 'react';
 import '../css/Inventory.css'
+import ItemStack from '../Game/ItemStack';
+import Inventory from '../Game/Inventory';
 
-class InventoryView extends React.Component {
-    renderItemStack(itemStack) {
+interface IInventoryProps {
+    inventory: Inventory
+}
+
+export default class InventoryView extends React.Component<IInventoryProps> {
+    renderItemStack(itemStack: ItemStack) {
         return (
             <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-1" key={itemStack.id}>
                 <div className="row no-gutters item">
@@ -25,4 +31,3 @@ class InventoryView extends React.Component {
         );
     }
 }
-export default InventoryView;

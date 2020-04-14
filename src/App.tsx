@@ -3,21 +3,23 @@ import './css/App.css';
 import Game from './Game/Game'
 import GameView from './Views/GameView'
 
-const REFRESH_RATE = 50;
-const TICK_BETWEEN_SAVE = 20;
-const STORAGE_NAME = 'game';
+const REFRESH_RATE: number = 50;
+const TICK_BETWEEN_SAVE: number = 20;
+const STORAGE_NAME: string = 'game';
 
-class App extends React.Component {
-    constructor() {
-        super();
+interface IAppState {
+    game: Game;
+}
 
-        var game = this.loadGame();
-        if (game === null) {
-            game = new Game();
-        }
+export default class App extends React.Component<any, IAppState> {
+    private stop: boolean;
+
+    constructor(props: any) {
+        super(props);
+        this.stop = false;
 
         this.state = {
-            game: game
+            game: this.loadGame()
         };
     }
 
@@ -57,15 +59,18 @@ class App extends React.Component {
         localStorage.setItem(STORAGE_NAME, JSON.stringify(save));
     }
 
-    loadGame() {
-        var save = JSON.parse(localStorage.getItem(STORAGE_NAME));
-        if (save === null)
-            return null
-        return Game.fromSave(save);
+    loadGame(): Game {
+        var stringSave = localStorage.getItem(STORAGE_NAME);
+        if (stringSave !== null && stringSave !== "") {
+            var save = JSON.parse(stringSave);
+            return Game.fromSave(save);
+        } else {
+            return new Game();
+        }
     }
 
     clearGame() {
-        localStorage.clear(STORAGE_NAME);
+        localStorage.setItem(STORAGE_NAME, "");
         window.location.reload();
     }
 
@@ -79,7 +84,6 @@ class App extends React.Component {
     }
 }
 
-function sleep(ms) {
+function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
-export default App;
