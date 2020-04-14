@@ -11,7 +11,7 @@ export interface IMachineSave {
     pause: boolean;
     currentCraftDuration: number;
     isCrafting: boolean;
-    craftId: number;
+    craftId: string;
     manual: boolean;
 }
 
@@ -23,7 +23,7 @@ export default class Machine extends Id {
     pause: boolean;
     currentCraftDuration: number;
     isCrafting: boolean;
-    
+
     constructor(name: string, craft: Craft, factory: Factory) {
         super();
         this.name = name;

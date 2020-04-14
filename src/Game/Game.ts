@@ -78,11 +78,9 @@ class Game {
     }
 
     static initResources() {
-        console.log(rawItems);
         if (Game.items === undefined) {
             Game.items = rawItems.map((rawItem) => new Item(rawItem.id, rawItem.name, rawItem.infinite));
         }
-        console.log(Game.items);
         if (Game.crafts === undefined) {
             Game.crafts = rawCrafts.map((rawCraft: any) => {
                 var input = rawCraft.input.map((rawItemStack: any) => new ItemStack(this.getItemById(rawItemStack.itemId), rawItemStack.quantity));
@@ -99,7 +97,7 @@ class Game {
         }
     }
 
-    static getCraftById(id: number): Craft {
+    static getCraftById(id: string): Craft {
         var req = Game.crafts.filter((craft) => craft.id === id);
         if (req.length !== 1) {
             throw new Error("Craft id \"" + id + "\" found " + req.length + " times");
@@ -107,7 +105,7 @@ class Game {
         return req[0];
     }
 
-    static getMachineCraftById(id: number): MachineCraft {
+    static getMachineCraftById(id: string): MachineCraft {
         var req = Game.machineCrafts.filter((craft) => craft.id === id);
         if (req.length !== 1) {
             throw new Error("MachineCraft id \"" + id + "\" found " + req.length + " times");

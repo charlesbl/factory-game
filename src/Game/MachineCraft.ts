@@ -4,7 +4,7 @@ import Factory from "./Factory";
 
 export default class MachineCraft extends Craft {
     outputCraft: Craft;
-    constructor(id: number, name: string, input: ItemStack[], outputCraft: Craft, duration: number) {
+    constructor(id: string, name: string, input: ItemStack[], outputCraft: Craft, duration: number) {
         super(id, name, input, [], duration);
         this.outputCraft = outputCraft;
     }

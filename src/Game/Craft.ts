@@ -2,12 +2,12 @@ import ItemStack from "./ItemStack";
 import Factory from "./Factory";
 
 class Craft {
-    id: number;
+    id: string;
     name: string;
     input: ItemStack[];
     output: ItemStack[];
     duration: number;
-    constructor(id: number, name: string, input: ItemStack[], output: ItemStack[], duration: number) {
+    constructor(id: string, name: string, input: ItemStack[], output: ItemStack[], duration: number) {
         this.id = id;
         this.name = name;
         this.input = input;

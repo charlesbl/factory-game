@@ -6,7 +6,7 @@ import ItemStack from "./ItemStack";
 export interface IPatternSave {
     id: number;
     name: string;
-    machinesCount: {[id: number]: number};
+    machinesCount: { [id: string]: number };
     patternsCount: number[];
 }
 
@@ -14,14 +14,14 @@ export default class Pattern {
     static latestId = 0;
     id: number;
     game: Game;
-    machinesCount: {[id: number]: number};
+    machinesCount: { [id: string]: number };
     patternsCount: number[];
     name: string;
     totalCost: Inventory;
 
     constructor(game: Game) {
         this.game = game;
-        this.machinesCount = [];
+        this.machinesCount = {};
         this.patternsCount = [];
         Game.machineCrafts.forEach((machineCraft: Craft) => this.machinesCount[machineCraft.id] = 0);
         this.game.patterns.forEach((pattern: Pattern) => this.patternsCount[pattern.id] = 0);
@@ -67,12 +67,12 @@ export default class Pattern {
         }
     }
 
-    addMachine(craftId: number) {
+    addMachine(craftId: string) {
         this.machinesCount[craftId]++;
         Game.getMachineCraftById(craftId).input.forEach((itemStack: ItemStack) => this.totalCost.add(itemStack));
     }
 
-    removeMachine(craftId: number) {
+    removeMachine(craftId: string) {
         if (this.machinesCount[craftId] > 0) {
             this.machinesCount[craftId]--;
             Game.getMachineCraftById(craftId).input.forEach((itemStack: ItemStack) => this.totalCost.remove(itemStack));

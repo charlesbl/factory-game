@@ -26,10 +26,10 @@ export default class Factory extends Id {
         this.factories = [];
         this.inventory = new Inventory();
 
-        if(pattern !== undefined) {
+        if (pattern !== undefined) {
             this.pattern = pattern;
             Object.entries(pattern.machinesCount).forEach(([id, count]) => {
-                var machineCraft = Game.getMachineCraftById(Number.parseInt(id));
+                var machineCraft = Game.getMachineCraftById(id);
                 for (let i = 0; i < count; i++) {
                     machineCraft.consume(game.factory);
                     machineCraft.produce(game.factory); //TODO Changer la construction de la machine dans sa propre factory => machineCraft.produce(factory);
@@ -37,7 +37,7 @@ export default class Factory extends Id {
             });
             Object.entries(pattern.patternsCount).forEach(([id, count]) => {
                 var subPattern = game.getPatternById(Number.parseInt(id));
-                for (let i:number = 0; i < count; i++) {
+                for (let i: number = 0; i < count; i++) {
                     this.buildSubFactory(subPattern);
                 }
             });
@@ -73,7 +73,7 @@ export default class Factory extends Id {
         return machine;
     }
 
-    destroyMachine(machine : Machine) {
+    destroyMachine(machine: Machine) {
         this.machines = this.machines.filter((elem) => {
             return elem !== machine;
         });

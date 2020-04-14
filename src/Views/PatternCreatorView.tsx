@@ -17,14 +17,14 @@ class PatternCreatorView extends React.Component<IBaseProps, IPatternCreatorStat
         }
     }
 
-    addMachine(craftId: number) {
+    addMachine(craftId: string) {
         this.state.pattern.addMachine(craftId);
         this.setState({
             pattern: this.state.pattern
         });
     }
 
-    removeMachine(craftId: number) {
+    removeMachine(craftId: string) {
         this.state.pattern.removeMachine(craftId);
         this.setState({
             pattern: this.state.pattern
