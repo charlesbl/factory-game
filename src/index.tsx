@@ -9,4 +9,4 @@ ReactDOM.render(
   </React.StrictMode>,
   document.getElementById('root')
 );
-serviceWorker.unregister();
+serviceWorker.register();

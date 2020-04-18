@@ -17,7 +17,6 @@ export default class App extends React.Component<any, IAppState> {
     constructor(props: any) {
         super(props);
         this.stop = false;
-
         this.state = {
             game: this.loadGame()
         };
