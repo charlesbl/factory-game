@@ -77,7 +77,7 @@ class PatternCreatorView extends React.Component<IBaseProps, IPatternCreatorStat
                 <button className="btn btn-primary" onClick={() => this.removePattern(pattern.id)}>-</button>
                 <span>{pattern.name}</span>
                 <button className="btn btn-primary" onClick={() => this.addPattern(pattern.id)}>+</button>
-                <span>{this.state.pattern.patternsCount[pattern.id]}</span>        {pattern.id}
+                <span>{this.state.pattern.patternsCount[pattern.id]}</span>
             </div>
         );
     }

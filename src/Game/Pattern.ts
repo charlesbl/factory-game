@@ -34,8 +34,7 @@ export default class Pattern {
         var pattern = new Pattern(game);
         pattern.id = Pattern.getId(save.id);
         pattern.name = save.name;
-        Object.entries(save.machinesCount).forEach(([aid, count]) => {
-            var id = Number.parseInt(aid);
+        Object.entries(save.machinesCount).forEach(([id, count]) => {
             if (pattern.machinesCount[id] !== undefined)
                 pattern.machinesCount[id] = count;
         });
