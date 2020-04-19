@@ -2,9 +2,9 @@ import Id from "./Id";
 import Game from "./Game";
 import Craft from "./Craft";
 import Factory from "./Factory";
+import { register } from "../serviceWorker";
 
-const MANUAL_CRAFT_MIN = 500;
-const MANUAL_CRAFT_MAX = 800;
+const MANUAL_CRAFT_FACTOR: number = 2;
 
 export interface IMachineSave {
     name: string;
@@ -24,15 +24,15 @@ export default class Machine extends Id {
     currentCraftDuration: number;
     isCrafting: boolean;
 
-    constructor(name: string, craft: Craft, factory: Factory) {
+    constructor(name: string, craft: Craft, factory: Factory, manual: boolean = false) {
         super();
         this.name = name;
         this.craft = craft;
         this.factory = factory;
-        this.pause = false;
         this.currentCraftDuration = 0;
         this.isCrafting = false;
-        this.manual = false;
+        this.manual = manual;
+        this.pause = manual;
     }
 
     getSave(): IMachineSave {
@@ -76,13 +76,11 @@ export default class Machine extends Id {
     }
 
     update(delta: number) {
-        if (!this.manual && !this.pause) {
+        if (this.manual)
+            delta *= MANUAL_CRAFT_FACTOR;
+        if (!this.pause) {
             this.forward(delta);
         }
-    }
-
-    manualUpdate() {
-        this.forward(Math.random() * (MANUAL_CRAFT_MAX - MANUAL_CRAFT_MIN) + MANUAL_CRAFT_MIN);
     }
 
     forward(delta: number) {
@@ -113,5 +111,9 @@ export default class Machine extends Id {
 
     togglePause() {
         this.pause = !this.pause;
+    }
+
+    canCraft(): boolean {
+        return this.craft.canCraft(this.factory);
     }
 }

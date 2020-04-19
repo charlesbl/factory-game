@@ -31,8 +31,9 @@ export default class Factory extends Id {
             Object.entries(pattern.machinesCount).forEach(([id, count]) => {
                 var machineCraft = Game.getMachineCraftById(id);
                 for (let i = 0; i < count; i++) {
+                    //Consume and produce in it own factory "machineCraft.produce(this)"
                     machineCraft.consume(game.factory);
-                    machineCraft.produce(game.factory); //TODO Changer la construction de la machine dans sa propre factory => machineCraft.produce(factory);
+                    machineCraft.produce(game.factory);
                 }
             });
             Object.entries(pattern.patternsCount).forEach(([id, count]) => {
@@ -67,8 +68,7 @@ export default class Factory extends Id {
     }
 
     buildMachine(machineCraft: MachineCraft, manual = false): Machine {
-        var machine = new Machine(machineCraft.name, machineCraft.outputCraft, this);
-        machine.manual = manual;
+        var machine = new Machine(machineCraft.name, machineCraft.outputCraft, this, manual);
         this.machines.push(machine);
         return machine;
     }

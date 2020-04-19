@@ -16,6 +16,9 @@ const MAX_TICK_TIME = 500;
 //TODO Keep mouse button down during manual craft
 //TODO Energy system
 //TODO config menu
+//TODO Max machine par types
+//TODO Upgrades
+//TODO Input/Output sub-factories
 
 export interface IGameSave {
     factory: IFactorySave;
