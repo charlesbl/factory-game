@@ -20,7 +20,7 @@ export default class Machine extends Id {
     name: string;
     craft: Craft;
     factory: Factory;
-    pause: boolean;
+    private pause: boolean;
     currentCraftDuration: number;
     isCrafting: boolean;
 
@@ -101,6 +101,10 @@ export default class Machine extends Id {
         }
     }
 
+    canCraft(): boolean {
+        return this.craft.canCraft(this.factory);
+    }
+
     getPercentage(): number {
         return 100 * this.currentCraftDuration / this.craft.duration;
     }
@@ -113,7 +117,15 @@ export default class Machine extends Id {
         this.pause = !this.pause;
     }
 
-    canCraft(): boolean {
-        return this.craft.canCraft(this.factory);
+    stop() {
+        this.pause = true;
+    }
+
+    start() {
+        this.pause = false;
+    }
+
+    get isPaused() {
+        return this.pause;
     }
 }
