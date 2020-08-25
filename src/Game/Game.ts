@@ -13,12 +13,9 @@ const MAX_TICK_TIME = 500;
 //TODO Factory in Factory
 //TODO rework crafts
 //TODO Download and load save
-//TODO Keep mouse button down during manual craft
 //TODO Energy system
 //TODO config menu
-//TODO Max machine par types
-//TODO Upgrades
-//TODO Input/Output sub-factories
+//TODO Economic system
 
 export interface IGameSave {
     factory: IFactorySave;

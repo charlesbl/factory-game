@@ -2,7 +2,6 @@ import Id from "./Id";
 import Game from "./Game";
 import Craft from "./Craft";
 import Factory from "./Factory";
-import { register } from "../serviceWorker";
 
 const MANUAL_CRAFT_FACTOR: number = 2;
 
