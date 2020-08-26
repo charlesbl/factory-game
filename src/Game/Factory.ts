@@ -10,18 +10,20 @@ export interface IFactorySave {
     inventory: IInventorySave;
     machines: IMachineSave[];
     factories: IFactorySave[];
-    pattern?: IPatternSave
+    pattern?: IPatternSave;
 }
 
 export default class Factory extends Id {
     game: Game;
+    topFactory?: Factory;
     machines: Machine[];
     factories: Factory[];
     inventory: Inventory;
     pattern?: Pattern;
-    constructor(game: Game, pattern?: Pattern) {
+    constructor(game: Game, topFactory?: Factory, pattern?: Pattern) {
         super();
         this.game = game;
+        this.topFactory = topFactory;
         this.machines = [];
         this.factories = [];
         this.inventory = new Inventory();
@@ -54,17 +56,20 @@ export default class Factory extends Id {
         };
     }
 
-    static fromSave(game: Game, save: IFactorySave): Factory {
+    static fromSave(game: Game, save: IFactorySave, topFactory?: Factory): Factory {
         var factory = new Factory(game);
+        factory.topFactory = topFactory;
         factory.machines = save.machines.map((machineSave) => Machine.fromSave(factory, machineSave));
         factory.inventory = Inventory.fromSave(save.inventory);
+        factory.factories = save.factories.map((factorySave) => Factory.fromSave(game, factorySave, factory))
+        //TODO save patternID instead of full pattern already saved in game
         if (save.pattern !== undefined)
             factory.pattern = Pattern.fromSave(game, save.pattern);
         return factory;
     }
 
-    buildSubFactory(pattern: Pattern) {
-        this.factories.push(new Factory(this.game, pattern));
+    buildSubFactory(pattern?: Pattern) {
+        this.factories.push(new Factory(this.game, this, pattern));
     }
 
     buildMachine(machineCraft: MachineCraft, manual = false): Machine {

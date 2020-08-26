@@ -1,37 +1,48 @@
 import React from 'react';
 import InventoryView from './InventoryView'
-import MachineTypeView from './MachineTypeView';
 import '../css/Factory.css'
-import Game from '../Game/Game';
-import PatternView from './PatternView';
-import Pattern from '../Game/Pattern';
-import IBaseProps from './IBaseProps';
-import MachineCraft from '../Game/MachineCraft';
+import Factory from '../Game/Factory';
+import Machine from '../Game/Machine';
+import MachineView from './MachineView';
+import FactoryCardView from './FactoryCardView';
 
-export default class FactoryView extends React.Component<IBaseProps> {
-    renderMachine(craft: MachineCraft) {
+interface IFactoryProps {
+    factory: Factory;
+    onSelectedFactory: (factory: Factory) => void;
+    onGoBack: () => void;
+}
+
+export default class FactoryView extends React.Component<IFactoryProps> {
+    renderMachine(machine: Machine) {
         return (
-            <div key={craft.id} className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2 machine-container">
-                <MachineTypeView craft={craft} factory={this.props.game.factory} />
+            <div key={machine.id} className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2 machine-container">
+                <MachineView machine={machine} />
+            </div>
+        );
+    }
+    renderFactoryCard(factory: Factory) {
+        return (
+            <div key={factory.id} className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2 machine-container">
+                <FactoryCardView factory={factory} onClickEnter={() => this.props.onSelectedFactory(factory)} />
             </div>
         );
     }
 
-    renderPattern(pattern: Pattern) {
-        return (
-            <PatternView key={pattern.id} pattern={pattern} factory={this.props.game.factory} />
-        );
-    }
-
     render() {
-        var machines = Game.machineCrafts.map((craft) => this.renderMachine(craft));
-        var patterns = this.props.game.patterns.map((pattern) => this.renderPattern(pattern));
+        var machines = this.props.factory.machines.map((machine) => this.renderMachine(machine));
+        var factories = this.props.factory.factories.map((factory) => this.renderFactoryCard(factory));
+        var returnButton = this.props.factory.topFactory ? <button className="btn btn-primary" onClick={() => this.props.onGoBack()}>Return</button> : ""
         return (
             <div>
-                <InventoryView inventory={this.props.game.factory.inventory} />
+                {returnButton}
+                <InventoryView inventory={this.props.factory.inventory} />
                 <div className="row">
                     {machines}
-                    {patterns}
+                    {factories}
+                    <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2 machine-container">
+                        <button className="btn btn-primary" onClick={() => this.props.factory.buildSubFactory()}>Add factory</button>
+                        <button className="btn btn-primary">Add machine</button>
+                    </div>
                 </div>
             </div>
         );
