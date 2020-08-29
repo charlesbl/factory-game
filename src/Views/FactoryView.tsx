@@ -38,7 +38,7 @@ export default class FactoryView extends React.Component<IFactoryProps> {
         return (
             <div>
                 {returnButton} <span>{this.props.game.money}€</span>
-                <InventoryView inventory={this.props.factory.inventory} />
+                <InventoryView game={this.props.game} inventory={this.props.factory.inventory} />
                 <div className="row">
                     {machines}
                     {factories}

@@ -28,6 +28,13 @@ export default class ItemStack extends Id {
         }
     }
 
+    tryBuy(game: Game, quantity: number = 1) {
+        if (this.item.cost && game.money >= this.item.cost * quantity) {
+            game.money -= this.item.cost * quantity;
+            this.quantity += quantity;
+        }
+    }
+
     static fromSave(save: IItemStackSave) {
         return new ItemStack(Game.getItemById(save.itemId), save.quantity);
     }
