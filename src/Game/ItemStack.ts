@@ -29,9 +29,16 @@ export default class ItemStack extends Id {
     }
 
     tryBuy(game: Game, quantity: number = 1) {
-        if (this.item.cost && game.money >= this.item.cost * quantity) {
-            game.money -= this.item.cost * quantity;
+        if (game.money >= this.item.getBuyPrice() * quantity) {
+            game.money -= this.item.getBuyPrice() * quantity;
             this.quantity += quantity;
+        }
+    }
+
+    trySell(game: Game, quantity: number = 1) {
+        if (this.quantity >= quantity) {
+            game.money += this.item.getSellPrice() * quantity;
+            this.quantity -= quantity;
         }
     }
 

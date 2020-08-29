@@ -28,6 +28,7 @@ export default class GameView extends React.Component<IBaseProps, IGameState> {
     render() {
         return (
             <div>
+                <span>{this.props.game.money.toFixed(2)}€</span>
                 <FactoryView
                     game={this.props.game}
                     factory={this.state.selectedFactory}

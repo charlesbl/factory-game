@@ -15,9 +15,7 @@ export default class CraftView extends React.Component<CraftProps> {
         var count = this.props.inventory.getQuantity(itemStack.item);
         var capedCount = count > itemStack.quantity ? itemStack.quantity : count;
         var content = itemStack.item.name;
-        if (!itemStack.item.infinite) {
-            content = capedCount + "/" + itemStack.quantity + " " + content;
-        }
+        content = capedCount + "/" + itemStack.quantity + " " + itemStack.item.name;
         return (
             <div key={itemStack.id} className="input">
                 {content}
@@ -38,7 +36,7 @@ export default class CraftView extends React.Component<CraftProps> {
         return (
             <div className="craft">
                 <div className="craft-grid">
-                    <div className="separator">=></div>
+                    <div className="separator">{"=>"}</div>
                     {input.map((itemStack => this.renderInput(itemStack)))}
                     {output.map((itemStack => this.renderOutput(itemStack)))}
                 </div>

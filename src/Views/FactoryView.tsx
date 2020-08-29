@@ -37,7 +37,7 @@ export default class FactoryView extends React.Component<IFactoryProps> {
         var returnButton = this.props.factory.topFactory ? <button className="btn btn-primary" onClick={() => this.props.onGoBack()}>Return</button> : ""
         return (
             <div>
-                {returnButton} <span>{this.props.game.money}€</span>
+                {returnButton}
                 <InventoryView game={this.props.game} inventory={this.props.factory.inventory} />
                 <div className="row">
                     {machines}

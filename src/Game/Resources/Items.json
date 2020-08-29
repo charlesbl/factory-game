@@ -1,37 +1,39 @@
 [
     {
-        "id": "ground",
-        "name": "Ground",
-        "infinite": true
-    },
-    {
         "id": "ironOre",
         "name": "Iron Ore",
-        "cost": 1
+        "cost": 1,
+        "buyable": true
     },
     {
         "id": "ironIngot",
-        "name": "Iron Ingot"
+        "name": "Iron Ingot",
+        "cost": 7
     },
     {
         "id": "ironPlate",
-        "name": "Iron Plate"
+        "name": "Iron Plate",
+        "cost": 16
     },
     {
         "id": "copperOre",
         "name": "Copper Ore",
-        "cost": 1
+        "cost": 1,
+        "buyable": true
     },
     {
         "id": "copperIngot",
-        "name": "Copper Ingot"
+        "name": "Copper Ingot",
+        "cost": 7
     },
     {
         "id": "copperPlate",
-        "name": "Copper Plate"
+        "name": "Copper Plate",
+        "cost": 16
     },
     {
         "id": "copperWire",
-        "name": "Copper Wire"
+        "name": "Copper Wire",
+        "cost": 4
     }
 ]

@@ -84,7 +84,7 @@ class Game {
 
     static initResources() {
         if (Game.items === undefined) {
-            Game.items = rawItems.map((rawItem) => new Item(rawItem.id, rawItem.name, rawItem.cost, rawItem.infinite));
+            Game.items = rawItems.map((rawItem) => new Item(rawItem.id, rawItem.name, rawItem.cost, rawItem.buyable));
         }
         if (Game.crafts === undefined) {
             Game.crafts = rawCrafts.map((rawCraft: any) => {
