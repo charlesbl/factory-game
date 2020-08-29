@@ -5,6 +5,7 @@ import Factory from '../Game/Factory';
 import Machine from '../Game/Machine';
 import MachineView from './MachineView';
 import FactoryCardView from './FactoryCardView';
+import Game from '../Game/Game';
 
 interface IFactoryProps {
     factory: Factory;
@@ -41,7 +42,7 @@ export default class FactoryView extends React.Component<IFactoryProps> {
                     {factories}
                     <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2 machine-container">
                         <button className="btn btn-primary" onClick={() => this.props.factory.buildSubFactory()}>Add factory</button>
-                        <button className="btn btn-primary">Add machine</button>
+                        <button className="btn btn-primary" onClick={() => this.props.factory.buildMachine(Game.getMachineCraftById("ironOreDrill"))}>Add machine</button>
                     </div>
                 </div>
             </div>

@@ -88,6 +88,9 @@ export default class Factory extends Id {
         this.machines.forEach(machine => {
             machine.update(delta);
         });
+        this.factories.forEach(factory => {
+            factory.update(delta);
+        });
     }
 
     getMachinesOfType(machineCraft: Craft): Machine[] {
