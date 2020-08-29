@@ -33,18 +33,32 @@ class Craft {
         });
     }
 
-    craft(factory: Factory) {
-        this.consume(factory);
-        this.produce(factory);
+    simpleCraft(factory: Factory) {
+        this.craft(factory, factory);
     }
 
-    tryCraft(factory: Factory) {
+    craft(consumeFactory: Factory, produceFactory: Factory) {
+        this.consume(consumeFactory);
+        this.produce(produceFactory);
+    }
+
+    simpleTryCraft(factory: Factory) {
         if (this.canCraft(factory)) {
-            this.craft(factory);
+            this.simpleCraft(factory);
             return true;
         } else {
             return false;
         }
     }
+
+    tryCraft(consumeFactory: Factory, produceFactory: Factory) {
+        if (this.canCraft(consumeFactory)) {
+            this.craft(consumeFactory, produceFactory);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
 }
 export default Craft;

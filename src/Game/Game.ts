@@ -29,6 +29,7 @@ class Game {
     factory: Factory;
     lastTime: number;
     patterns: Pattern[];
+    money: number;
 
     constructor(initManualMachine: boolean = true) {
         Game.initResources();
@@ -37,6 +38,7 @@ class Game {
         if (initManualMachine)
             Game.machineCrafts.forEach((machineCraft) => this.factory.buildMachine(machineCraft, true));
         this.lastTime = Date.now();
+        this.money = 100;
     }
 
     static fromSave(save: IGameSave) {
@@ -79,7 +81,7 @@ class Game {
 
     static initResources() {
         if (Game.items === undefined) {
-            Game.items = rawItems.map((rawItem) => new Item(rawItem.id, rawItem.name, rawItem.infinite));
+            Game.items = rawItems.map((rawItem) => new Item(rawItem.id, rawItem.name, rawItem.cost, rawItem.infinite));
         }
         if (Game.crafts === undefined) {
             Game.crafts = rawCrafts.map((rawCraft: any) => {

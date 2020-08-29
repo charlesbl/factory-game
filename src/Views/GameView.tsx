@@ -11,7 +11,6 @@ export default class GameView extends React.Component<IBaseProps, IGameState> {
 
     constructor(props: Readonly<IBaseProps>) {
         super(props);
-        // N’appelez pas `this.setState()` ici !
         this.state = { selectedFactory: this.props.game.factory };
     }
 
@@ -30,6 +29,7 @@ export default class GameView extends React.Component<IBaseProps, IGameState> {
         return (
             <div>
                 <FactoryView
+                    game={this.props.game}
                     factory={this.state.selectedFactory}
                     onSelectedFactory={(factory) => this.changeFactory(factory)}
                     onGoBack={() => this.goBack()} />

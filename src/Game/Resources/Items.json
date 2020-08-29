@@ -6,7 +6,8 @@
     },
     {
         "id": "ironOre",
-        "name": "Iron Ore"
+        "name": "Iron Ore",
+        "cost": 1
     },
     {
         "id": "ironIngot",
@@ -18,7 +19,8 @@
     },
     {
         "id": "copperOre",
-        "name": "Copper Ore"
+        "name": "Copper Ore",
+        "cost": 1
     },
     {
         "id": "copperIngot",

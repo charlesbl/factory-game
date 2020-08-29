@@ -1,17 +1,5 @@
 [
     {
-        "id": "ironOreDrill",
-        "name": "Iron Ore Drill",
-        "duration": 5000,
-        "input": [
-            {
-                "itemId": "ironPlate",
-                "quantity": 10
-            }
-        ],
-        "output": "ironOre"
-    },
-    {
         "id": "ironFurnace",
         "name": "Iron Furnace",
         "duration": 5000,
@@ -38,18 +26,6 @@
             }
         ],
         "output": "ironPlate"
-    },
-    {
-        "id": "copperOreDrill",
-        "name": "Copper Ore Drill",
-        "duration": 5000,
-        "input": [
-            {
-                "itemId": "ironPlate",
-                "quantity": 10
-            }
-        ],
-        "output": "copperOre"
     },
     {
         "id": "copperFurnace",
