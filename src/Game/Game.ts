@@ -20,6 +20,7 @@ const MAX_TICK_TIME = 500;
 export interface IGameSave {
     factory: IFactorySave;
     patterns: IPatternSave[];
+    money: number;
 }
 
 class Game {
@@ -45,13 +46,15 @@ class Game {
         var game = new Game(false);
         game.patterns = save.patterns.map((patternSave) => Pattern.fromSave(game, patternSave));
         game.factory = Factory.fromSave(game, save.factory);
+        game.money = save.money;
         return game;
     }
 
     getSave(): IGameSave {
         return {
             factory: this.factory.getSave(),
-            patterns: this.patterns.map((pattern) => pattern.getSave())
+            patterns: this.patterns.map((pattern) => pattern.getSave()),
+            money: this.money
         };
     }
 
