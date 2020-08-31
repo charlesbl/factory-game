@@ -1,16 +1,18 @@
 import Factory, { IFactorySave } from './Factory';
-import Item from './Item'
-import ItemStack from './ItemStack'
-import Craft from './Craft'
-import rawItems from './Resources/Items.json'
-import rawCrafts from './Resources/Crafts.json'
-import rawMachineCrafts from './Resources/MachineCrafts.json'
+import Item from './Item';
+import ItemStack from './ItemStack';
+import Craft from './Craft';
+import rawItems from './Resources/Items.json';
+import rawCrafts from './Resources/Crafts.json';
+import rawMachineCrafts from './Resources/MachineCrafts.json';
 import Pattern, { IPatternSave } from './Pattern';
 import MachineCraft from './MachineCraft';
 
-//TODO Machines views
 //TODO Auto sell
 //TODO Auto buy
+//TODO Machine View
+//TODO Save factory in Pattern
+//TODO Build factory with pattern
 //TODO Energy system
 //TODO rework crafts
 //TODO Download and load save

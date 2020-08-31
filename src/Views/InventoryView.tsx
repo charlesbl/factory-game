@@ -1,6 +1,6 @@
 import React from 'react';
 import '../css/Inventory.css'
-import ItemStack from '../Game/ItemStack';
+import ItemStack, { ExchangeDirection } from '../Game/ItemStack';
 import Inventory from '../Game/Inventory';
 import IBaseProps from './IBaseProps';
 
@@ -10,8 +10,15 @@ interface IInventoryProps extends IBaseProps {
 
 export default class InventoryView extends React.Component<IInventoryProps> {
     renderItemStack(itemStack: ItemStack) {
-        var buyButton = itemStack.item.buyable ? <button onClick={() => itemStack.tryBuy(this.props.game)}>{itemStack.item.getBuyPrice()}</button> : "";
-        var sellButton = <button onClick={() => itemStack.trySell(this.props.game)}>{itemStack.item.getSellPrice()}</button>;
+        var buyButton = itemStack.item.buyable ? <button className="green" onClick={() => itemStack.tryBuy(this.props.game)}>{itemStack.item.getBuyPrice()}</button> : "";
+        var sellButton = <button className="red" onClick={() => itemStack.trySell(this.props.game)}>{itemStack.item.getSellPrice()}</button>;
+
+        var importActivated = itemStack.exchangeDirection === ExchangeDirection.import;
+        var importButton = itemStack.item.buyable || this.props.inventory.factory?.topFactory ?
+            <button className={"green dark" + (importActivated ? " darker" : "")} onClick={() => itemStack.toggleImport()}>Import</button> : "";
+
+        var exportActivated = itemStack.exchangeDirection === ExchangeDirection.export;
+        var exportButton = <button className={"red dark" + (exportActivated ? " darker" : "")} onClick={() => itemStack.toggleExport()}>Export</button>;
         return (
             <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-1" key={itemStack.id}>
                 <div className="row no-gutters item">
@@ -20,8 +27,12 @@ export default class InventoryView extends React.Component<IInventoryProps> {
                     </div>
                     <div className="col-5 text-left">
                         <span>{itemStack.quantity}</span>
+                    </div>
+                    <div className="col-12">
+                        {importButton}
                         {buyButton}
                         {sellButton}
+                        {exportButton}
                     </div>
                 </div>
             </div>

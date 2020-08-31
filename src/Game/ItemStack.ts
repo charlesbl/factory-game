@@ -5,16 +5,25 @@ import Item from "./Item";
 export interface IItemStackSave {
     itemId: string;
     quantity: number;
+    exchangeDirection: ExchangeDirection;
+}
+
+export enum ExchangeDirection {
+    none,
+    import,
+    export
 }
 
 export default class ItemStack extends Id {
     item: Item;
     quantity: number;
+    exchangeDirection: ExchangeDirection;
 
-    constructor(item: Item, quantity: number) {
+    constructor(item: Item, quantity: number, exchangeDirection: ExchangeDirection = ExchangeDirection.none) {
         super();
         this.item = item;
         this.quantity = quantity;
+        this.exchangeDirection = exchangeDirection;
     }
 
     toString(): string {
@@ -24,7 +33,8 @@ export default class ItemStack extends Id {
     getSave(): IItemStackSave {
         return {
             itemId: this.item.id,
-            quantity: this.quantity
+            quantity: this.quantity,
+            exchangeDirection: this.exchangeDirection
         }
     }
 
@@ -42,7 +52,28 @@ export default class ItemStack extends Id {
         }
     }
 
+    sellAll(game: Game) {
+        game.money += this.item.getSellPrice() * this.quantity;
+        this.quantity = 0;
+    }
+
+    toggleImport() {
+        if (this.exchangeDirection === ExchangeDirection.import) {
+            this.exchangeDirection = ExchangeDirection.none;
+        } else {
+            this.exchangeDirection = ExchangeDirection.import;
+        }
+    }
+
+    toggleExport() {
+        if (this.exchangeDirection === ExchangeDirection.export) {
+            this.exchangeDirection = ExchangeDirection.none;
+        } else {
+            this.exchangeDirection = ExchangeDirection.export;
+        }
+    }
+
     static fromSave(save: IItemStackSave) {
-        return new ItemStack(Game.getItemById(save.itemId), save.quantity);
+        return new ItemStack(Game.getItemById(save.itemId), save.quantity, save.exchangeDirection);
     }
 }

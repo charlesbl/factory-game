@@ -1,6 +1,7 @@
 import Game from './Game'
 import ItemStack, { IItemStackSave } from './ItemStack'
 import Item from './Item';
+import Factory from './Factory';
 
 export interface IInventorySave {
     itemStacks: { [key: string]: IItemStackSave }
@@ -8,7 +9,9 @@ export interface IInventorySave {
 
 export default class Inventory {
     itemStacks: { [key: string]: ItemStack }
-    constructor() {
+    factory?: Factory;
+    constructor(factory?: Factory) {
+        this.factory = factory;
         this.itemStacks = {};
         Game.items.forEach((item: Item) => {
             this.itemStacks[item.id] = new ItemStack(item, 0);
@@ -23,10 +26,11 @@ export default class Inventory {
         }
     }
 
-    static fromSave(save: IInventorySave) {
-        var inventory = new Inventory();
+    static fromSave(save: IInventorySave, factory: Factory) {
+        var inventory = new Inventory(factory);
         Object.entries(save.itemStacks).forEach(([id, itemStackSave]) => {
             inventory.add(ItemStack.fromSave(itemStackSave));
+            inventory.itemStacks[itemStackSave.itemId].exchangeDirection = itemStackSave.exchangeDirection;
         });
         return inventory;
     }
@@ -41,6 +45,19 @@ export default class Inventory {
 
     add(itemStack: ItemStack, count: number = 1) {
         this.itemStacks[itemStack.item.id].quantity += itemStack.quantity * count;
+    }
+
+    addItem(item: Item, count: number = 1) {
+        this.itemStacks[item.id].quantity += count;
+    }
+
+    removeItem(item: Item, count: number = 1): boolean {
+        if (this.itemStacks[item.id].quantity - count >= 0) {
+            this.itemStacks[item.id].quantity -= count;
+            return true;
+        } else {
+            return false;
+        }
     }
 
     contains(itemStack: ItemStack) {
