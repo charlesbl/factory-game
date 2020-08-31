@@ -5,16 +5,26 @@ import Factory from '../Game/Factory';
 import Machine from '../Game/Machine';
 import MachineView from './MachineView';
 import FactoryCardView from './FactoryCardView';
-import Game from '../Game/Game';
 import IBaseProps from './IBaseProps';
+import SelectMachineView from './SelectMachineView';
+import MachineCraft from '../Game/MachineCraft';
 
 interface IFactoryProps extends IBaseProps {
     factory: Factory;
     onSelectedFactory: (factory: Factory) => void;
     onGoBack: () => void;
 }
+interface IFactoryState {
+    selectedMachineCraft: MachineCraft | undefined;
+}
 
-export default class FactoryView extends React.Component<IFactoryProps> {
+export default class FactoryView extends React.Component<IFactoryProps, IFactoryState> {
+    selectMachineCraft(machineCraft: MachineCraft | undefined) {
+        this.setState({
+            selectedMachineCraft: machineCraft
+        });
+    }
+
     renderMachine(machine: Machine) {
         return (
             <div key={machine.id} className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2 machine-container">
@@ -31,10 +41,9 @@ export default class FactoryView extends React.Component<IFactoryProps> {
     }
 
     render() {
-        var testCraft = Game.getMachineCraftById("ironFurnace");
         var machines = this.props.factory.machines.map((machine) => this.renderMachine(machine));
         var factories = this.props.factory.factories.map((factory) => this.renderFactoryCard(factory));
-        var returnButton = this.props.factory.topFactory ? <button className="btn btn-primary" onClick={() => this.props.onGoBack()}>Return</button> : ""
+        var returnButton = this.props.factory.topFactory ? <button className="btn btn-primary" onClick={() => this.props.onGoBack()}>Return</button> : "";
         return (
             <div>
                 {returnButton}
@@ -44,7 +53,10 @@ export default class FactoryView extends React.Component<IFactoryProps> {
                     {factories}
                     <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2 machine-container">
                         <button className="btn btn-primary" onClick={() => this.props.factory.buildSubFactory()}>Add factory</button>
-                        <button className="btn btn-primary" disabled={!testCraft.canCraft(this.props.game.factory)} onClick={() => testCraft.tryCraft(this.props.game.factory, this.props.factory)}>Add machine</button>
+                        <SelectMachineView onChange={(machineCraft) => this.selectMachineCraft(machineCraft)} />
+                        <button className="btn btn-primary"
+                            disabled={!(this.state && this.state.selectedMachineCraft && this.state.selectedMachineCraft.canCraft(this.props.game.factory))}
+                            onClick={() => this.state.selectedMachineCraft?.tryCraft(this.props.game.factory, this.props.factory)}>Add machine</button>
                     </div>
                 </div>
             </div>

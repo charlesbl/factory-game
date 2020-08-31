@@ -8,14 +8,15 @@ import rawMachineCrafts from './Resources/MachineCrafts.json'
 import Pattern, { IPatternSave } from './Pattern';
 import MachineCraft from './MachineCraft';
 
-const MAX_TICK_TIME = 500;
-
-//TODO Factory in Factory
+//TODO Machines views
+//TODO Auto sell
+//TODO Auto buy
+//TODO Energy system
 //TODO rework crafts
 //TODO Download and load save
-//TODO Energy system
 //TODO config menu
-//TODO Economic system
+
+const MAX_TICK_TIME = 500;
 
 export interface IGameSave {
     factory: IFactorySave;
