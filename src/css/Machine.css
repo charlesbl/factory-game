@@ -1,23 +1,30 @@
-.btn-side {
-    display: inline-block;
+.machine {
+    width: 100%;
     height: 100%;
-    padding: 1px;
-    align-self: flex-end;
-    width: 2em;
+    background-color: #3A3F44;
+    text-align: center;
 }
-.btn-side > i {
-    margin: 0;
+.name {
+    font-size: 1.5em;
+    font-weight: bold;
+}
+.arrow {
+    font-size: 3em;
 }
 .progress {
-    background-color: rgba(0, 0, 1, 0);
+    width: 100%;
     border-radius: 0;
-    height: 100%;
-    width: 10%;
-    padding: 2px;
-    flex-grow: 1;
+    height: 1em;
 }
-.machine {
-    height: 2.1em;
-    padding: 3px;
-    display: flex;
+.wrapper {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+}
+.btn-wrapper {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+.btn-craft {
+    grid-column-start: 1;
+    grid-column-end: 3;
 }

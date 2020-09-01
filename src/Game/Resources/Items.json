@@ -35,5 +35,10 @@
         "id": "copperWire",
         "name": "Copper Wire",
         "cost": 4
+    },
+    {
+        "id": "circuit",
+        "name": "Electronic Circuit",
+        "cost": 80
     }
 ]

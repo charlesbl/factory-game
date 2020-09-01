@@ -57,7 +57,7 @@
     },
     {
         "id": "wiringMachine",
-        "name": "Wiring machine",
+        "name": "Wiring Machine",
         "duration": 5000,
         "input": [
             {
@@ -70,5 +70,21 @@
             }
         ],
         "output": "copperWire"
+    },
+    {
+        "id": "circuitMachine",
+        "name": "Circuit Machine",
+        "duration": 5000,
+        "input": [
+            {
+                "itemId": "ironPlate",
+                "quantity": 10
+            },
+            {
+                "itemId": "copperPlate",
+                "quantity": 10
+            }
+        ],
+        "output": "circuit"
     }
 ]

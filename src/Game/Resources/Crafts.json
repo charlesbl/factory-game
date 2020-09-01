@@ -83,5 +83,26 @@
                 "quantity": 5
             }
         ]
+    },
+    {
+        "id": "circuit",
+        "name": "Electronic Circuit",
+        "duration": 10000,
+        "input": [
+            {
+                "itemId": "copperWire",
+                "quantity": 5
+            },
+            {
+                "itemId": "ironPlate",
+                "quantity": 2
+            }
+        ],
+        "output": [
+            {
+                "itemId": "circuit",
+                "quantity": 1
+            }
+        ]
     }
 ]
