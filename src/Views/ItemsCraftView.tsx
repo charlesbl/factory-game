@@ -1,5 +1,4 @@
 import React from 'react';
-import '../css/CraftView.css'
 import ItemStack from '../Game/ItemStack';
 
 interface IItemsCraftProps {
