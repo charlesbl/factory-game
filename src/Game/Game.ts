@@ -8,8 +8,6 @@ import rawMachineCrafts from './Resources/MachineCrafts.json';
 import Pattern, { IPatternSave } from './Pattern';
 import MachineCraft from './MachineCraft';
 
-//TODO Auto sell
-//TODO Auto buy
 //TODO Machine View
 //TODO Save factory in Pattern
 //TODO Build factory with pattern
