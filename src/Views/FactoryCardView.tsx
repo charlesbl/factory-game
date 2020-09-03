@@ -26,8 +26,9 @@ export default class FactoryCardView extends React.Component<IFactoryProps> {
                         <div className="arrow"><i className="fas fa-arrow-right fa-10px"></i></div>
                         <div className="fbtn-wrapper">
                             <button className="btn btn-primary" onClick={() => this.props.onClickEnter()}>Enter</button>
-                            <button className="btn btn-secondary btn-save" onClick={() => console.log("TODO: Save")}>Save</button> {/*TODO*/}
-                            <button className="btn btn-danger btn-destroy" onClick={() => this.props.factory.destroy()}><i className="fas fa-trash fa-xs"></i></button> {/*TODO*/}
+                            {/*TODO*/}<button className="btn btn-secondary btn-save" onClick={() => console.log("TODO: Save")}>Save</button>
+                            {/*TODO*/}<button onClick={() => console.log("TODO: Factory pause")} className="btn btn-warning btn-side">{false ? <i className="fas fa-play fa-xs"></i> : <i className="fas fa-pause fa-xs"></i>}</button>
+                            <button className="btn btn-danger btn-destroy" onClick={() => this.props.factory.destroy()}><i className="fas fa-trash fa-xs"></i></button>
                         </div>
                     </div>
                     <ItemsCraftView itemStacks={exportStacks} />
