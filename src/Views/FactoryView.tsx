@@ -9,6 +9,7 @@ import IBaseProps from './IBaseProps';
 import SelectMachineView from './SelectMachineView';
 import MachineCraft from '../Game/MachineCraft';
 import SelectFactoryView from './SelectFactoryView';
+import Pattern from '../Game/Pattern';
 
 interface IFactoryProps extends IBaseProps {
     factory: Factory;
@@ -17,12 +18,22 @@ interface IFactoryProps extends IBaseProps {
 }
 interface IFactoryState {
     selectedMachineCraft: MachineCraft | undefined;
+    selectedPattern: Pattern | undefined;
 }
 
 export default class FactoryView extends React.Component<IFactoryProps, IFactoryState> {
     selectMachineCraft(machineCraft: MachineCraft | undefined) {
         this.setState({
-            selectedMachineCraft: machineCraft
+            selectedMachineCraft: machineCraft,
+            selectedPattern: this.state?.selectedPattern
+        });
+    }
+
+    selectPattern(pattern: Pattern | undefined) {
+        console.log(pattern);
+        this.setState({
+            selectedMachineCraft: this.state?.selectedMachineCraft,
+            selectedPattern: pattern
         });
     }
 
@@ -33,6 +44,7 @@ export default class FactoryView extends React.Component<IFactoryProps, IFactory
             </div>
         );
     }
+
     renderFactoryCard(factory: Factory) {
         return (
             <div key={factory.id} className="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2 machine-container">
@@ -57,8 +69,8 @@ export default class FactoryView extends React.Component<IFactoryProps, IFactory
                     {factories}
                 </div>
                 <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2 machine-container">
-                    <SelectFactoryView game={this.props.game} onChange={(pattern) => this.props.factory.buildSubFactory(pattern)} />
-                    <button className="btn btn-primary" onClick={() => this.props.factory.buildSubFactory()}>Add factory</button>
+                    <SelectFactoryView game={this.props.game} onChange={(pattern) => this.selectPattern(pattern)} />
+                    <button className="btn btn-primary" onClick={() => this.props.factory.buildSubFactory(this.state?.selectedPattern)}>Add factory</button>
                     <SelectMachineView onChange={(machineCraft) => this.selectMachineCraft(machineCraft)} />
                     <button className="btn btn-primary"
                         disabled={!(this.state && this.state.selectedMachineCraft && this.state.selectedMachineCraft.canCraft(this.props.game.factory))}

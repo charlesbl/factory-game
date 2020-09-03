@@ -2,6 +2,7 @@ import Id from "./Id";
 import Game from "./Game";
 import Craft from "./Craft";
 import Factory from "./Factory";
+import MachineCraft from "./MachineCraft";
 
 const MANUAL_CRAFT_FACTOR: number = 2;
 
@@ -12,6 +13,7 @@ export interface IMachineSave {
     isCrafting: boolean;
     craftId: string;
     manual: boolean;
+    machineCraftId: string;
 }
 
 export default class Machine extends Id {
@@ -22,12 +24,14 @@ export default class Machine extends Id {
     private pause: boolean;
     currentCraftDuration: number;
     isCrafting: boolean;
+    machineCraft: MachineCraft;
 
-    constructor(name: string, craft: Craft, factory: Factory, manual: boolean = false) {
+    constructor(name: string, craft: Craft, factory: Factory, machineCraft: MachineCraft, manual: boolean = false) {
         super();
         this.name = name;
         this.craft = craft;
         this.factory = factory;
+        this.machineCraft = machineCraft;
         this.currentCraftDuration = 0;
         this.isCrafting = false;
         this.manual = manual;
@@ -41,12 +45,13 @@ export default class Machine extends Id {
             currentCraftDuration: this.currentCraftDuration,
             isCrafting: this.isCrafting,
             craftId: this.craft.id,
-            manual: this.manual
+            manual: this.manual,
+            machineCraftId: this.machineCraft.id
         };
     }
 
     static fromSave(factory: Factory, save: IMachineSave) {
-        var machine = new Machine(save.name, Game.getCraftById(save.craftId), factory);
+        var machine = new Machine(save.name, Game.getCraftById(save.craftId), factory, Game.getMachineCraftById(save.machineCraftId));
         machine.pause = save.pause;
         machine.currentCraftDuration = save.currentCraftDuration;
         machine.isCrafting = save.isCrafting;

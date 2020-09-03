@@ -12,6 +12,7 @@ export interface IFactorySave {
     machines: IMachineSave[];
     factories: IFactorySave[];
     pattern?: IPatternSave;
+    pause: boolean;
 }
 
 export default class Factory extends Id {
@@ -21,10 +22,13 @@ export default class Factory extends Id {
     factories: Factory[];
     inventory: Inventory;
     pattern?: Pattern;
+    pause: boolean;
+
     constructor(game: Game, topFactory?: Factory, pattern?: Pattern) {
         super();
         this.game = game;
         this.topFactory = topFactory;
+        this.pause = false;
         this.machines = [];
         this.factories = [];
         this.inventory = new Inventory(this);
@@ -34,9 +38,8 @@ export default class Factory extends Id {
             Object.entries(pattern.machinesCount).forEach(([id, count]) => {
                 var machineCraft = Game.getMachineCraftById(id);
                 for (let i = 0; i < count; i++) {
-                    //Consume and produce in it own factory "machineCraft.produce(this)"
                     machineCraft.consume(game.factory);
-                    machineCraft.produce(game.factory);
+                    machineCraft.produce(this);
                 }
             });
             Object.entries(pattern.patternsCount).forEach(([id, count]) => {
@@ -53,7 +56,8 @@ export default class Factory extends Id {
             inventory: this.inventory.getSave(),
             machines: this.machines.map((machine) => machine.getSave()),
             factories: this.factories.map((factory) => factory.getSave()),
-            pattern: this.pattern !== undefined ? this.pattern.getSave() : undefined
+            pattern: this.pattern !== undefined ? this.pattern.getSave() : undefined,
+            pause: this.pause
         };
     }
 
@@ -74,7 +78,7 @@ export default class Factory extends Id {
     }
 
     buildMachine(machineCraft: MachineCraft, manual = false): Machine {
-        var machine = new Machine(machineCraft.name, machineCraft.outputCraft, this, manual);
+        var machine = new Machine(machineCraft.name, machineCraft.outputCraft, this, machineCraft, manual);
         this.machines.push(machine);
         return machine;
     }
@@ -127,5 +131,29 @@ export default class Factory extends Id {
                 return elem !== this;
             });
         }
+    }
+
+    stop() {
+        this.pause = true;
+        this.factories.forEach((factory) => factory.stop());
+        this.machines.forEach((machine) => machine.stop());
+    }
+
+    start() {
+        this.pause = false;
+        this.factories.forEach((factory) => factory.start());
+        this.machines.forEach((machine) => machine.start());
+    }
+
+    togglePause() {
+        if (this.pause) {
+            this.start();
+        } else {
+            this.stop();
+        }
+    }
+
+    savePattern() {
+        console.log(Pattern.createFromFactory(this.game, this));
     }
 }
