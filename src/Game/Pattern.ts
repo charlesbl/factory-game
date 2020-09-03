@@ -3,7 +3,6 @@ import Inventory from "./Inventory";
 import Craft from "./Craft";
 import ItemStack from "./ItemStack";
 import Factory from "./Factory";
-import { version } from "process";
 
 export interface IPatternSave {
     id: number;

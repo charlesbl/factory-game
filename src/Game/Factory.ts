@@ -154,6 +154,6 @@ export default class Factory extends Id {
     }
 
     savePattern() {
-        console.log(Pattern.createFromFactory(this.game, this));
+        Pattern.createFromFactory(this.game, this);
     }
 }

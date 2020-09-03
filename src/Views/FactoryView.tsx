@@ -30,7 +30,6 @@ export default class FactoryView extends React.Component<IFactoryProps, IFactory
     }
 
     selectPattern(pattern: Pattern | undefined) {
-        console.log(pattern);
         this.setState({
             selectedMachineCraft: this.state?.selectedMachineCraft,
             selectedPattern: pattern
@@ -70,7 +69,11 @@ export default class FactoryView extends React.Component<IFactoryProps, IFactory
                 </div>
                 <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2 machine-container">
                     <SelectFactoryView game={this.props.game} onChange={(pattern) => this.selectPattern(pattern)} />
-                    <button className="btn btn-primary" onClick={() => this.props.factory.buildSubFactory(this.state?.selectedPattern)}>Add factory</button>
+                    <button className="btn btn-primary"
+                        onClick={() => this.props.factory.buildSubFactory(this.state?.selectedPattern)}>Add factory</button>
+                    <button className="btn btn-primary"
+                        disabled={this.state?.selectedPattern === undefined}
+                        onClick={() => { if (this.state.selectedPattern) this.props.game.destroyPattern(this.state.selectedPattern) }}>Remove factory</button>
                     <SelectMachineView onChange={(machineCraft) => this.selectMachineCraft(machineCraft)} />
                     <button className="btn btn-primary"
                         disabled={!(this.state && this.state.selectedMachineCraft && this.state.selectedMachineCraft.canCraft(this.props.game.factory))}

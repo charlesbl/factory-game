@@ -17,7 +17,7 @@ export default class FactoryCardView extends React.Component<IFactoryProps> {
             <div className="factory">
                 <div className="factory-header">
                     <div className="name">{this.props.factory.pattern ? this.props.factory.pattern.name : "Factory"}</div>
-                    <button onClick={() => console.log("click")} className="btn btn-primary btn-modify"><i className="fas fa-edit fa-xs"></i></button>
+                    {/*TODO*/}<button onClick={() => console.log("click")} className="btn btn-primary btn-modify"><i className="fas fa-edit fa-xs"></i></button>
                 </div>
 
                 <div className="factory-wrapper">

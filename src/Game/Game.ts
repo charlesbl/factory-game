@@ -75,6 +75,13 @@ class Game {
         this.patterns.push(pattern);
     }
 
+    destroyPattern(pattern: Pattern) {
+        this.patterns = this.patterns.filter((elem) => {
+            return elem !== pattern;
+        });
+        console.log(this.patterns);
+    }
+
     getPatternById(id: number): Pattern {
         var req = this.patterns.filter((pattern) => pattern.id === id);
         if (req.length !== 1) {
