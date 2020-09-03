@@ -94,7 +94,7 @@ export default class Factory extends Id {
                 } else {
                     itemStack.trySell(this.game);
                 }
-            } else if (itemStack.exchangeDirection === ExchangeDirection.import && itemStack.quantity < 100) {
+            } else if (itemStack.exchangeDirection === ExchangeDirection.import && itemStack.quantity < 10) {
                 if (this.topFactory) {
                     if (this.topFactory.inventory.removeItem(itemStack.item))
                         this.inventory.addItem(itemStack.item);
@@ -117,5 +117,15 @@ export default class Factory extends Id {
 
     getMachinesOfType(machineCraft: Craft): Machine[] {
         return this.machines.filter((machine) => machine.craft.id === machineCraft.id);
+    }
+
+    destroy() {
+        this.factories.forEach((factory) => factory.destroy());
+        this.machines.forEach((machine) => this.destroyMachine(machine));
+        if (this.topFactory) {
+            this.topFactory.factories = this.topFactory.factories.filter((elem) => {
+                return elem !== this;
+            });
+        }
     }
 }

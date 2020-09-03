@@ -22,13 +22,11 @@ class MachineView extends React.Component<IMachineProps> {
         var actions = this.props.machine.manual ? <div className="btn-wrapper">{craftBtn}</div> : <div className="btn-wrapper">{pauseBtn}{destroyBtn}</div>
         return (
             <div className="machine">
-                <div className="machine-header">
-                    <div className="name">{this.props.machine.name}</div>
-                </div>
+                <div className="name">{this.props.machine.name}</div>
                 <progress className="progress" max={100} value={this.props.machine.getPercentage()}></progress>
                 <div className="wrapper">
                     <ItemsCraftView itemStacks={this.props.machine.craft.input} craftDuration={this.props.machine.craft.duration} />
-                    <div className="middle">
+                    <div>
                         <div>{this.props.machine.getPercentage().toFixed(0)}%</div>
                         <div className="arrow"><i className="fas fa-arrow-right fa-10px"></i></div>
                         <div>{(this.props.machine.craft.duration / 1000).toFixed(1)}s</div>

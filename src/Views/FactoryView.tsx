@@ -8,6 +8,7 @@ import FactoryCardView from './FactoryCardView';
 import IBaseProps from './IBaseProps';
 import SelectMachineView from './SelectMachineView';
 import MachineCraft from '../Game/MachineCraft';
+import SelectFactoryView from './SelectFactoryView';
 
 interface IFactoryProps extends IBaseProps {
     factory: Factory;
@@ -34,7 +35,7 @@ export default class FactoryView extends React.Component<IFactoryProps, IFactory
     }
     renderFactoryCard(factory: Factory) {
         return (
-            <div key={factory.id} className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2 machine-container">
+            <div key={factory.id} className="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2 machine-container">
                 <FactoryCardView factory={factory} onClickEnter={() => this.props.onSelectedFactory(factory)} />
             </div>
         );
@@ -51,9 +52,12 @@ export default class FactoryView extends React.Component<IFactoryProps, IFactory
                 {this.props.factory.topFactory ? <InventoryView game={this.props.game} inventory={this.props.factory.inventory} /> : ""}
                 <div className="row">
                     {machines}
+                </div>
+                <div className="row">
                     {factories}
                 </div>
                 <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2 machine-container">
+                    <SelectFactoryView game={this.props.game} onChange={(pattern) => this.props.factory.buildSubFactory(pattern)} />
                     <button className="btn btn-primary" onClick={() => this.props.factory.buildSubFactory()}>Add factory</button>
                     <SelectMachineView onChange={(machineCraft) => this.selectMachineCraft(machineCraft)} />
                     <button className="btn btn-primary"

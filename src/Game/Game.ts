@@ -8,7 +8,7 @@ import rawMachineCrafts from './Resources/MachineCrafts.json';
 import Pattern, { IPatternSave } from './Pattern';
 import MachineCraft from './MachineCraft';
 
-//TODO Machine View
+//TODO FavtoryCard View
 //TODO Save factory in Pattern
 //TODO Build factory with pattern
 //TODO Energy system

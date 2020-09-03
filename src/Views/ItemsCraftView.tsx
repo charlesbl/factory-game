@@ -3,17 +3,21 @@ import ItemStack from '../Game/ItemStack';
 
 interface IItemsCraftProps {
     itemStacks: ItemStack[];
-    craftDuration: number;
+    craftDuration?: number;
 }
 
 export default class ItemsCraftView extends React.Component<IItemsCraftProps> {
 
     renderItemStack(itemStack: ItemStack) {
-        var rate = itemStack.quantity / this.props.craftDuration * 1000;
+        var rateDiv;
+        if (this.props.craftDuration) {
+            var rate = itemStack.quantity / this.props.craftDuration * 1000;
+            rateDiv = <div>{rate.toFixed(2)}/s</div>;
+        }
         return (
             <div key={itemStack.id} className="item">
-                <div>{itemStack.quantity} {itemStack.item.name}</div>
-                <div>{rate.toFixed(2)}/s</div>
+                <div>{this.props.craftDuration ? itemStack.quantity : ""} {itemStack.item.name}</div>
+                {rateDiv}
             </div>
         );
     }
