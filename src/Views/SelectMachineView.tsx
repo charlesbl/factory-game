@@ -10,7 +10,7 @@ interface ISelectMachineProps {
 export default class SelectMachineView extends React.Component<ISelectMachineProps> {
     renderOption(machineCraft: MachineCraft) {
         return (
-            <option key={machineCraft.id} value={machineCraft.id}>{machineCraft.name}</option>
+            <option key={machineCraft.id} value={machineCraft.id}>{machineCraft.name} {machineCraft.cost.toFixed(2)}€</option>
         );
     }
 

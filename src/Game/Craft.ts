@@ -1,5 +1,6 @@
 import ItemStack from "./ItemStack";
 import Factory from "./Factory";
+import Game from "./Game";
 
 class Craft {
     id: string;
@@ -7,12 +8,15 @@ class Craft {
     input: ItemStack[];
     output: ItemStack[];
     duration: number;
+    cost: number;
+
     constructor(id: string, name: string, input: ItemStack[], output: ItemStack[], duration: number) {
         this.id = id;
         this.name = name;
         this.input = input;
         this.output = output;
         this.duration = duration;
+        this.cost = this.getCost();
     }
 
     canCraft(factory: Factory) {
@@ -58,6 +62,25 @@ class Craft {
         } else {
             return false;
         }
+    }
+
+    getCost(): number {
+        var cost = 0;
+        this.input.forEach((itemStack) => {
+            cost += itemStack.item.getBuyPrice();
+        });
+        return cost;
+    }
+
+    tryBuy(produceFactory: Factory, game: Game) {
+        if (game.money >= this.cost) {
+            this.produce(produceFactory);
+            game.money -= this.cost;
+        }
+    }
+
+    canBuy(game: Game) {
+        return game.money >= this.cost
     }
 
 }
