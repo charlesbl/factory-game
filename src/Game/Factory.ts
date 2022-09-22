@@ -15,6 +15,8 @@ export interface IFactorySave {
     pause: boolean;
 }
 
+const TRANSFER_THRESHOLD = 10;
+
 export default class Factory extends Id {
     game: Game;
     topFactory?: Factory;
@@ -91,19 +93,20 @@ export default class Factory extends Id {
 
     updateImportExport() {
         this.inventory.getItemStackList().forEach((itemStack) => {
-            if (itemStack.exchangeDirection === ExchangeDirection.export && itemStack.quantity > 10) {
+                const extraQuantity = TRANSFER_THRESHOLD - itemStack.quantity;
+            if (itemStack.exchangeDirection === ExchangeDirection.export && itemStack.quantity > TRANSFER_THRESHOLD) {
                 if (this.topFactory) {
-                    if (this.inventory.removeItem(itemStack.item))
-                        this.topFactory.inventory.addItem(itemStack.item);
+                    if (this.inventory.removeItem(itemStack.item, -extraQuantity))
+                        this.topFactory.inventory.addItem(itemStack.item, -extraQuantity);
                 } else {
-                    itemStack.trySell(this.game);
+                    itemStack.trySell(this.game, -extraQuantity);
                 }
-            } else if (itemStack.exchangeDirection === ExchangeDirection.import && itemStack.quantity < 10) {
+            } else if (itemStack.exchangeDirection === ExchangeDirection.import && itemStack.quantity < TRANSFER_THRESHOLD) {
                 if (this.topFactory) {
-                    if (this.topFactory.inventory.removeItem(itemStack.item))
-                        this.inventory.addItem(itemStack.item);
+                    if (this.topFactory.inventory.removeItem(itemStack.item, extraQuantity))
+                        this.inventory.addItem(itemStack.item, extraQuantity);
                 } else {
-                    itemStack.tryBuy(this.game);
+                    itemStack.tryBuy(this.game, extraQuantity);
                 }
             }
         });

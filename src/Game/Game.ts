@@ -40,7 +40,7 @@ class Game {
         if (initManualMachine)
             Game.machineCrafts.forEach((machineCraft) => this.factory.buildMachine(machineCraft, true));
         this.lastTime = Date.now();
-        this.money = 100;
+        this.money = 1000;
     }
 
     static fromSave(save: IGameSave) {
