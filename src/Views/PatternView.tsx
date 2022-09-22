@@ -9,7 +9,7 @@ interface PatternProps {
 
 class PatternView extends React.Component<PatternProps> {
     build() {
-        this.props.factory.buildSubFactory(this.props.pattern);
+        this.props.factory.buildSubFactory(this.props.pattern.id);
     }
 
     render() {

@@ -14,8 +14,7 @@ export default class InventoryView extends React.Component<IInventoryProps> {
         var sellButton = <button className="red" onClick={() => itemStack.trySell(this.props.game)}>{itemStack.item.getSellPrice()}</button>;
 
         var importActivated = itemStack.exchangeDirection === ExchangeDirection.import;
-        var importButton = itemStack.item.buyable || this.props.inventory.factory?.topFactory ?
-            <button className={"green dark" + (importActivated ? " darker" : "")} onClick={() => itemStack.toggleImport()}>Import</button> : "";
+        var importButton = <button className={"green dark" + (importActivated ? " darker" : "")} onClick={() => itemStack.toggleImport()}>Import</button>;
 
         var exportActivated = itemStack.exchangeDirection === ExchangeDirection.export;
         var exportButton = <button className={"red dark" + (exportActivated ? " darker" : "")} onClick={() => itemStack.toggleExport()}>Export</button>;

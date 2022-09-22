@@ -1,5 +1,5 @@
 import Game from "./Game";
-import Inventory from "./Inventory";
+import Inventory, { IInventorySave } from "./Inventory";
 import Craft from "./Craft";
 import ItemStack from "./ItemStack";
 import Factory from "./Factory";
@@ -9,6 +9,7 @@ export interface IPatternSave {
     name: string;
     machinesCount: { [id: string]: number };
     patternsCount: number[];
+    inventory: IInventorySave;
 }
 
 export default class Pattern {
@@ -20,6 +21,7 @@ export default class Pattern {
     name: string;
     totalCost: Inventory;
     costPrice: number;
+    inventory: Inventory;
 
     constructor(game: Game) {
         this.game = game;
@@ -29,6 +31,7 @@ export default class Pattern {
         this.id = Pattern.getId();
         this.name = "Pattern name";
         this.totalCost = new Inventory();
+        this.inventory = new Inventory();
         this.costPrice = 0;
     }
 
@@ -40,30 +43,34 @@ export default class Pattern {
             if (pattern.machinesCount[id] !== undefined)
                 pattern.machinesCount[id] = count;
         });
+            console.log(save.patternsCount);
         Object.entries(save.patternsCount).forEach(([aid, count]) => {
             var id = Number.parseInt(aid);
-            if (pattern.patternsCount[id] !== undefined)
+            if (pattern.patternsCount[id] !== undefined) {
                 pattern.patternsCount[id] = count;
+            }
         });
         pattern.updateTotalCost();
+        pattern.inventory = Inventory.fromSave(save.inventory);
         return pattern;
     }
 
     static createFromFactory(game: Game, factory: Factory): Pattern {
-        var pattern: Pattern;
-        pattern = new Pattern(game);
+        const subPatterns = factory.factories.map((factory) => {
+            console.log(factory.patternId);
+            let pId = factory.patternId;
+            if (pId === undefined) {
+                pId = Pattern.createFromFactory(game, factory).id;
+            }
+            return pId;
+        });
+        const pattern: Pattern = new Pattern(game);
         game.addPattern(pattern);
         factory.machines.forEach((machine) => pattern.addMachine(machine.machineCraft.id));
-        var subPatterns = factory.factories.map((factory) => {
-            var sPattern = factory.pattern;
-            if (!sPattern) {
-                sPattern = Pattern.createFromFactory(game, factory);
-            }
-            return sPattern;
-        });
-        subPatterns.forEach((subPattern) => pattern.addPattern(subPattern.id));
-        factory.pattern = pattern;
+        subPatterns.forEach((subPattern) => pattern.addPattern(subPattern));
+        factory.patternId = pattern.id;
         pattern.updateTotalCost();
+        pattern.inventory = factory.inventory;
         return pattern;
     }
 
@@ -73,6 +80,7 @@ export default class Pattern {
             name: this.name,
             machinesCount: this.machinesCount,
             patternsCount: this.patternsCount,
+            inventory: this.inventory.getSave()
         };
     }
 
@@ -81,8 +89,7 @@ export default class Pattern {
             Pattern.latestId = id;
             return id;
         } else {
-            Pattern.latestId++;
-            return Pattern.latestId;
+            return Pattern.latestId++;
         }
     }
 
@@ -107,14 +114,6 @@ export default class Pattern {
         if (!this.patternsCount[patternId])
             this.patternsCount[patternId] = 0;
         this.patternsCount[patternId]++;
-        this.totalCost.addInventory(this.game.getPatternById(patternId).totalCost);
-    }
-
-    removePattern(patternId: number) {
-        if (this.patternsCount[patternId] > 0) {
-            this.patternsCount[patternId]--;
-            this.totalCost.removeInventory(this.game.getPatternById(patternId).totalCost);
-        }
     }
 
     updateTotalCost() {
@@ -146,8 +145,8 @@ export default class Pattern {
 
     tryBuy(produceFactory: Factory, game: Game) {
         if (game.money >= this.costPrice) {
-            produceFactory.buildSubFactory(this);
-            game.money -= this.costPrice;
+            produceFactory.buildSubFactory(this.id);
+            this.game.money -= this.costPrice;
         }
     }
 

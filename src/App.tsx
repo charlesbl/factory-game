@@ -23,7 +23,8 @@ export default class App extends React.Component<any, IAppState> {
     }
 
     componentDidMount() {
-        setTimeout(() => this.gameLoop());
+        this.stop = false;
+        this.gameLoop();
     }
 
     componentWillUnmount() {
@@ -31,16 +32,16 @@ export default class App extends React.Component<any, IAppState> {
     }
 
     async gameLoop() {
-        var tickCount = 0;
+        let tickCount = 0;
         while (!this.stop) {
-            var startTime = Date.now();
+            const startTime = Date.now();
             this.tick();
             tickCount++;
             if (tickCount >= TICK_BETWEEN_SAVE) {
                 tickCount = 0;
                 this.saveGame();
             }
-            var tickTime = Date.now() - startTime;
+            const tickTime = Date.now() - startTime;
             if (tickTime <= REFRESH_RATE)
                 await sleep(REFRESH_RATE - tickTime);
         }
@@ -59,9 +60,9 @@ export default class App extends React.Component<any, IAppState> {
     }
 
     loadGame(): Game {
-        var stringSave = localStorage.getItem(STORAGE_NAME);
+        const stringSave = localStorage.getItem(STORAGE_NAME);
         if (stringSave !== null && stringSave !== "") {
-            var save = JSON.parse(stringSave);
+            const save = JSON.parse(stringSave);
             return Game.fromSave(save);
         } else {
             return new Game();
@@ -77,6 +78,12 @@ export default class App extends React.Component<any, IAppState> {
         return (
             <div className="container-fluid">
                 <button className="btn btn-primary" onClick={() => this.clearGame()}>Clear save</button>
+
+                <button className="btn btn-primary" onClick={() => {
+                    // eslint-disable-next-line
+                    this.state.game.money += 1000;
+                }
+                }>Cheat 1000€</button>
                 <GameView game={this.state.game} />
             </div>
         );

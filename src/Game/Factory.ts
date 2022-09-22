@@ -2,7 +2,7 @@ import Machine, { IMachineSave } from './Machine'
 import Inventory, { IInventorySave } from './Inventory'
 import Id from './Id';
 import Game from './Game';
-import Pattern, { IPatternSave } from './Pattern';
+import Pattern from './Pattern';
 import Craft from './Craft';
 import MachineCraft from './MachineCraft';
 import { ExchangeDirection } from './ItemStack';
@@ -11,11 +11,11 @@ export interface IFactorySave {
     inventory: IInventorySave;
     machines: IMachineSave[];
     factories: IFactorySave[];
-    pattern?: IPatternSave;
+    patternId?: number;
     pause: boolean;
 }
 
-const TRANSFER_THRESHOLD = 10;
+const TRANSFER_THRESHOLD = 20;
 
 export default class Factory extends Id {
     game: Game;
@@ -23,20 +23,21 @@ export default class Factory extends Id {
     machines: Machine[];
     factories: Factory[];
     inventory: Inventory;
-    pattern?: Pattern;
+    patternId?: number;
     pause: boolean;
 
-    constructor(game: Game, topFactory?: Factory, pattern?: Pattern) {
+    constructor(game: Game, topFactory?: Factory, patternId?: number) {
         super();
         this.game = game;
         this.topFactory = topFactory;
         this.pause = false;
         this.machines = [];
         this.factories = [];
-        this.inventory = new Inventory(this);
+        this.inventory = new Inventory();
 
-        if (pattern !== undefined) {
-            this.pattern = pattern;
+        if (patternId !== undefined) {
+            this.patternId = patternId;
+            const pattern = game.getPatternById(patternId);
             Object.entries(pattern.machinesCount).forEach(([id, count]) => {
                 var machineCraft = Game.getMachineCraftById(id);
                 for (let i = 0; i < count; i++) {
@@ -44,11 +45,13 @@ export default class Factory extends Id {
                 }
             });
             Object.entries(pattern.patternsCount).forEach(([id, count]) => {
-                var subPattern = game.getPatternById(Number.parseInt(id));
                 for (let i: number = 0; i < count; i++) {
-                    this.buildSubFactory(subPattern);
+                    this.buildSubFactory(Number.parseInt(id));
                 }
             });
+            pattern.inventory.getItemStackList().forEach((itemStack) => {
+                this.inventory.setExchangeDirection(itemStack.item, itemStack.exchangeDirection);
+            })
         }
     }
 
@@ -57,7 +60,7 @@ export default class Factory extends Id {
             inventory: this.inventory.getSave(),
             machines: this.machines.map((machine) => machine.getSave()),
             factories: this.factories.map((factory) => factory.getSave()),
-            pattern: this.pattern !== undefined ? this.pattern.getSave() : undefined,
+            patternId: this.patternId,
             pause: this.pause
         };
     }
@@ -66,17 +69,15 @@ export default class Factory extends Id {
         var factory = new Factory(game);
         factory.topFactory = topFactory;
         factory.machines = save.machines.map((machineSave) => Machine.fromSave(factory, machineSave));
-        factory.inventory = Inventory.fromSave(save.inventory, factory);
+        factory.inventory = Inventory.fromSave(save.inventory);
         factory.factories = save.factories.map((factorySave) => Factory.fromSave(game, factorySave, factory))
-        //TODO save patternID instead of full pattern already saved in game
-        if (save.pattern !== undefined)
-            factory.pattern = Pattern.fromSave(game, save.pattern);
+        if (save.patternId !== undefined)
+            factory.patternId = save.patternId;
         return factory;
     }
 
-    buildSubFactory(pattern?: Pattern) {
-        this.factories.push(new Factory(this.game, this, pattern));
-        this.game.money -= pattern ? pattern?.costPrice : 0;
+    buildSubFactory(patternId?: number) {
+        this.factories.push(new Factory(this.game, this, patternId));
     }
 
     buildMachine(machineCraft: MachineCraft, manual = false): Machine {
@@ -136,6 +137,12 @@ export default class Factory extends Id {
         }
     }
 
+    destroyPattern(patternId: number) {
+        this.factories.forEach((factory) => factory.destroyPattern(patternId));
+        if(this.patternId === patternId)
+            this.patternId = undefined;
+    }
+
     stop() {
         this.pause = true;
         this.factories.forEach((factory) => factory.stop());
@@ -158,5 +165,12 @@ export default class Factory extends Id {
 
     savePattern() {
         Pattern.createFromFactory(this.game, this);
+    }
+
+    getPattern(): Pattern | undefined {
+        if(this.patternId)
+            return this.game.getPatternById(this.patternId);
+        else
+            return undefined;
     }
 }

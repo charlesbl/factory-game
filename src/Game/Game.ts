@@ -8,8 +8,6 @@ import rawMachineCrafts from './Resources/MachineCrafts.json';
 import Pattern, { IPatternSave } from './Pattern';
 import MachineCraft from './MachineCraft';
 
-//TODO Buy machine with money
-//TODO Item view
 //TODO Rename Factory
 //TODO Energy system
 //TODO rework crafts
@@ -45,7 +43,13 @@ class Game {
 
     static fromSave(save: IGameSave) {
         var game = new Game(false);
-        game.patterns = save.patterns.map((patternSave) => Pattern.fromSave(game, patternSave));
+        let highestId = 0;
+        game.patterns = save.patterns.map((patternSave) => {
+            if(patternSave.id > highestId)
+                highestId = patternSave.id;
+            return Pattern.fromSave(game, patternSave);
+        });
+        Pattern.latestId = highestId + 1;
         game.factory = Factory.fromSave(game, save.factory);
         game.money = save.money;
         return game;
@@ -79,10 +83,11 @@ class Game {
         this.patterns = this.patterns.filter((elem) => {
             return elem !== pattern;
         });
+        this.factory.destroyPattern(pattern.id);
     }
 
     getPatternById(id: number): Pattern {
-        var req = this.patterns.filter((pattern) => pattern.id === id);
+        const req = this.patterns.filter((pattern) => pattern.id === id);
         if (req.length !== 1) {
             throw new Error("Pattern id \"" + id + "\" found " + req.length + " times");
         }

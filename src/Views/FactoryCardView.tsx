@@ -11,12 +11,13 @@ interface IFactoryProps {
 
 export default class FactoryCardView extends React.Component<IFactoryProps> {
     render() {
-        var importStacks = this.props.factory.inventory.getItemStackList().filter((itemStacks) => itemStacks.exchangeDirection === ExchangeDirection.import);
-        var exportStacks = this.props.factory.inventory.getItemStackList().filter((itemStacks) => itemStacks.exchangeDirection === ExchangeDirection.export);
+        const importStacks = this.props.factory.inventory.getItemStackList().filter((itemStacks) => itemStacks.exchangeDirection === ExchangeDirection.import);
+        const exportStacks = this.props.factory.inventory.getItemStackList().filter((itemStacks) => itemStacks.exchangeDirection === ExchangeDirection.export);
+        const pattern = this.props.factory.getPattern();
         return (
             <div className="factory">
                 <div className="factory-header">
-                    <div className="name">{this.props.factory.pattern ? this.props.factory.pattern.name : "Factory"}</div>
+                    <div className="name">{pattern ? pattern.name : "Factory"}</div>
                     {/*TODO*/}<button onClick={() => console.log("click")} className="btn btn-primary btn-modify"><i className="fas fa-edit fa-xs"></i></button>
                 </div>
 

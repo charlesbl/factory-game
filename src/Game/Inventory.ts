@@ -1,7 +1,6 @@
 import Game from './Game'
-import ItemStack, { IItemStackSave } from './ItemStack'
+import ItemStack, { ExchangeDirection, IItemStackSave } from './ItemStack'
 import Item from './Item';
-import Factory from './Factory';
 
 export interface IInventorySave {
     itemStacks: { [key: string]: IItemStackSave }
@@ -9,9 +8,7 @@ export interface IInventorySave {
 
 export default class Inventory {
     itemStacks: { [key: string]: ItemStack }
-    factory?: Factory;
-    constructor(factory?: Factory) {
-        this.factory = factory;
+    constructor() {
         this.itemStacks = {};
         Game.items.forEach((item: Item) => {
             this.itemStacks[item.id] = new ItemStack(item, 0);
@@ -26,8 +23,8 @@ export default class Inventory {
         }
     }
 
-    static fromSave(save: IInventorySave, factory: Factory) {
-        var inventory = new Inventory(factory);
+    static fromSave(save: IInventorySave) {
+        var inventory = new Inventory();
         Object.entries(save.itemStacks).forEach(([id, itemStackSave]) => {
             inventory.add(ItemStack.fromSave(itemStackSave));
             inventory.itemStacks[itemStackSave.itemId].exchangeDirection = itemStackSave.exchangeDirection;
@@ -78,5 +75,9 @@ export default class Inventory {
         for (let i = 0; i < count; i++) {
             inventory.getItemStackList().forEach((itemStack) => this.remove(itemStack));
         }
+    }
+
+    setExchangeDirection(item: Item, exchangeDirection: ExchangeDirection) {
+        this.itemStacks[item.id].exchangeDirection = exchangeDirection;
     }
 }
