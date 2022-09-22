@@ -79,7 +79,6 @@ class Game {
         this.patterns = this.patterns.filter((elem) => {
             return elem !== pattern;
         });
-        console.log(this.patterns);
     }
 
     getPatternById(id: number): Pattern {
