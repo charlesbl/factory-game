@@ -19,6 +19,7 @@ export default class Pattern {
     patternsCount: number[];
     name: string;
     totalCost: Inventory;
+    costPrice: number;
 
     constructor(game: Game) {
         this.game = game;
@@ -28,6 +29,7 @@ export default class Pattern {
         this.id = Pattern.getId();
         this.name = "Pattern name";
         this.totalCost = new Inventory();
+        this.costPrice = 0;
     }
 
     static fromSave(game: Game, save: IPatternSave): Pattern {
@@ -61,6 +63,7 @@ export default class Pattern {
         });
         subPatterns.forEach((subPattern) => pattern.addPattern(subPattern.id));
         factory.pattern = pattern;
+        pattern.updateTotalCost();
         return pattern;
     }
 
@@ -129,5 +132,26 @@ export default class Pattern {
             pattern.updateTotalCost();
             this.totalCost.addInventory(pattern.totalCost, count);
         });
+        this.costPrice = this.getCostPrice();
+    }
+
+
+    getCostPrice(): number {
+        var cost = 0;
+        this.totalCost.getItemStackList().forEach((itemStack) => {
+            cost += itemStack.item.getBuyPrice() * itemStack.quantity;
+        });
+        return cost;
+    }
+
+    tryBuy(produceFactory: Factory, game: Game) {
+        if (game.money >= this.costPrice) {
+            produceFactory.buildSubFactory(this);
+            game.money -= this.costPrice;
+        }
+    }
+
+    canBuy(game: Game) {
+        return game.money >= this.costPrice;
     }
 }

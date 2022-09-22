@@ -70,7 +70,8 @@ export default class FactoryView extends React.Component<IFactoryProps, IFactory
                 <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2 machine-container">
                     <SelectFactoryView game={this.props.game} onChange={(pattern) => this.selectPattern(pattern)} />
                     <button className="btn btn-primary"
-                        onClick={() => this.props.factory.buildSubFactory(this.state?.selectedPattern)}>Add factory</button>
+                        disabled={this.state?.selectedPattern && !this.state?.selectedPattern?.canBuy(this.props.game)}
+                        onClick={() => this.state?.selectedPattern?.tryBuy(this.props.factory, this.props.game)}>Add factory</button>
                     <button className="btn btn-primary"
                         disabled={this.state?.selectedPattern === undefined}
                         onClick={() => { if (this.state.selectedPattern) this.props.game.destroyPattern(this.state.selectedPattern) }}>Remove factory</button>

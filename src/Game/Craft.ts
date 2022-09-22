@@ -67,7 +67,7 @@ class Craft {
     getCost(): number {
         var cost = 0;
         this.input.forEach((itemStack) => {
-            cost += itemStack.item.getBuyPrice();
+            cost += itemStack.item.getBuyPrice() * itemStack.quantity;
         });
         return cost;
     }

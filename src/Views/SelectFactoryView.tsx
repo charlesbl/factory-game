@@ -10,7 +10,7 @@ interface ISelectFactoryProps extends IBaseProps {
 export default class SelectFactoryView extends React.Component<ISelectFactoryProps> {
     renderOption(pattern: Pattern) {
         return (
-            <option key={pattern.id} value={pattern.id}>{pattern.name}</option>
+            <option key={pattern.id} value={pattern.id}>{pattern.name} {Math.trunc(pattern.costPrice)}€</option>
         );
     }
 
