@@ -26,6 +26,6 @@ export default class GameSave extends Saveable<Game> {
     }
 
     getObj = (): Game => {
-        return new Game(this.factory.getObj(), this.money)
+        return new Game(this.factory.getObj(), this.money, this.inventory.getObj())
     }
 }
