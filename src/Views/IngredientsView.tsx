@@ -6,11 +6,10 @@ interface IItemsCraftProps {
 }
 
 const renderItemStack = (ingredient: Ingredient, index: number): JSX.Element => {
-    let rateDiv
     return (
         <div key={index} className="item">
             <div>{ingredient.item.name}</div>
-            {rateDiv}
+            <div>{ingredient.quantityPerSecond.toFixed(2)}/s</div>
         </div>
     )
 }

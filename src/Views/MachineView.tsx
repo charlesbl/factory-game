@@ -26,7 +26,7 @@ const MachineView = (props: IMachineProps): JSX.Element => {
                 <IngredientsView ingredients={props.machine.craft.input} />
                 <div>
                     <div className="arrow"><i className="fas fa-arrow-right fa-10px"></i></div>
-                    <div>{(props.machine.craft.duration / 1000).toFixed(1)}s</div>
+                    <div>58%</div>
                     {actions}
                 </div>
                 <IngredientsView ingredients={props.machine.craft.output} />

@@ -19,7 +19,7 @@ const getItemById = (id: string): Item => {
 const Crafts = rawCrafts.map((rawCraft: any) => {
     const input: Ingredient[] = rawCraft.input.map((rawItemStack: any) => new Ingredient(getItemById(rawItemStack.itemId), rawItemStack.quantity))
     const outputItems: Ingredient[] = rawCraft.output.map((rawItemStack: any) => new Ingredient(getItemById(rawItemStack.itemId), rawItemStack.quantity))
-    return new Craft(rawCraft.id, rawCraft.name, input, outputItems, rawCraft.duration)
+    return new Craft(rawCraft.id, rawCraft.name, input, outputItems)
 })
 const getCraftById = (id: string): Craft => {
     const req = Crafts.filter((craft) => craft.id === id)
@@ -32,7 +32,7 @@ const getCraftById = (id: string): Craft => {
 const MachineCrafts = rawMachineCrafts.map((rawCraft: any) => {
     const input = rawCraft.input.map((rawItemStack: any) => new ItemStack(getItemById(rawItemStack.itemId), rawItemStack.quantity))
     const outputCraft: Craft = getCraftById(rawCraft.output)
-    return new MachineCraft(rawCraft.id, rawCraft.name, input, outputCraft, rawCraft.duration)
+    return new MachineCraft(rawCraft.id, rawCraft.name, input, outputCraft)
 })
 const getMachineCraftById = (id: string): MachineCraft => {
     const req = MachineCrafts.filter((craft) => craft.id === id)
