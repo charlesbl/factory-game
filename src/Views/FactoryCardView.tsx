@@ -1,21 +1,20 @@
-import React from 'react';
-import { notImplemented } from '..';
+import React from 'react'
+import { notImplemented } from '..'
 import '../css/FactoryCardView.css'
-import Factory from '../Game/Factory';
-import ItemsCraftView from './IngredientsView';
+import Factory from '../Game/Factory'
 
 interface IFactoryProps {
-    factory: Factory,
+    factory: Factory
     onClickEnter: () => void
 }
 
 export default class FactoryCardView extends React.Component<IFactoryProps> {
-    render() {
+    render (): JSX.Element {
         return (
             <div className="factory">
                 <div className="factory-header">
-                    <div className="name">"Factory"</div>
-                    {/*TODO*/}<button onClick={() => notImplemented()} className="btn btn-primary btn-modify"><i className="fas fa-edit fa-xs"></i></button>
+                    <div className="name">Factory</div>
+                    {/* TODO */}<button onClick={() => notImplemented()} className="btn btn-primary btn-modify"><i className="fas fa-edit fa-xs"></i></button>
                 </div>
 
                 <div className="factory-wrapper">
@@ -28,6 +27,6 @@ export default class FactoryCardView extends React.Component<IFactoryProps> {
                     </div>
                 </div>
             </div>
-        );
+        )
     }
 }

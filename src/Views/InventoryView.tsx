@@ -1,15 +1,15 @@
-import React from 'react';
+import React from 'react'
 import '../css/Inventory.css'
-import ItemStack from '../Game/ItemStack';
-import Inventory from '../Game/Inventory';
-import IBaseProps from './IBaseProps';
+import ItemStack from '../Game/ItemStack'
+import Inventory from '../Game/Inventory'
+import IBaseProps from './IBaseProps'
 
 interface IInventoryProps extends IBaseProps {
     inventory: Inventory
 }
 
 export default class InventoryView extends React.Component<IInventoryProps> {
-    renderItemStack(itemId: string, itemStack: ItemStack) {
+    renderItemStack (itemId: string, itemStack: ItemStack): JSX.Element {
         return (
             <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-1" key={itemId}>
                 <div className="row no-gutters item">
@@ -23,14 +23,15 @@ export default class InventoryView extends React.Component<IInventoryProps> {
                     </div>
                 </div>
             </div>
-        );
+        )
     }
-    render() {
-        const items = Object.entries(this.props.inventory.itemStacks).map(([id, itemStack]) => this.renderItemStack(id, itemStack));
+
+    render (): JSX.Element {
+        const items = Object.entries(this.props.inventory.itemStacks).map(([id, itemStack]) => this.renderItemStack(id, itemStack))
         return (
             <div className="row no-gutters">
                 {items}
             </div>
-        );
+        )
     }
 }

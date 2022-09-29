@@ -25,8 +25,7 @@ export default class App extends React.Component<any, IAppState> {
 
     componentDidMount (): void {
         this.stop = false
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.gameLoop()
+        void this.gameLoop()
     }
 
     componentWillUnmount (): void {
@@ -56,7 +55,7 @@ export default class App extends React.Component<any, IAppState> {
     }
 
     saveGame (): void {
-        const save = new GameSave(undefined, this.state.game)
+        const save = new GameSave(this.state.game)
         localStorage.setItem(STORAGE_NAME, JSON.stringify(save))
     }
 

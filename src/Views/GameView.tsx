@@ -1,33 +1,32 @@
-import React from 'react';
-import FactoryView from './FactoryView';
-import IBaseProps from './IBaseProps';
-import Factory from '../Game/Factory';
-import { notImplemented } from '..';
+import React from 'react'
+import FactoryView from './FactoryView'
+import IBaseProps from './IBaseProps'
+import Factory from '../Game/Factory'
+import { notImplemented } from '..'
 
 interface IGameState {
-    selectedFactory: Factory;
+    selectedFactory: Factory
 }
 
 export default class GameView extends React.Component<IBaseProps, IGameState> {
-
-    constructor(props: Readonly<IBaseProps>) {
-        super(props);
-        this.state = { selectedFactory: this.props.game.factory };
+    constructor (props: Readonly<IBaseProps>) {
+        super(props)
+        this.state = { selectedFactory: this.props.game.factory }
     }
 
-    changeFactory(factory: Factory) {
+    changeFactory (factory: Factory): void {
         this.setState({
             selectedFactory: factory
-        });
+        })
     }
 
-    goBack() {
-        notImplemented();
+    goBack (): void {
+        notImplemented()
         // if (this.state.selectedFactory.topFactory)
         //     this.changeFactory(this.state.selectedFactory.topFactory);
     }
 
-    render() {
+    render (): JSX.Element {
         return (
             <div>
                 <span>{this.props.game.money.toFixed(2)}€</span>
@@ -37,6 +36,6 @@ export default class GameView extends React.Component<IBaseProps, IGameState> {
                     onSelectedFactory={(factory) => this.changeFactory(factory)}
                     onGoBack={() => this.goBack()} />
             </div>
-        );
+        )
     }
 }
