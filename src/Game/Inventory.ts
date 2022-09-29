@@ -1,35 +1,15 @@
 import Game from './Game'
-import ItemStack, { ExchangeDirection, IItemStackSave } from './ItemStack'
+import ItemStack from './ItemStack'
 import Item from './Item';
-
-export interface IInventorySave {
-    itemStacks: { [key: string]: IItemStackSave }
-}
+import Ressources from './Resources/Ressources';
 
 export default class Inventory {
-    itemStacks: { [key: string]: ItemStack }
+    itemStacks: { [key: string]: ItemStack }; // key = itemId
     constructor() {
         this.itemStacks = {};
-        Game.items.forEach((item: Item) => {
+        Ressources.Items.forEach((item: Item) => {
             this.itemStacks[item.id] = new ItemStack(item, 0);
         });
-    }
-
-    getSave(): IInventorySave {
-        const result: { [key: string]: IItemStackSave } = {};
-        Object.entries(this.itemStacks).forEach(([id, itemStack]) => result[id] = itemStack.getSave());
-        return {
-            itemStacks: result
-        }
-    }
-
-    static fromSave(save: IInventorySave) {
-        const inventory = new Inventory();
-        Object.entries(save.itemStacks).forEach(([id, itemStackSave]) => {
-            inventory.add(ItemStack.fromSave(itemStackSave));
-            inventory.itemStacks[itemStackSave.itemId].exchangeDirection = itemStackSave.exchangeDirection;
-        });
-        return inventory;
     }
 
     getItemStackList() {
@@ -75,9 +55,5 @@ export default class Inventory {
         for (let i = 0; i < count; i++) {
             inventory.getItemStackList().forEach((itemStack) => this.remove(itemStack));
         }
-    }
-
-    setExchangeDirection(item: Item, exchangeDirection: ExchangeDirection) {
-        this.itemStacks[item.id].exchangeDirection = exchangeDirection;
     }
 }

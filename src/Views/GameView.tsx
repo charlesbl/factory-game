@@ -2,6 +2,7 @@ import React from 'react';
 import FactoryView from './FactoryView';
 import IBaseProps from './IBaseProps';
 import Factory from '../Game/Factory';
+import { notImplemented } from '..';
 
 interface IGameState {
     selectedFactory: Factory;
@@ -21,8 +22,9 @@ export default class GameView extends React.Component<IBaseProps, IGameState> {
     }
 
     goBack() {
-        if (this.state.selectedFactory.topFactory)
-            this.changeFactory(this.state.selectedFactory.topFactory);
+        notImplemented();
+        // if (this.state.selectedFactory.topFactory)
+        //     this.changeFactory(this.state.selectedFactory.topFactory);
     }
 
     render() {
