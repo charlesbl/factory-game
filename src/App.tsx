@@ -65,7 +65,7 @@ export default class App extends React.Component<any, IAppState> {
             const save = new GameSave(undefined, JSON.parse(stringSave))
             return save.getObj()
         } else {
-            return new Game()
+            return new Game(undefined, undefined, undefined, true)
         }
     }
 

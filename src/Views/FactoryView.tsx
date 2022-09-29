@@ -7,6 +7,7 @@ import FactoryCardView from './FactoryCardView'
 import IBaseProps from './IBaseProps'
 import SelectMachineView from './SelectMachineView'
 import MachineCraft from '../Game/MachineCraft'
+import InventoryView from './InventoryView'
 
 interface IFactoryProps extends IBaseProps {
     factory: Factory
@@ -46,7 +47,7 @@ export default class FactoryView extends React.Component<IFactoryProps, IFactory
         const returnButton = <button className="btn btn-primary" onClick={() => this.props.onGoBack()}>Return</button>
         return (
             <div>
-                {/* <InventoryView game={this.props.game} inventory={this.props.game.factory.inventory} /> */}
+                <InventoryView game={this.props.game} inventory={this.props.game.inventory} />
                 {returnButton}
                 <div className="row">
                     {machines}
