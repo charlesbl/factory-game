@@ -55,7 +55,7 @@ export default class App extends React.Component<any, IAppState> {
     }
 
     saveGame() {
-        var save = this.state.game.getSave();
+        const save = this.state.game.getSave();
         localStorage.setItem(STORAGE_NAME, JSON.stringify(save));
     }
 

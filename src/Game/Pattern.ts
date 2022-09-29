@@ -36,7 +36,7 @@ export default class Pattern {
     }
 
     static fromSave(game: Game, save: IPatternSave): Pattern {
-        var pattern = new Pattern(game);
+        const pattern = new Pattern(game);
         pattern.id = Pattern.getId(save.id);
         pattern.name = save.name;
         Object.entries(save.machinesCount).forEach(([id, count]) => {
@@ -45,7 +45,7 @@ export default class Pattern {
         });
             console.log(save.patternsCount);
         Object.entries(save.patternsCount).forEach(([aid, count]) => {
-            var id = Number.parseInt(aid);
+            const id = Number.parseInt(aid);
             if (pattern.patternsCount[id] !== undefined) {
                 pattern.patternsCount[id] = count;
             }
@@ -119,7 +119,7 @@ export default class Pattern {
     updateTotalCost() {
         this.totalCost = new Inventory();
         Game.machineCrafts.forEach((machineCraft: Craft) => {
-            var quantity = this.machinesCount[machineCraft.id];
+            const quantity = this.machinesCount[machineCraft.id];
             if (quantity > 0) {
                 machineCraft.input.forEach((itemStack) => {
                     this.totalCost.add(itemStack, quantity);
@@ -127,7 +127,7 @@ export default class Pattern {
             }
         });
         Object.entries(this.patternsCount).forEach(([id, count]) => {
-            var pattern = this.game.getPatternById(Number.parseInt(id));
+            const pattern = this.game.getPatternById(Number.parseInt(id));
             pattern.updateTotalCost();
             this.totalCost.addInventory(pattern.totalCost, count);
         });
@@ -136,7 +136,7 @@ export default class Pattern {
 
 
     getCostPrice(): number {
-        var cost = 0;
+        let cost = 0;
         this.totalCost.getItemStackList().forEach((itemStack) => {
             cost += itemStack.item.getBuyPrice() * itemStack.quantity;
         });

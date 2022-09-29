@@ -39,7 +39,7 @@ export default class Factory extends Id {
             this.patternId = patternId;
             const pattern = game.getPatternById(patternId);
             Object.entries(pattern.machinesCount).forEach(([id, count]) => {
-                var machineCraft = Game.getMachineCraftById(id);
+                const machineCraft = Game.getMachineCraftById(id);
                 for (let i = 0; i < count; i++) {
                     machineCraft.produce(this);
                 }
@@ -66,7 +66,7 @@ export default class Factory extends Id {
     }
 
     static fromSave(game: Game, save: IFactorySave, topFactory?: Factory): Factory {
-        var factory = new Factory(game);
+        const factory = new Factory(game);
         factory.topFactory = topFactory;
         factory.machines = save.machines.map((machineSave) => Machine.fromSave(factory, machineSave));
         factory.inventory = Inventory.fromSave(save.inventory);
@@ -81,7 +81,7 @@ export default class Factory extends Id {
     }
 
     buildMachine(machineCraft: MachineCraft, manual = false): Machine {
-        var machine = new Machine(machineCraft.name, machineCraft.outputCraft, this, machineCraft, manual);
+        const machine = new Machine(machineCraft.name, machineCraft.outputCraft, this, machineCraft, manual);
         this.machines.push(machine);
         return machine;
     }

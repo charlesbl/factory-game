@@ -53,9 +53,9 @@ export default class FactoryView extends React.Component<IFactoryProps, IFactory
     }
 
     render() {
-        var machines = this.props.factory.machines.map((machine) => this.renderMachine(machine));
-        var factories = this.props.factory.factories.map((factory) => this.renderFactoryCard(factory));
-        var returnButton = this.props.factory.topFactory ? <button className="btn btn-primary" onClick={() => this.props.onGoBack()}>Return</button> : "";
+        const machines = this.props.factory.machines.map((machine) => this.renderMachine(machine));
+        const factories = this.props.factory.factories.map((factory) => this.renderFactoryCard(factory));
+        const returnButton = this.props.factory.topFactory ? <button className="btn btn-primary" onClick={() => this.props.onGoBack()}>Return</button> : "";
         return (
             <div>
                 <InventoryView game={this.props.game} inventory={this.props.game.factory.inventory} />

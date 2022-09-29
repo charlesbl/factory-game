@@ -22,7 +22,7 @@ export default class SelectMachineView extends React.Component<ISelectMachinePro
     }
 
     render() {
-        var options = Game.machineCrafts.map((machineCraft) => this.renderOption(machineCraft));
+        const options = Game.machineCrafts.map((machineCraft) => this.renderOption(machineCraft));
         return (
             <select onChange={(event) => this.changeSelect(event)} className="custom-select custom-select-sm">
                 <option value="none">Open this select menu</option>

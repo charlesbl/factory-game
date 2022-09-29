@@ -22,7 +22,7 @@ export default class SelectFactoryView extends React.Component<ISelectFactoryPro
     }
 
     render() {
-        var options = this.props.game.patterns.map((pattern) => this.renderOption(pattern));
+        const options = this.props.game.patterns.map((pattern) => this.renderOption(pattern));
         return (
             <select onChange={(event) => this.changeSelect(event)} className="custom-select custom-select-sm">
                 <option value="none">Open this select menu</option>

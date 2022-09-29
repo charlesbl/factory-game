@@ -16,7 +16,7 @@ export default class Inventory {
     }
 
     getSave(): IInventorySave {
-        var result: { [key: string]: IItemStackSave } = {};
+        const result: { [key: string]: IItemStackSave } = {};
         Object.entries(this.itemStacks).forEach(([id, itemStack]) => result[id] = itemStack.getSave());
         return {
             itemStacks: result
@@ -24,7 +24,7 @@ export default class Inventory {
     }
 
     static fromSave(save: IInventorySave) {
-        var inventory = new Inventory();
+        const inventory = new Inventory();
         Object.entries(save.itemStacks).forEach(([id, itemStackSave]) => {
             inventory.add(ItemStack.fromSave(itemStackSave));
             inventory.itemStacks[itemStackSave.itemId].exchangeDirection = itemStackSave.exchangeDirection;

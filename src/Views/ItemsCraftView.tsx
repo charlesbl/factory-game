@@ -9,9 +9,9 @@ interface IItemsCraftProps {
 export default class ItemsCraftView extends React.Component<IItemsCraftProps> {
 
     renderItemStack(itemStack: ItemStack) {
-        var rateDiv;
+        let rateDiv;
         if (this.props.craftDuration) {
-            var rate = itemStack.quantity / this.props.craftDuration * 1000;
+            const rate = itemStack.quantity / this.props.craftDuration * 1000;
             rateDiv = <div>{rate.toFixed(2)}/s</div>;
         }
         return (

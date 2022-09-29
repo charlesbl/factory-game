@@ -42,7 +42,7 @@ class Game {
     }
 
     static fromSave(save: IGameSave) {
-        var game = new Game(false);
+        const game = new Game(false);
         let highestId = 0;
         game.patterns = save.patterns.map((patternSave) => {
             if(patternSave.id > highestId)
@@ -64,12 +64,12 @@ class Game {
     }
 
     update() {
-        var newTime = Date.now();
-        var delta = newTime - this.lastTime;
+        const newTime = Date.now();
+        let delta = newTime - this.lastTime;
         this.lastTime = newTime;
 
         while (delta > 0) {
-            var capedDelta = delta < MAX_TICK_TIME ? delta : MAX_TICK_TIME;
+            const capedDelta = delta < MAX_TICK_TIME ? delta : MAX_TICK_TIME;
             this.factory.update(capedDelta);
             delta -= MAX_TICK_TIME;
         }
@@ -100,22 +100,22 @@ class Game {
         }
         if (Game.crafts === undefined) {
             Game.crafts = rawCrafts.map((rawCraft: any) => {
-                var input = rawCraft.input.map((rawItemStack: any) => new ItemStack(this.getItemById(rawItemStack.itemId), rawItemStack.quantity));
-                var outputItems: ItemStack[] = rawCraft.output.map((rawItemStack: any) => new ItemStack(this.getItemById(rawItemStack.itemId), rawItemStack.quantity));
+                const input = rawCraft.input.map((rawItemStack: any) => new ItemStack(this.getItemById(rawItemStack.itemId), rawItemStack.quantity));
+                const outputItems: ItemStack[] = rawCraft.output.map((rawItemStack: any) => new ItemStack(this.getItemById(rawItemStack.itemId), rawItemStack.quantity));
                 return new Craft(rawCraft.id, rawCraft.name, input, outputItems, rawCraft.duration);
             });
         }
         if (Game.machineCrafts === undefined) {
             Game.machineCrafts = rawMachineCrafts.map((rawCraft: any) => {
-                var input = rawCraft.input.map((rawItemStack: any) => new ItemStack(this.getItemById(rawItemStack.itemId), rawItemStack.quantity));
-                var outputCraft: Craft = Game.getCraftById(rawCraft.output);
+                const input = rawCraft.input.map((rawItemStack: any) => new ItemStack(this.getItemById(rawItemStack.itemId), rawItemStack.quantity));
+                const outputCraft: Craft = Game.getCraftById(rawCraft.output);
                 return new MachineCraft(rawCraft.id, rawCraft.name, input, outputCraft, rawCraft.duration);
             });
         }
     }
 
     static getCraftById(id: string): Craft {
-        var req = Game.crafts.filter((craft) => craft.id === id);
+        const req = Game.crafts.filter((craft) => craft.id === id);
         if (req.length !== 1) {
             throw new Error("Craft id \"" + id + "\" found " + req.length + " times");
         }
@@ -123,7 +123,7 @@ class Game {
     }
 
     static getMachineCraftById(id: string): MachineCraft {
-        var req = Game.machineCrafts.filter((craft) => craft.id === id);
+        const req = Game.machineCrafts.filter((craft) => craft.id === id);
         if (req.length !== 1) {
             throw new Error("MachineCraft id \"" + id + "\" found " + req.length + " times");
         }
@@ -131,7 +131,7 @@ class Game {
     }
 
     static getItemById(id: string): Item {
-        var req = Game.items.filter((item) => item.id === id);
+        const req = Game.items.filter((item) => item.id === id);
         if (req.length !== 1) {
             throw new Error("Item id \"" + id + "\" found " + req.length + " times");
         }

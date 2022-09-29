@@ -51,7 +51,7 @@ export default class Machine extends Id {
     }
 
     static fromSave(factory: Factory, save: IMachineSave) {
-        var machine = new Machine(save.name, Game.getCraftById(save.craftId), factory, Game.getMachineCraftById(save.machineCraftId));
+        const machine = new Machine(save.name, Game.getCraftById(save.craftId), factory, Game.getMachineCraftById(save.machineCraftId));
         machine.pause = save.pause;
         machine.currentCraftDuration = save.currentCraftDuration;
         machine.isCrafting = save.isCrafting;

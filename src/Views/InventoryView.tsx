@@ -10,14 +10,14 @@ interface IInventoryProps extends IBaseProps {
 
 export default class InventoryView extends React.Component<IInventoryProps> {
     renderItemStack(itemStack: ItemStack) {
-        var buyButton = itemStack.item.buyable ? <button className="green" onClick={() => itemStack.tryBuy(this.props.game)}>{itemStack.item.getBuyPrice()}</button> : "";
-        var sellButton = <button className="red" onClick={() => itemStack.trySell(this.props.game)}>{itemStack.item.getSellPrice()}</button>;
+        const buyButton = itemStack.item.buyable ? <button className="green" onClick={() => itemStack.tryBuy(this.props.game)}>{itemStack.item.getBuyPrice()}</button> : "";
+        const sellButton = <button className="red" onClick={() => itemStack.trySell(this.props.game)}>{itemStack.item.getSellPrice()}</button>;
 
-        var importActivated = itemStack.exchangeDirection === ExchangeDirection.import;
-        var importButton = <button className={"green dark" + (importActivated ? " darker" : "")} onClick={() => itemStack.toggleImport()}>Import</button>;
+        const importActivated = itemStack.exchangeDirection === ExchangeDirection.import;
+        const importButton = <button className={"green dark" + (importActivated ? " darker" : "")} onClick={() => itemStack.toggleImport()}>Import</button>;
 
-        var exportActivated = itemStack.exchangeDirection === ExchangeDirection.export;
-        var exportButton = <button className={"red dark" + (exportActivated ? " darker" : "")} onClick={() => itemStack.toggleExport()}>Export</button>;
+        const exportActivated = itemStack.exchangeDirection === ExchangeDirection.export;
+        const exportButton = <button className={"red dark" + (exportActivated ? " darker" : "")} onClick={() => itemStack.toggleExport()}>Export</button>;
         return (
             <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-1" key={itemStack.id}>
                 <div className="row no-gutters item">
@@ -38,7 +38,7 @@ export default class InventoryView extends React.Component<IInventoryProps> {
         );
     }
     render() {
-        var items = Object.entries(this.props.inventory.itemStacks).map(([id, itemStack]) => this.renderItemStack(itemStack));
+        const items = Object.entries(this.props.inventory.itemStacks).map(([id, itemStack]) => this.renderItemStack(itemStack));
         return (
             <div className="row no-gutters">
                 {items}
