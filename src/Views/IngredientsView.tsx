@@ -5,22 +5,21 @@ interface IItemsCraftProps {
     ingredients: Ingredient[]
 }
 
-export default class IngredientsView extends React.Component<IItemsCraftProps> {
-    renderItemStack (ingredient: Ingredient, index: number): JSX.Element {
-        let rateDiv
-        return (
-            <div key={index} className="item">
-                <div>{ingredient.item.name}</div>
-                {rateDiv}
-            </div>
-        )
-    }
-
-    render (): JSX.Element {
-        return (
-            <div className="item-list">
-                {this.props.ingredients.map((itemStack, i) => this.renderItemStack(itemStack, i))}
-            </div>
-        )
-    }
+const renderItemStack = (ingredient: Ingredient, index: number): JSX.Element => {
+    let rateDiv
+    return (
+        <div key={index} className="item">
+            <div>{ingredient.item.name}</div>
+            {rateDiv}
+        </div>
+    )
 }
+
+const IngredientsView = (props: IItemsCraftProps): JSX.Element => {
+    return (
+        <div className="item-list">
+            {props.ingredients.map((itemStack, i) => renderItemStack(itemStack, i))}
+        </div>
+    )
+}
+export default IngredientsView

@@ -1,41 +1,28 @@
-import React from 'react'
+import React, { useState } from 'react'
 import FactoryView from './FactoryView'
 import IBaseProps from './IBaseProps'
 import Factory from '../Game/Factory'
 import { notImplemented } from '..'
 
-interface IGameState {
-    selectedFactory: Factory
+const goBack = (): void => {
+    notImplemented()
+    // if (this.state.selectedFactory.topFactory)
+    //     this.changeFactory(this.state.selectedFactory.topFactory);
 }
 
-export default class GameView extends React.Component<IBaseProps, IGameState> {
-    constructor (props: Readonly<IBaseProps>) {
-        super(props)
-        this.state = { selectedFactory: this.props.game.factory }
-    }
+const GameView = (props: IBaseProps): JSX.Element => {
+    const [selectedFactory, setFactory] = useState<Factory>(props.game.factory)
 
-    changeFactory (factory: Factory): void {
-        this.setState({
-            selectedFactory: factory
-        })
-    }
-
-    goBack (): void {
-        notImplemented()
-        // if (this.state.selectedFactory.topFactory)
-        //     this.changeFactory(this.state.selectedFactory.topFactory);
-    }
-
-    render (): JSX.Element {
-        return (
-            <div>
-                <span>{this.props.game.money.toFixed(2)}€</span>
-                <FactoryView
-                    game={this.props.game}
-                    factory={this.state.selectedFactory}
-                    onSelectedFactory={(factory) => this.changeFactory(factory)}
-                    onGoBack={() => this.goBack()} />
-            </div>
-        )
-    }
+    return (
+        <div>
+            <span>{props.game.money.toFixed(2)}€</span>
+            <FactoryView
+                game={props.game}
+                factory={selectedFactory}
+                onSelectedFactory={(factory) => setFactory(factory)}
+                onGoBack={() => goBack()} />
+        </div>
+    )
 }
+
+export default GameView
