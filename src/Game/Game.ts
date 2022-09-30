@@ -1,4 +1,5 @@
 import Factory from './Factory'
+import Ingredient from './Ingredient'
 import Inventory from './Inventory'
 import ManualMachine from './ManualMachine'
 import Ressources from './Resources/Ressources'
@@ -40,24 +41,67 @@ export default class Game {
         this.manualMachines = Ressources.getMachineCrafts().map((machineCraft) => new ManualMachine(machineCraft.name, machineCraft.outputCraft))
     }
 
+    private canCraft (input: Ingredient[], productionTimeInSec: number): boolean {
+        let ressourcesAvailable = true
+        input.forEach((ingredient) => {
+            const cost = ingredient.quantityPerSecond * productionTimeInSec
+            if (this.inventory.getQuantity(ingredient.item) < cost) {
+                ressourcesAvailable = false
+            }
+        })
+        return ressourcesAvailable
+    }
+
+    private tryConsumeCraft (input: Ingredient[], output: Ingredient[], productionTimeInSec: number): boolean {
+        if (this.canCraft(input, productionTimeInSec)) {
+            input.forEach((ingredient) => {
+                const cost = ingredient.quantityPerSecond * productionTimeInSec
+                this.inventory.removeItem(ingredient.item, cost)
+            })
+            output.forEach((ingredient) => {
+                this.inventory.addItem(ingredient.item, ingredient.quantityPerSecond * productionTimeInSec)
+            })
+            return true
+        } else {
+            return false
+        }
+    }
+
+    private tryConsumeManualCraft (machine: ManualMachine, productionTimeInSec: number): boolean {
+        if (machine.active) {
+            return this.tryConsumeCraft(machine.craft.input, machine.craft.output, productionTimeInSec * 10)
+        } else {
+            return false
+        }
+    }
+
+    private tryConsumeFactory (factory: Factory, productionTimeInSec: number): boolean {
+        const success = this.tryConsumeCraft(factory.inputs, factory.outputs, productionTimeInSec)
+        // if (!success) {
+        //     factory.machines.forEach((m) => {
+        //         this.tryConsumeCraft(m, productionTimeInSec)
+        //     })
+        //     factory.factories.forEach((f) => {
+        //         this.tryConsumeFactory(f, productionTimeInSec)
+        //     })
+        // }
+        console.log(success)
+        return success
+    }
+
     public update (delta: number): void {
         const deltaSecond = delta / 1000
         this.manualMachines.forEach((m) => {
-            if (m.active) {
-                m.craft.input.forEach((ingredient) => {
-                    this.inventory.removeItem(ingredient.item, ingredient.quantityPerSecond * deltaSecond)
-                })
-                m.craft.output.forEach((ingredient) => {
-                    this.inventory.addItem(ingredient.item, ingredient.quantityPerSecond * deltaSecond)
-                })
+            const success = this.tryConsumeManualCraft(m, deltaSecond)
+            if (!success) {
+                m.active = false
             }
         })
-
-        this.factory.inputs.forEach((ingredient) => {
-            this.inventory.removeItem(ingredient.item, ingredient.quantityPerSecond * deltaSecond)
+        this.factory.machines.forEach((m) => {
+            this.tryConsumeCraft(m.craft.input, m.craft.output, deltaSecond)
         })
-        this.factory.outputs.forEach((ingredient) => {
-            this.inventory.addItem(ingredient.item, ingredient.quantityPerSecond * deltaSecond)
+        this.factory.factories.forEach((f) => {
+            this.tryConsumeFactory(f, deltaSecond)
         })
     }
 

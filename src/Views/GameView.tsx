@@ -38,7 +38,6 @@ const GameView = (props: IBaseProps): JSX.Element => {
                 <button className="btn btn-primary"
                     onClick={() => {
                         if (selectedMachineCraft === undefined) return
-                        console.log(selectedMachineCraft)
                         currentFactory.buildMachine(selectedMachineCraft)
                     }}>
                         Add machine
