@@ -5,7 +5,7 @@ import IngredientsView from './IngredientsView'
 
 interface IMachineProps {
     machine: Machine
-    onDeleteMachine: () => void
+    onDeleteMachine?: () => void
     manual: boolean
     onTogglePauseMachine?: () => void
 }
@@ -24,7 +24,7 @@ const MachineView = (props: IMachineProps): JSX.Element => {
         </button>
         actions.push(craftBtn)
     } else {
-        actions.push(<button onClick={() => props.onDeleteMachine()} className="btn btn-danger btn-side"><i className="fas fa-trash fa-xs"></i></button>)
+        actions.push(<button onClick={() => props.onDeleteMachine?.()} className="btn btn-danger btn-side"><i className="fas fa-trash fa-xs"></i></button>)
         actions.push(<button onClick={() => {
             props.machine.active = !props.machine.active
             props.onTogglePauseMachine?.()

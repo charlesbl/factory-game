@@ -5,23 +5,40 @@ import Factory from '../Game/Factory'
 import InventoryView from './InventoryView'
 import SelectMachineView from './SelectMachineView'
 import MachineCraft from '../Game/MachineCraft'
+import Machine from '../Game/Machine'
+import MachineView from './MachineView'
+
+const renderManualMachine = (machine: Machine, index: number): JSX.Element => {
+    return (
+        <div key={index} className="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2 machine-container">
+            <MachineView machine={machine} manual={true}/>
+        </div>
+    )
+}
 
 const GameView = (props: IBaseProps): JSX.Element => {
     const [selectedMachineCraft, selectMachineCraft] = useState<MachineCraft | undefined>(undefined)
     const [factories, setFactories] = useState<Factory[]>([props.game.factory])
     const currentFactory = factories[factories.length - 1]
 
+    const manualMachines = props.game.manualMachines.map((machine, i) => renderManualMachine(machine, i))
+
     return (
         <div>
             <span>{props.game.money.toFixed(2)}€</span>
             <InventoryView inventory={props.game.inventory} />
-            {factories.length > 1 && <button className="btn btn-primary"
+
+            <div className="row">
+                {manualMachines}
+            </div>
+            <button className="btn btn-primary"
+                disabled={factories.length === 1}
                 onClick={() => {
                     factories.pop()
                     setFactories([...factories])
                 }}>
                     Return
-            </button>}
+            </button>
             <FactoryView
                 game={props.game}
                 factory={currentFactory}
