@@ -11,6 +11,7 @@ import Ressources from './Resources/Ressources'
 // TODO config menu
 
 const INIT_MONEY = 1000
+const MANUAL_CRAFTING_FACTOR = 20
 
 export default class Game {
     public readonly factory: Factory
@@ -73,7 +74,7 @@ export default class Game {
 
     private tryConsumeManualCraft (machine: Machine, productionTimeInSec: number): boolean {
         if (machine.active) {
-            return this.tryConsumeCraft(machine.craft.input, machine.craft.output, productionTimeInSec * 10)
+            return this.tryConsumeCraft(machine.craft.input, machine.craft.output, productionTimeInSec * MANUAL_CRAFTING_FACTOR)
         } else {
             return false
         }
