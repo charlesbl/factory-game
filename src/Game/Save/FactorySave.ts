@@ -23,6 +23,8 @@ export default class FactorySave extends Saveable<Factory> {
     }
 
     public getObj = (): Factory => {
-        return new Factory(this.machines.map((machineSave: MachineSave) => machineSave.getObj()), this.factories.map((factorySave: FactorySave) => factorySave.getObj()))
+        const factory = new Factory(this.machines.map((machineSave: MachineSave) => machineSave.getObj()), this.factories.map((factorySave: FactorySave) => factorySave.getObj()))
+        factory.factories.forEach((f) => f.setTopFactory(factory))
+        return factory
     }
 }

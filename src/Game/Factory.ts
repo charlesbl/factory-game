@@ -8,6 +8,7 @@ export default class Factory {
     private _factories: Factory[]
     private _inputs: Ingredient[]
     private _outputs: Ingredient[]
+    private topFactory?: Factory
 
     public get machines (): Machine[] {
         return this._machines
@@ -17,7 +18,7 @@ export default class Factory {
         return this._factories
     }
 
-    public constructor (machines?: Machine[], factories?: Factory[]) {
+    public constructor (machines?: Machine[], factories?: Factory[], topFactory?: Factory) {
         if (machines !== undefined) {
             this._machines = machines
         } else {
@@ -31,11 +32,22 @@ export default class Factory {
         }
         this._inputs = []
         this._outputs = []
+
+        this.topFactory = topFactory
         this.updateInputsAndOutputs()
     }
 
+    public togglePauseMachine (machine: Machine): void {
+        machine.active = !machine.active
+        this.updateInputsAndOutputs()
+    }
+
+    public setTopFactory (factory: Factory): void {
+        this.topFactory = factory
+    }
+
     public addSubFactory (): void {
-        this._factories.push(new Factory())
+        this._factories.push(new Factory(undefined, undefined, this))
         this.updateInputsAndOutputs()
     }
 
@@ -80,6 +92,8 @@ export default class Factory {
         const [simplifiedInputs, simplifiedOutputs] = Ingredient.simplifyIngredient(mergedInputs, mergedOutputs)
         this._inputs = simplifiedInputs
         this._outputs = simplifiedOutputs
+        this.topFactory?.updateInputsAndOutputs()
+        console.log('update f')
     }
 
     public setAllMachineActive (value: boolean): void {

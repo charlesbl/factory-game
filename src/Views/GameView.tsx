@@ -44,13 +44,6 @@ const GameView = (props: IBaseProps): JSX.Element => {
                 factory={currentFactory}
                 onSelectedFactory={(factory) => {
                     setFactories([...factories, factory])
-                }}
-                onUpdateFactoryIO={() => {
-                    currentFactory.updateInputsAndOutputs()
-                    factories.reduceRight((_, factory) => {
-                        factory.updateInputsAndOutputs()
-                        return factory
-                    })
                 }}/>
 
             <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2">
