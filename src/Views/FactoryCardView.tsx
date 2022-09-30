@@ -7,6 +7,7 @@ import IngredientsView from './IngredientsView'
 interface IFactoryProps {
     factory: Factory
     onClickEnter: () => void
+    onDeleteFactory: () => void
 }
 
 const FactoryCardView = (props: IFactoryProps): JSX.Element => {
@@ -23,7 +24,7 @@ const FactoryCardView = (props: IFactoryProps): JSX.Element => {
                     <div className="arrow"><i className="fas fa-arrow-right fa-10px"></i></div>
                     <div className="fbtn-wrapper">
                         <button className="btn btn-primary" onClick={() => props.onClickEnter()}>Enter</button>
-                        <button className="btn btn-danger btn-destroy" onClick={() => props.factory.destroy()}><i className="fas fa-trash fa-xs"></i></button>
+                        <button className="btn btn-danger btn-destroy" onClick={() => props.onDeleteFactory()}><i className="fas fa-trash fa-xs"></i></button>
                     </div>
                 </div>
                 <IngredientsView ingredients={props.factory.outputs} />

@@ -41,9 +41,12 @@ export default class Factory {
         return this.machines.filter((machine) => machine.craft.id === machineCraft.id)
     }
 
-    destroy (): void {
-        this.factories.forEach((factory) => factory.destroy())
-        this.machines.forEach((machine) => this.destroyMachine(machine))
+    destroySubFactory (subFactory: Factory): void {
+        subFactory.machines.forEach((machine) => subFactory.destroyMachine(machine))
+        subFactory.factories.forEach((factory) => subFactory.destroySubFactory(factory))
+        this.factories = this.factories.filter((elem) => {
+            return elem !== subFactory
+        })
     }
 
     public get inputs (): Ingredient[] {
