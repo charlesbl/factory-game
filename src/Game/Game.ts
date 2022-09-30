@@ -54,7 +54,6 @@ export default class Game {
 
     update (delta: number): void {
         const deltaSecond = delta / 1000
-        // TODO update unique game inventory using the factory
         this._manualMachines.forEach((m) => {
             if (m.active) {
                 m.craft.input.forEach((ingredient) => {

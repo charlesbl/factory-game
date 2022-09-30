@@ -11,36 +11,38 @@ const GameView = (props: IBaseProps): JSX.Element => {
     const [factories, setFactories] = useState<Factory[]>([props.game.factory])
     const currentFactory = factories[factories.length - 1]
 
-    const returnButton = factories.length === 1
-        ? ''
-        : <button className="btn btn-primary" onClick={() => {
-            factories.pop()
-            setFactories([...factories])
-        }}>Return</button>
-
     return (
         <div>
             <span>{props.game.money.toFixed(2)}€</span>
             <InventoryView inventory={props.game.inventory} />
-            {returnButton}
+            {factories.length > 1 && <button className="btn btn-primary"
+                onClick={() => {
+                    factories.pop()
+                    setFactories([...factories])
+                }}>
+                    Return
+            </button>}
             <FactoryView
                 game={props.game}
                 factory={currentFactory}
                 onSelectedFactory={(factory) => {
-                    factories.push(factory)
-                    setFactories([...factories])
+                    setFactories([...factories, factory])
                 }} />
 
             <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2">
                 <button className="btn btn-primary"
-                    onClick={() => currentFactory.addSubFactory()}>Add factory</button>
+                    onClick={() => currentFactory.addSubFactory()}>
+                        Add factory
+                </button>
                 <SelectMachineView onChange={(machineCraft) => selectMachineCraft(machineCraft)} />
                 <button className="btn btn-primary"
                     onClick={() => {
                         if (selectedMachineCraft === undefined) return
                         console.log(selectedMachineCraft)
                         currentFactory.buildMachine(selectedMachineCraft)
-                    }}>Add machine</button>
+                    }}>
+                        Add machine
+                </button>
             </div>
         </div>
     )

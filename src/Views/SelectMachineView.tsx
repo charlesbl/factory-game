@@ -17,7 +17,7 @@ const changeSelect = (value: string, onChange: (machineCraft?: MachineCraft) => 
     if (value !== 'none') {
         onChange(Ressources.getMachineCraftById(value))
     } else {
-        onChange(undefined)
+        onChange()
     }
 }
 
