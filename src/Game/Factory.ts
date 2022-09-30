@@ -25,8 +25,8 @@ export default class Factory {
         this.factories.push(new Factory())
     }
 
-    buildMachine (machineCraft: MachineCraft, manual = false): Machine {
-        const machine = new Machine(machineCraft.name, machineCraft.outputCraft, manual)
+    buildMachine (machineCraft: MachineCraft): Machine {
+        const machine = new Machine(machineCraft.name, machineCraft.outputCraft)
         this.machines.push(machine)
         return machine
     }

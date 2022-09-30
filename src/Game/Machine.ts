@@ -3,11 +3,9 @@ import Craft from './Craft'
 export default class Machine {
     name: string
     craft: Craft
-    manual: boolean
 
-    constructor (name: string, craft: Craft, manual: boolean = false) {
+    constructor (name: string, craft: Craft) {
         this.name = name
         this.craft = craft
-        this.manual = manual
     }
 }

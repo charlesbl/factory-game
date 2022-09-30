@@ -1,30 +1,31 @@
 import React from 'react'
-import { notImplemented } from '..'
 import '../css/Machine.css'
 import Machine from '../Game/Machine'
+import ManualMachine from '../Game/ManualMachine'
 import IngredientsView from './IngredientsView'
 
 interface IMachineProps {
     machine: Machine
     onDeleteMachine: () => void
+    manual: boolean
 }
 
 const MachineView = (props: IMachineProps): JSX.Element => {
-    const canCraft = true // TODO implement if user can manually craft
-    const craftBtn = <button onMouseDown={() => notImplemented()}
-        onMouseUp={() => notImplemented()}
-        onMouseOut={() => notImplemented()}
-        className="btn btn-success btn-side btn-craft" disabled={!canCraft}>
-        <i className="fas fa-hammer fa-xs"></i>
-    </button>
-    const destroyBtn = <button onClick={() => props.onDeleteMachine()} className="btn btn-danger btn-side"><i className="fas fa-trash fa-xs"></i></button>
-
     const actions: JSX.Element[] = []
-    if (props.machine.manual) {
-        actions.push(craftBtn)
+    if (!props.manual) {
+        actions.push(<button onClick={() => props.onDeleteMachine()} className="btn btn-danger btn-side"><i className="fas fa-trash fa-xs"></i></button>)
     }
-    if (!props.machine.manual) {
-        actions.push(destroyBtn)
+    if (props.manual) {
+        const manualMachine = props.machine as ManualMachine
+        const canCraft = true // TODO implement if user can manually craft
+
+        const craftBtn = <button onMouseDown={() => { manualMachine.active = true }}
+            onMouseUp={() => { manualMachine.active = false }}
+            onMouseOut={() => { manualMachine.active = false }}
+            className="btn btn-success btn-side btn-craft" disabled={!canCraft}>
+            <i className="fas fa-hammer fa-xs"></i>
+        </button>
+        actions.push(craftBtn)
     }
     return (
         <div className="machine">

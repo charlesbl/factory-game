@@ -9,7 +9,7 @@ const startGameLoop = (game: Game, onUpdate: () => void, saveGame: () => void): 
     void new Promise<void>((resolve) => {
         const gameloop = (): void => {
             const startTime = Date.now()
-            game.update()
+            game.update(REFRESH_RATE)
             onUpdate()
             tickCount++
             if (tickCount >= TICK_BETWEEN_SAVE) {

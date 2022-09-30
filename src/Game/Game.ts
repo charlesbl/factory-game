@@ -1,5 +1,6 @@
 import Factory from './Factory'
 import Inventory from './Inventory'
+import ManualMachine from './ManualMachine'
 import Ressources from './Resources/Ressources'
 
 // TODO Rename Factory
@@ -14,6 +15,7 @@ export default class Game {
     private readonly _factory: Factory
     private _money: number
     private readonly _inventory: Inventory
+    private readonly _manualMachines: ManualMachine[]
 
     public get factory (): Factory {
         return this._factory
@@ -27,7 +29,11 @@ export default class Game {
         return this._inventory
     }
 
-    constructor (factory?: Factory, money?: number, inventory?: Inventory, initManualMachine: boolean = false) {
+    public get manualMachines (): ManualMachine[] {
+        return this._manualMachines
+    }
+
+    constructor (factory?: Factory, money?: number, inventory?: Inventory) {
         if (factory !== undefined) {
             this._factory = factory
         } else {
@@ -43,13 +49,29 @@ export default class Game {
         } else {
             this._inventory = new Inventory()
         }
-        if (initManualMachine) {
-            Ressources.getMachineCrafts().forEach((machineCraft) => this._factory.buildMachine(machineCraft, true))
-        }
+        this._manualMachines = Ressources.getMachineCrafts().map((machineCraft) => new ManualMachine(machineCraft.name, machineCraft.outputCraft))
     }
 
-    update (): void {
+    update (delta: number): void {
+        const deltaSecond = delta / 1000
         // TODO update unique game inventory using the factory
+        this._manualMachines.forEach((m) => {
+            if (m.active) {
+                m.craft.input.forEach((ingredient) => {
+                    this._inventory.removeItem(ingredient.item, ingredient.quantityPerSecond * deltaSecond)
+                })
+                m.craft.output.forEach((ingredient) => {
+                    this._inventory.addItem(ingredient.item, ingredient.quantityPerSecond * deltaSecond)
+                })
+            }
+        })
+
+        this._factory.inputs.forEach((ingredient) => {
+            this._inventory.removeItem(ingredient.item, ingredient.quantityPerSecond * deltaSecond)
+        })
+        this._factory.outputs.forEach((ingredient) => {
+            this._inventory.addItem(ingredient.item, ingredient.quantityPerSecond * deltaSecond)
+        })
     }
 
     public cheatMoney (): void {

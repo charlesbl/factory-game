@@ -21,7 +21,7 @@ const GameView = (props: IBaseProps): JSX.Element => {
     return (
         <div>
             <span>{props.game.money.toFixed(2)}€</span>
-            <InventoryView game={props.game} inventory={props.game.inventory} />
+            <InventoryView inventory={props.game.inventory} />
             {returnButton}
             <FactoryView
                 game={props.game}

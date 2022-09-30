@@ -19,7 +19,7 @@ const loadGame = (): Game => {
         const save = new GameSave(undefined, JSON.parse(stringSave))
         return save.getObj()
     } else {
-        return new Game(undefined, undefined, undefined, true)
+        return new Game()
     }
 }
 

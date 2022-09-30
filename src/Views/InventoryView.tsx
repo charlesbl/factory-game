@@ -2,9 +2,8 @@ import React from 'react'
 import '../css/Inventory.css'
 import ItemStack from '../Game/ItemStack'
 import Inventory from '../Game/Inventory'
-import IBaseProps from './IBaseProps'
 
-interface IInventoryProps extends IBaseProps {
+interface IInventoryProps {
     inventory: Inventory
 }
 
@@ -16,7 +15,7 @@ const renderItemStack = (itemId: string, itemStack: ItemStack): JSX.Element => {
                     <span className="item-name">{itemStack.item.name}:</span>
                 </div>
                 <div className="col-5 text-left">
-                    <span>{itemStack.quantity}</span>
+                    <span>{itemStack.quantity.toFixed(1)}</span>
                 </div>
                 <div className="col-12">
                 </div>
