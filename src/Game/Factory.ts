@@ -4,62 +4,70 @@ import MachineCraft from './MachineCraft'
 import Ingredient from './Ingredient'
 
 export default class Factory {
-    machines: Machine[]
-    factories: Factory[]
+    private _machines: Machine[]
+    private _factories: Factory[]
 
-    constructor (machines?: Machine[], factories?: Factory[]) {
+    public get machines (): Machine[] {
+        return this._machines
+    }
+
+    public get factories (): Factory[] {
+        return this._factories
+    }
+
+    public constructor (machines?: Machine[], factories?: Factory[]) {
         if (machines !== undefined) {
-            this.machines = machines
+            this._machines = machines
         } else {
-            this.machines = []
+            this._machines = []
         }
 
         if (factories !== undefined) {
-            this.factories = factories
+            this._factories = factories
         } else {
-            this.factories = []
+            this._factories = []
         }
     }
 
-    addSubFactory (): void {
-        this.factories.push(new Factory())
+    public addSubFactory (): void {
+        this._factories.push(new Factory())
     }
 
-    buildMachine (machineCraft: MachineCraft): Machine {
+    public buildMachine (machineCraft: MachineCraft): Machine {
         const machine = new Machine(machineCraft.name, machineCraft.outputCraft)
-        this.machines.push(machine)
+        this._machines.push(machine)
         return machine
     }
 
-    destroyMachine (machine: Machine): void {
-        this.machines = this.machines.filter((elem) => {
+    public destroyMachine (machine: Machine): void {
+        this._machines = this._machines.filter((elem) => {
             return elem !== machine
         })
     }
 
-    getMachinesOfType (machineCraft: Craft): Machine[] {
-        return this.machines.filter((machine) => machine.craft.id === machineCraft.id)
+    public getMachinesOfType (machineCraft: Craft): Machine[] {
+        return this._machines.filter((machine) => machine.craft.id === machineCraft.id)
     }
 
-    destroySubFactory (subFactory: Factory): void {
-        subFactory.machines.forEach((machine) => subFactory.destroyMachine(machine))
-        subFactory.factories.forEach((factory) => subFactory.destroySubFactory(factory))
-        this.factories = this.factories.filter((elem) => {
+    public destroySubFactory (subFactory: Factory): void {
+        subFactory._machines.forEach((machine) => subFactory.destroyMachine(machine))
+        subFactory._factories.forEach((factory) => subFactory.destroySubFactory(factory))
+        this._factories = this._factories.filter((elem) => {
             return elem !== subFactory
         })
     }
 
     public get inputs (): Ingredient[] {
         const allInputs: Ingredient[] = []
-        allInputs.push(...this.machines.map((machine) => machine.craft.input).flat())
-        allInputs.push(...this.factories.map((factory) => factory.inputs).flat())
+        allInputs.push(...this._machines.map((machine) => machine.craft.input).flat())
+        allInputs.push(...this._factories.map((factory) => factory.inputs).flat())
         return Ingredient.mergeIngredient(allInputs)
     }
 
     public get outputs (): Ingredient[] {
         const allOutputs: Ingredient[] = []
-        allOutputs.push(...this.machines.map((machine) => machine.craft.output).flat())
-        allOutputs.push(...this.factories.map((factory) => factory.outputs).flat())
+        allOutputs.push(...this._machines.map((machine) => machine.craft.output).flat())
+        allOutputs.push(...this._factories.map((factory) => factory.outputs).flat())
         return Ingredient.mergeIngredient(allOutputs)
     }
 }

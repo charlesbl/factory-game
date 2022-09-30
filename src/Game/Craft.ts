@@ -6,7 +6,7 @@ class Craft {
     public readonly input: Ingredient[]
     public readonly output: Ingredient[]
 
-    constructor (id: string, name: string, input: Ingredient[], output: Ingredient[]) {
+    public constructor (id: string, name: string, input: Ingredient[], output: Ingredient[]) {
         this.id = id
         this.name = name
         this.input = input

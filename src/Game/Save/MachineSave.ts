@@ -3,25 +3,25 @@ import Ressources from '../Resources/Ressources'
 import Saveable from './Saveable'
 
 export default class MachineSave extends Saveable<Machine> {
-    name!: string
-    craftId!: string
+    private name!: string
+    private craftId!: string
 
-    constructor (obj?: Machine, blob?: any) {
+    public constructor (obj?: Machine, blob?: any) {
         super()
         this.init(obj, blob)
     }
 
-    fromObj = (machine: Machine): void => {
+    protected readonly fromObj = (machine: Machine): void => {
         this.name = machine.name
         this.craftId = machine.craft.id
     }
 
-    fromSave = (blob: MachineSave): void => {
+    protected readonly fromSave = (blob: MachineSave): void => {
         this.name = blob.name
         this.craftId = blob.craftId
     }
 
-    getObj = (): Machine => {
+    public readonly getObj = (): Machine => {
         return new Machine(this.name, Ressources.getCraftById(this.craftId))
     }
 }

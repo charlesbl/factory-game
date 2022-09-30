@@ -2,15 +2,15 @@ import Item from './Item'
 import Ressources from './Resources/Ressources'
 
 export default class Ingredient {
-    readonly item: Item
-    readonly quantityPerSecond: number
+    public readonly item: Item
+    public readonly quantityPerSecond: number
 
-    constructor (item: Item, quantity: number) {
+    public constructor (item: Item, quantity: number) {
         this.item = item
         this.quantityPerSecond = quantity
     }
 
-    static mergeIngredient = (ingredients: Ingredient[]): Ingredient[] => {
+    public static mergeIngredient = (ingredients: Ingredient[]): Ingredient[] => {
         const result: { [key: string]: number } = {}
         ingredients.forEach((ingredient: Ingredient) => {
             if (result[ingredient.item.id] == null) {

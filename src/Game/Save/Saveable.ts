@@ -1,5 +1,5 @@
 export default abstract class Saveable<T> {
-    init (obj?: T, blob?: any): void {
+    protected init (obj?: T, blob?: any): void {
         if (obj !== undefined) {
             this.fromObj(obj)
         } else if (blob !== undefined) {
@@ -9,7 +9,7 @@ export default abstract class Saveable<T> {
         }
     }
 
-    abstract fromObj: (obj: T) => void
-    abstract fromSave: (blob: any) => void
-    abstract getObj: () => T
+    protected abstract fromObj: (obj: T) => void
+    protected abstract fromSave: (blob: any) => void
+    public abstract getObj: () => T
 }

@@ -12,6 +12,6 @@ parserOptions:
 plugins:
   - react
 rules: {
-  "@typescript-eslint/indent": ["error", 4]
-#  @typescript-eslint/explicit-member-accessibility: "warn"
+  "@typescript-eslint/indent": ["error", 4],
+  "@typescript-eslint/explicit-member-accessibility": "error"
 }

@@ -1,15 +1,23 @@
 import Item from './Item'
 
 export default class ItemStack {
-    item: Item
-    quantity: number
+    public readonly item: Item
+    private _quantity: number
 
-    constructor (item: Item, quantity: number) {
-        this.item = item
-        this.quantity = quantity
+    public get quantity (): number {
+        return this._quantity
     }
 
-    toString (): string {
-        return `${this.item.name} + ': ' + ${this.quantity}`
+    public set quantity (value: number) {
+        this._quantity = value
+    }
+
+    public constructor (item: Item, quantity: number) {
+        this.item = item
+        this._quantity = quantity
+    }
+
+    public toString (): string {
+        return `${this.item.name} + ': ' + ${this._quantity}`
     }
 }

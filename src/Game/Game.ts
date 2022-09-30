@@ -12,32 +12,20 @@ import Ressources from './Resources/Ressources'
 const INIT_MONEY = 1000
 
 export default class Game {
-    private readonly _factory: Factory
+    public readonly factory: Factory
+    public readonly inventory: Inventory
+    public readonly manualMachines: ManualMachine[]
     private _money: number
-    private readonly _inventory: Inventory
-    private readonly _manualMachines: ManualMachine[]
-
-    public get factory (): Factory {
-        return this._factory
-    }
 
     public get money (): number {
         return this._money
     }
 
-    public get inventory (): Inventory {
-        return this._inventory
-    }
-
-    public get manualMachines (): ManualMachine[] {
-        return this._manualMachines
-    }
-
-    constructor (factory?: Factory, money?: number, inventory?: Inventory) {
+    public constructor (factory?: Factory, money?: number, inventory?: Inventory) {
         if (factory !== undefined) {
-            this._factory = factory
+            this.factory = factory
         } else {
-            this._factory = new Factory()
+            this.factory = new Factory()
         }
         if (money !== undefined) {
             this._money = money
@@ -45,31 +33,31 @@ export default class Game {
             this._money = INIT_MONEY
         }
         if (inventory !== undefined) {
-            this._inventory = inventory
+            this.inventory = inventory
         } else {
-            this._inventory = new Inventory()
+            this.inventory = new Inventory()
         }
-        this._manualMachines = Ressources.getMachineCrafts().map((machineCraft) => new ManualMachine(machineCraft.name, machineCraft.outputCraft))
+        this.manualMachines = Ressources.getMachineCrafts().map((machineCraft) => new ManualMachine(machineCraft.name, machineCraft.outputCraft))
     }
 
-    update (delta: number): void {
+    public update (delta: number): void {
         const deltaSecond = delta / 1000
-        this._manualMachines.forEach((m) => {
+        this.manualMachines.forEach((m) => {
             if (m.active) {
                 m.craft.input.forEach((ingredient) => {
-                    this._inventory.removeItem(ingredient.item, ingredient.quantityPerSecond * deltaSecond)
+                    this.inventory.removeItem(ingredient.item, ingredient.quantityPerSecond * deltaSecond)
                 })
                 m.craft.output.forEach((ingredient) => {
-                    this._inventory.addItem(ingredient.item, ingredient.quantityPerSecond * deltaSecond)
+                    this.inventory.addItem(ingredient.item, ingredient.quantityPerSecond * deltaSecond)
                 })
             }
         })
 
-        this._factory.inputs.forEach((ingredient) => {
-            this._inventory.removeItem(ingredient.item, ingredient.quantityPerSecond * deltaSecond)
+        this.factory.inputs.forEach((ingredient) => {
+            this.inventory.removeItem(ingredient.item, ingredient.quantityPerSecond * deltaSecond)
         })
-        this._factory.outputs.forEach((ingredient) => {
-            this._inventory.addItem(ingredient.item, ingredient.quantityPerSecond * deltaSecond)
+        this.factory.outputs.forEach((ingredient) => {
+            this.inventory.addItem(ingredient.item, ingredient.quantityPerSecond * deltaSecond)
         })
     }
 
