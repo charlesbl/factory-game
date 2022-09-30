@@ -6,6 +6,7 @@ import IngredientsView from './IngredientsView'
 
 interface IMachineProps {
     machine: Machine
+    onDeleteMachine: () => void
 }
 
 const MachineView = (props: IMachineProps): JSX.Element => {
@@ -16,7 +17,7 @@ const MachineView = (props: IMachineProps): JSX.Element => {
         className="btn btn-success btn-side btn-craft" disabled={!canCraft}>
         <i className="fas fa-hammer fa-xs"></i>
     </button>
-    const destroyBtn = <button onClick={() => notImplemented()} className="btn btn-danger btn-side"><i className="fas fa-trash fa-xs"></i></button>
+    const destroyBtn = <button onClick={() => props.onDeleteMachine()} className="btn btn-danger btn-side"><i className="fas fa-trash fa-xs"></i></button>
 
     const actions: JSX.Element[] = []
     if (props.machine.manual) {

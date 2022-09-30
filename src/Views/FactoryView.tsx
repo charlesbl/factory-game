@@ -11,10 +11,10 @@ interface IFactoryProps extends IBaseProps {
     onSelectedFactory: (factory: Factory) => void
 }
 
-const renderMachine = (machine: Machine, index: number): JSX.Element => {
+const renderMachine = (machine: Machine, index: number, onDeleteMachine: () => void): JSX.Element => {
     return (
         <div key={index} className="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2 machine-container">
-            <MachineView machine={machine} />
+            <MachineView machine={machine} onDeleteMachine={onDeleteMachine} />
         </div>
     )
 }
@@ -28,7 +28,7 @@ const renderFactoryCard = (factory: Factory, index: number, onClickEnter: () => 
 }
 
 const FactoryView = (props: IFactoryProps): JSX.Element => {
-    const machines = props.factory.machines.map((machine, i) => renderMachine(machine, i))
+    const machines = props.factory.machines.map((machine, i) => renderMachine(machine, i, () => props.factory.destroyMachine(machine)))
     const factories = props.factory.factories.map((factory, i) => renderFactoryCard(factory, i, () => props.onSelectedFactory(factory)))
     return (
         <div>
