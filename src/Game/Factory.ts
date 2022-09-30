@@ -6,6 +6,8 @@ import Ingredient from './Ingredient'
 export default class Factory {
     private _machines: Machine[]
     private _factories: Factory[]
+    private _inputs: Ingredient[]
+    private _outputs: Ingredient[]
 
     public get machines (): Machine[] {
         return this._machines
@@ -27,15 +29,20 @@ export default class Factory {
         } else {
             this._factories = []
         }
+        this._inputs = []
+        this._outputs = []
+        this.updateInputsAndOutputs()
     }
 
     public addSubFactory (): void {
         this._factories.push(new Factory())
+        this.updateInputsAndOutputs()
     }
 
     public buildMachine (machineCraft: MachineCraft): Machine {
         const machine = new Machine(machineCraft.name, machineCraft.outputCraft)
         this._machines.push(machine)
+        this.updateInputsAndOutputs()
         return machine
     }
 
@@ -43,6 +50,7 @@ export default class Factory {
         this._machines = this._machines.filter((elem) => {
             return elem !== machine
         })
+        this.updateInputsAndOutputs()
     }
 
     public getMachinesOfType (machineCraft: Craft): Machine[] {
@@ -55,19 +63,30 @@ export default class Factory {
         this._factories = this._factories.filter((elem) => {
             return elem !== subFactory
         })
+        this.updateInputsAndOutputs()
     }
 
-    public get inputs (): Ingredient[] {
+    private updateInputsAndOutputs (): void {
         const allInputs: Ingredient[] = []
         allInputs.push(...this._machines.map((machine) => machine.craft.input).flat())
         allInputs.push(...this._factories.map((factory) => factory.inputs).flat())
-        return Ingredient.mergeIngredient(allInputs)
-    }
+        const mergedInputs = Ingredient.mergeIngredient(allInputs)
 
-    public get outputs (): Ingredient[] {
         const allOutputs: Ingredient[] = []
         allOutputs.push(...this._machines.map((machine) => machine.craft.output).flat())
         allOutputs.push(...this._factories.map((factory) => factory.outputs).flat())
-        return Ingredient.mergeIngredient(allOutputs)
+        const mergedOutputs = Ingredient.mergeIngredient(allOutputs)
+
+        const [simplifiedInputs, simplifiedOutputs] = Ingredient.simplifyIngredient(mergedInputs, mergedOutputs)
+        this._inputs = simplifiedInputs
+        this._outputs = simplifiedOutputs
+    }
+
+    public get inputs (): Ingredient[] {
+        return this._inputs
+    }
+
+    public get outputs (): Ingredient[] {
+        return this._outputs
     }
 }
