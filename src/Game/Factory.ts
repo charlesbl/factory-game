@@ -1,6 +1,7 @@
 import Machine from './Machine'
 import Craft from './Craft'
 import MachineCraft from './MachineCraft'
+import Ingredient from './Ingredient'
 
 export default class Factory {
     machines: Machine[]
@@ -43,5 +44,19 @@ export default class Factory {
     destroy (): void {
         this.factories.forEach((factory) => factory.destroy())
         this.machines.forEach((machine) => this.destroyMachine(machine))
+    }
+
+    public get inputs (): Ingredient[] {
+        const allInputs: Ingredient[] = []
+        allInputs.push(...this.machines.map((machine) => machine.craft.input).flat())
+        allInputs.push(...this.factories.map((factory) => factory.inputs).flat())
+        return Ingredient.mergeIngredient(allInputs)
+    }
+
+    public get outputs (): Ingredient[] {
+        const allOutputs: Ingredient[] = []
+        allOutputs.push(...this.machines.map((machine) => machine.craft.output).flat())
+        allOutputs.push(...this.factories.map((factory) => factory.outputs).flat())
+        return Ingredient.mergeIngredient(allOutputs)
     }
 }

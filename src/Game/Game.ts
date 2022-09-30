@@ -44,7 +44,7 @@ export default class Game {
             this._inventory = new Inventory()
         }
         if (initManualMachine) {
-            Ressources.MachineCrafts.forEach((machineCraft) => this._factory.buildMachine(machineCraft, true))
+            Ressources.getMachineCrafts().forEach((machineCraft) => this._factory.buildMachine(machineCraft, true))
         }
     }
 

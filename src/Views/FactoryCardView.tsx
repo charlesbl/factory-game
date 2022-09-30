@@ -2,6 +2,7 @@ import React from 'react'
 import { notImplemented } from '..'
 import '../css/FactoryCardView.css'
 import Factory from '../Game/Factory'
+import IngredientsView from './IngredientsView'
 
 interface IFactoryProps {
     factory: Factory
@@ -17,6 +18,7 @@ const FactoryCardView = (props: IFactoryProps): JSX.Element => {
             </div>
 
             <div className="factory-wrapper">
+                <IngredientsView ingredients={props.factory.inputs} />
                 <div>
                     <div className="arrow"><i className="fas fa-arrow-right fa-10px"></i></div>
                     <div className="fbtn-wrapper">
@@ -24,6 +26,7 @@ const FactoryCardView = (props: IFactoryProps): JSX.Element => {
                         <button className="btn btn-danger btn-destroy" onClick={() => props.factory.destroy()}><i className="fas fa-trash fa-xs"></i></button>
                     </div>
                 </div>
+                <IngredientsView ingredients={props.factory.outputs} />
             </div>
         </div>
     )

@@ -22,7 +22,7 @@ const changeSelect = (value: string, onChange: (machineCraft?: MachineCraft) => 
 }
 
 const SelectMachineView = (props: ISelectMachineProps): JSX.Element => {
-    const options = Ressources.MachineCrafts.map((machineCraft) => renderOption(machineCraft))
+    const options = Ressources.getMachineCrafts().map((machineCraft) => renderOption(machineCraft))
     return (
         <select onChange={(event) => changeSelect(event.target.value, props.onChange)} className="custom-select custom-select-sm">
             <option value="none">Open this select menu</option>

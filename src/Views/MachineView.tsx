@@ -16,9 +16,15 @@ const MachineView = (props: IMachineProps): JSX.Element => {
         className="btn btn-success btn-side btn-craft" disabled={!canCraft}>
         <i className="fas fa-hammer fa-xs"></i>
     </button>
-
     const destroyBtn = <button onClick={() => notImplemented()} className="btn btn-danger btn-side"><i className="fas fa-trash fa-xs"></i></button>
-    const actions = props.machine.manual ? <div className="btn-wrapper">{craftBtn}</div> : <div className="btn-wrapper">{destroyBtn}</div>
+
+    const actions: JSX.Element[] = []
+    if (props.machine.manual) {
+        actions.push(craftBtn)
+    }
+    if (!props.machine.manual) {
+        actions.push(destroyBtn)
+    }
     return (
         <div className="machine">
             <div className="name">{props.machine.name}</div>
@@ -27,7 +33,7 @@ const MachineView = (props: IMachineProps): JSX.Element => {
                 <div>
                     <div className="arrow"><i className="fas fa-arrow-right fa-10px"></i></div>
                     <div>58%</div>
-                    {actions}
+                    {actions.map((btn, i) => <div key={i} className="btn-wrapper">{btn}</div>)}
                 </div>
                 <IngredientsView ingredients={props.machine.craft.output} />
             </div>

@@ -6,7 +6,7 @@ export default class Inventory {
     itemStacks: { [key: string]: ItemStack } // key = itemId
     constructor () {
         this.itemStacks = {}
-        Ressources.Items.forEach((item: Item) => {
+        Ressources.getItems().forEach((item: Item) => {
             this.itemStacks[item.id] = new ItemStack(item, 0)
         })
     }
