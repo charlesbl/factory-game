@@ -84,7 +84,10 @@ export default class Factory {
 
     public setAllMachineActive (value: boolean): void {
         this._machines.forEach((machine) => { machine.active = value })
-        this._factories.forEach((factory) => factory.setAllMachineActive(value))
+        this._factories.forEach((factory) => {
+            factory.setAllMachineActive(value)
+        })
+        this.updateInputsAndOutputs()
     }
 
     public get inputs (): Ingredient[] {

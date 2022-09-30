@@ -29,6 +29,7 @@ const GameView = (props: IBaseProps): JSX.Element => {
                     setFactories([...factories, factory])
                 }}
                 onUpdateFactoryIO={() => {
+                    currentFactory.updateInputsAndOutputs()
                     factories.reduceRight((_, factory) => {
                         factory.updateInputsAndOutputs()
                         return factory

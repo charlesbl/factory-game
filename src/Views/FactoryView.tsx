@@ -20,22 +20,22 @@ const renderMachine = (machine: Machine, index: number, onDeleteMachine: () => v
     )
 }
 
-const renderFactoryCard = (factory: Factory, index: number, onClickEnter: () => void, onDeleteFactory: () => void): JSX.Element => {
+const renderFactoryCard = (factory: Factory, index: number, onClickEnter: () => void, onDeleteFactory: () => void, onActiveAllMachine: () => void): JSX.Element => {
     return (
         <div key={index} className="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2 machine-container">
-            <FactoryCardView factory={factory} onClickEnter={onClickEnter} onDeleteFactory={onDeleteFactory} />
+            <FactoryCardView factory={factory} onClickEnter={onClickEnter} onDeleteFactory={onDeleteFactory} onToggleAllMachines={onActiveAllMachine} />
         </div>
     )
 }
 
 const FactoryView = (props: IFactoryProps): JSX.Element => {
     const onTogglePauseMachine = (): void => {
-        props.factory.updateInputsAndOutputs()
+        // props.factory.updateInputsAndOutputs()
         props.onUpdateFactoryIO()
     }
     const machines = props.factory.machines.map((machine, i) => renderMachine(machine, i, () => props.factory.destroyMachine(machine), false, onTogglePauseMachine))
     const manualMachines = props.game.manualMachines.map((machine, i) => renderMachine(machine, i, () => props.factory.destroyMachine(machine), true))
-    const factories = props.factory.factories.map((factory, i) => renderFactoryCard(factory, i, () => props.onSelectedFactory(factory), () => props.factory.destroySubFactory(factory)))
+    const factories = props.factory.factories.map((factory, i) => renderFactoryCard(factory, i, () => props.onSelectedFactory(factory), () => props.factory.destroySubFactory(factory), () => props.onUpdateFactoryIO()))
     return (
         <div>
             <div className="row">
