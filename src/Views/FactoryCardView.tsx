@@ -1,5 +1,4 @@
 import React from 'react'
-import { notImplemented } from '..'
 import '../css/FactoryCardView.css'
 import Factory from '../Game/Factory'
 import IngredientsView from './IngredientsView'
@@ -15,7 +14,7 @@ const FactoryCardView = (props: IFactoryProps): JSX.Element => {
         <div className="factory">
             <div className="factory-header">
                 <div className="name">Factory</div>
-                {/* TODO */}<button onClick={() => notImplemented()} className="btn btn-primary btn-modify"><i className="fas fa-edit fa-xs"></i></button>
+                {/* TODO */}<button className="btn btn-primary btn-modify"><i className="fas fa-edit fa-xs"></i></button>
             </div>
 
             <div className="factory-wrapper">

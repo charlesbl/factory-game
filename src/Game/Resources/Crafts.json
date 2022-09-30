@@ -1,5 +1,27 @@
 [
     {
+        "id": "ironDrill",
+        "name": "Iron Drill",
+        "input": [],
+        "output": [
+            {
+                "itemId": "ironOre",
+                "quantity": 1
+            }
+        ]
+    },
+    {
+        "id": "copperDrill",
+        "name": "Copper Drill",
+        "input": [],
+        "output": [
+            {
+                "itemId": "ironOre",
+                "quantity": 1
+            }
+        ]
+    },
+    {
         "id": "ironIngot",
         "name": "Iron Ingot",
         "input": [
