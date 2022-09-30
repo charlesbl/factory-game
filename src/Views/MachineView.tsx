@@ -7,6 +7,7 @@ interface IMachineProps {
     machine: Machine
     onDeleteMachine: () => void
     manual: boolean
+    onTogglePauseMachine?: () => void
 }
 
 const MachineView = (props: IMachineProps): JSX.Element => {
@@ -25,10 +26,10 @@ const MachineView = (props: IMachineProps): JSX.Element => {
     } else {
         actions.push(<button onClick={() => props.onDeleteMachine()} className="btn btn-danger btn-side"><i className="fas fa-trash fa-xs"></i></button>)
     }
-    actions.push(<button onClick={() => { props.machine.active = !props.machine.active }} className="btn btn-warning btn-side">{!props.machine.active ? <i className="fas fa-play fa-xs"></i> : <i className="fas fa-pause fa-xs"></i>}</button>)
-    if (!props.machine.active) {
-        actions.push(<div>pause</div>)
-    }
+    actions.push(<button onClick={() => {
+        props.machine.active = !props.machine.active
+        props.onTogglePauseMachine?.()
+    }} className="btn btn-warning btn-side">{!props.machine.active ? <i className="fas fa-play fa-xs"></i> : <i className="fas fa-pause fa-xs"></i>}</button>)
     return (
         <div className="machine">
             <div className="name">{props.machine.name}</div>
