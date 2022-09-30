@@ -1,7 +1,6 @@
 import React from 'react'
 import '../css/Machine.css'
 import Machine from '../Game/Machine'
-import ManualMachine from '../Game/ManualMachine'
 import IngredientsView from './IngredientsView'
 
 interface IMachineProps {
@@ -12,11 +11,8 @@ interface IMachineProps {
 
 const MachineView = (props: IMachineProps): JSX.Element => {
     const actions: JSX.Element[] = []
-    if (!props.manual) {
-        actions.push(<button onClick={() => props.onDeleteMachine()} className="btn btn-danger btn-side"><i className="fas fa-trash fa-xs"></i></button>)
-    }
     if (props.manual) {
-        const manualMachine = props.machine as ManualMachine
+        const manualMachine = props.machine
         const canCraft = true // TODO implement if user can manually craft
 
         const craftBtn = <button onMouseDown={() => { manualMachine.active = true }}
@@ -26,6 +22,12 @@ const MachineView = (props: IMachineProps): JSX.Element => {
             <i className="fas fa-hammer fa-xs"></i>
         </button>
         actions.push(craftBtn)
+    } else {
+        actions.push(<button onClick={() => props.onDeleteMachine()} className="btn btn-danger btn-side"><i className="fas fa-trash fa-xs"></i></button>)
+    }
+    actions.push(<button onClick={() => { props.machine.active = !props.machine.active }} className="btn btn-warning btn-side">{!props.machine.active ? <i className="fas fa-play fa-xs"></i> : <i className="fas fa-pause fa-xs"></i>}</button>)
+    if (!props.machine.active) {
+        actions.push(<div>pause</div>)
     }
     return (
         <div className="machine">

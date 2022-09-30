@@ -31,14 +31,13 @@ const clearGame = (): void => {
 const GAME = loadGame()
 
 const App = (): JSX.Element => {
-    const [, setGame] = useState<Game>(GAME)
+    const [, setState] = useState(0)
 
     const updateGame = (): void => {
-        setGame(new Game(GAME.factory, GAME.money, GAME.inventory))
+        setState((n) => n + 1)
     }
-
     useEffect(() => {
-        const stopLoop = startGameLoop(GAME, updateGame, saveGame)
+        const stopLoop = startGameLoop(GAME, () => updateGame(), saveGame)
         return () => {
             stopLoop()
         }

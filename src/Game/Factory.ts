@@ -66,20 +66,25 @@ export default class Factory {
         this.updateInputsAndOutputs()
     }
 
-    private updateInputsAndOutputs (): void {
+    public updateInputsAndOutputs (): void {
         const allInputs: Ingredient[] = []
-        allInputs.push(...this._machines.map((machine) => machine.craft.input).flat())
+        allInputs.push(...this._machines.filter((machine) => machine.active).map((machine) => machine.craft.input).flat())
         allInputs.push(...this._factories.map((factory) => factory.inputs).flat())
         const mergedInputs = Ingredient.mergeIngredient(allInputs)
 
         const allOutputs: Ingredient[] = []
-        allOutputs.push(...this._machines.map((machine) => machine.craft.output).flat())
+        allOutputs.push(...this._machines.filter((machine) => machine.active).map((machine) => machine.craft.output).flat())
         allOutputs.push(...this._factories.map((factory) => factory.outputs).flat())
         const mergedOutputs = Ingredient.mergeIngredient(allOutputs)
 
         const [simplifiedInputs, simplifiedOutputs] = Ingredient.simplifyIngredient(mergedInputs, mergedOutputs)
         this._inputs = simplifiedInputs
         this._outputs = simplifiedOutputs
+    }
+
+    public setAllMachineActive (value: boolean): void {
+        this._machines.forEach((machine) => { machine.active = value })
+        this._factories.forEach((factory) => factory.setAllMachineActive(value))
     }
 
     public get inputs (): Ingredient[] {
