@@ -4,9 +4,8 @@ import Factory from '../Game/Factory'
 import Machine from '../Game/Machine'
 import MachineView from './MachineView'
 import FactoryCardView from './FactoryCardView'
-import IBaseProps from './IBaseProps'
 
-interface IFactoryProps extends IBaseProps {
+interface IFactoryProps {
     factory: Factory
     onSelectedFactory: (factory: Factory) => void
 }

@@ -1,10 +1,10 @@
 import Craft from './Craft'
 import Factory from './Factory'
+import CraftManager from './CraftManager'
 import Ingredient from './Ingredient'
 import Inventory from './Inventory'
 import Machine from './Machine'
 import MachineCraft from './MachineCraft'
-import Ressources from './Resources/Ressources'
 
 // TODO Custom machines = custom craft, use custom craft as normal craft to create a new machine
 // TODO create/edit/delete custom machines
@@ -20,29 +20,44 @@ export default class Game {
     public readonly inventory: Inventory
     public readonly manualMachines: Machine[]
     private _money: number
+    private readonly _craftManager: CraftManager
 
     public get money (): number {
         return this._money
     }
 
-    public constructor (factory?: Factory, money?: number, inventory?: Inventory) {
+    public get craftManager (): CraftManager {
+        return this._craftManager
+    }
+
+    public constructor (factory?: Factory, money?: number, inventory?: Inventory, craftManager?: CraftManager) {
         if (factory !== undefined) {
             this.factory = factory
         } else {
             this.factory = new Factory()
+            this.factory.name = 'Main'
         }
+
         if (money !== undefined) {
             this._money = money
         } else {
             this._money = INIT_MONEY
         }
+
         if (inventory !== undefined) {
             this.inventory = inventory
         } else {
             this.inventory = new Inventory()
         }
-        this.manualMachines = Ressources.getMachineCrafts().map((machineCraft) => {
-            const m = new Machine(machineCraft.name, machineCraft.outputCraft)
+
+        if (craftManager !== undefined) {
+            this._craftManager = craftManager
+        } else {
+            this._craftManager = new CraftManager([], [])
+        }
+
+        this.manualMachines = this._craftManager.machineCrafts.map((machineCraft) => {
+            const m = new Machine(machineCraft)
             m.active = false
             return m
         })

@@ -11,7 +11,7 @@ interface IManualMachineProps {
 
 const ManualMachineView = (props: IManualMachineProps): JSX.Element => {
     const actions: JSX.Element[] = []
-    const canCraft = props.machine.craft.canCraft(props.inventory, 1) // TODO implement if user can manually craft
+    const canCraft = props.machine.craft.canCraft(props.inventory, 1)
 
     const craftBtn = <button onMouseDown={() => { props.machine.active = true }}
         onMouseUp={() => { props.machine.active = false }}

@@ -7,6 +7,10 @@ import SelectMachineView from './SelectMachineView'
 import Machine from '../Game/Machine'
 import ManualMachineView from './ManualMachineView'
 import Inventory from '../Game/Inventory'
+import Craft from '../Game/Craft'
+import Ingredient from '../Game/Ingredient'
+import Ressources from '../Game/Resources/Ressources'
+import MachineCraft from '../Game/MachineCraft'
 
 const renderManualMachine = (machine: Machine, index: number, inventory: Inventory): JSX.Element => {
     return (
@@ -38,9 +42,19 @@ const GameView = (props: IBaseProps): JSX.Element => {
                 }}>
                     Return
             </button>
+            <button className="btn btn-primary" onClick={() => {
+                const randName = (Math.random() * 1000).toFixed()
+                const randQuantity = Math.random() * 10
+                const craft = new Craft(randName, randName, [new Ingredient(Ressources.getItems()[0], randQuantity)], [new Ingredient(Ressources.getItems()[1], randQuantity)])
+                props.game.craftManager.addCraft(craft)
+                const machineCraft = new MachineCraft('machine' + randName, randName, [], craft)
+                props.game.craftManager.addMachineCraft(machineCraft)
+            }}>
+                    add random craft
+            </button>
 
             <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2">
-                <SelectMachineView inventory={props.game.inventory} onAddClicked={(mc) => {
+                <SelectMachineView inventory={props.game.inventory} craftManager={props.game.craftManager} onAddClicked={(mc) => {
                     props.game.tryConsumeMachineCraft(mc, currentFactory)
                 }}/>
                 <button className="btn btn-primary" onClick={() => currentFactory.addSubFactory()}>
@@ -49,7 +63,6 @@ const GameView = (props: IBaseProps): JSX.Element => {
             </div>
 
             <FactoryView
-                game={props.game}
                 factory={currentFactory}
                 onSelectedFactory={(factory) => {
                     setFactories([...factories, factory])

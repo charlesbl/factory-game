@@ -64,7 +64,7 @@ export default class Factory {
     }
 
     public buildMachine (machineCraft: MachineCraft): Machine {
-        const machine = new Machine(machineCraft.name, machineCraft.outputCraft)
+        const machine = new Machine(machineCraft)
         this._machines.push(machine)
         this.updateInputsAndOutputs()
         return machine
@@ -105,7 +105,7 @@ export default class Factory {
         this._inputs = simplifiedInputs
         this._outputs = simplifiedOutputs
         this.topFactory?.updateInputsAndOutputs()
-        console.log('update f')
+        console.log('update factory: ' + this._name)
     }
 
     public setAllMachineActive (value: boolean): void {

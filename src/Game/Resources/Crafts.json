@@ -11,17 +11,6 @@
         ]
     },
     {
-        "id": "copperDrill",
-        "name": "Copper Drill",
-        "input": [],
-        "output": [
-            {
-                "itemId": "copperOre",
-                "quantity": 1
-            }
-        ]
-    },
-    {
         "id": "ironIngot",
         "name": "Iron Ingot",
         "input": [
@@ -50,6 +39,17 @@
             {
                 "itemId": "ironPlate",
                 "quantity": 2
+            }
+        ]
+    },
+    {
+        "id": "copperDrill",
+        "name": "Copper Drill",
+        "input": [],
+        "output": [
+            {
+                "itemId": "copperOre",
+                "quantity": 1
             }
         ]
     },

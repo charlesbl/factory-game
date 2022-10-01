@@ -5,7 +5,7 @@ import ItemStackSave from './ItemStackSave'
 export default class InventorySave extends Saveable<Inventory> {
     private itemStacks!: { [key: string]: ItemStackSave }
 
-    public constructor (obj?: Inventory, blob?: any) {
+    public constructor (obj?: Inventory, blob?: InventorySave) {
         super()
         this.init(obj, blob)
     }

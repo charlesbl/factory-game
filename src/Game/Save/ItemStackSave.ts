@@ -6,7 +6,7 @@ export default class ItemStackSave extends Saveable<ItemStack> {
     private itemId!: string
     private quantity!: number
 
-    public constructor (obj?: ItemStack, blob?: any) {
+    public constructor (obj?: ItemStack, blob?: ItemStackSave) {
         super()
         this.init(obj, blob)
     }
