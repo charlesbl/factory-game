@@ -5,6 +5,7 @@ import Ingredient from './Ingredient'
 import Inventory from './Inventory'
 import Machine from './Machine'
 import MachineCraft from './MachineCraft'
+import Ressources from './Resources/Ressources'
 
 // TODO Custom machines = custom craft, use custom craft as normal craft to create a new machine
 // TODO create/edit/delete custom machines
@@ -56,7 +57,7 @@ export default class Game {
             this._craftManager = new CraftManager([], [])
         }
 
-        this.manualMachines = this._craftManager.machineCrafts.map((machineCraft) => {
+        this.manualMachines = CraftManager.getBasicMachineCrafts().map((machineCraft) => {
             const m = new Machine(machineCraft)
             m.active = false
             return m
@@ -125,5 +126,6 @@ export default class Game {
 
     public cheatMoney (): void {
         this._money += 1000
+        Ressources.getItems().forEach((i) => this.inventory.addItem(i, 100))
     }
 };

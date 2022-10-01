@@ -64,6 +64,7 @@ const GameView = (props: IBaseProps): JSX.Element => {
 
             <FactoryView
                 factory={currentFactory}
+                craftManager={props.game.craftManager}
                 onSelectedFactory={(factory) => {
                     setFactories([...factories, factory])
                 }}/>

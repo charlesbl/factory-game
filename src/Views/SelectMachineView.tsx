@@ -12,7 +12,7 @@ interface ISelectMachineProps {
 
 const renderOption = (machineCraft: MachineCraft): JSX.Element => {
     return (
-        <option key={machineCraft.id} value={machineCraft.id}>{machineCraft.name} 0€</option>
+        <option key={machineCraft.id} value={machineCraft.id}>{machineCraft.name}: {machineCraft.input.map((i) => `${i.quantityPerSecond} ${i.item.name}`).join(' - ')}</option>
     )
 }
 

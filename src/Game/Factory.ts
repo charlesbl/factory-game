@@ -10,6 +10,7 @@ export default class Factory {
     private _factories: Factory[]
     private _inputs: Ingredient[]
     private _outputs: Ingredient[]
+    private _cost: Ingredient[]
     private topFactory?: Factory
     private _name: string
 
@@ -29,6 +30,18 @@ export default class Factory {
         this._name = value
     }
 
+    public get inputs (): Ingredient[] {
+        return this._inputs
+    }
+
+    public get outputs (): Ingredient[] {
+        return this._outputs
+    }
+
+    public get cost (): Ingredient[] {
+        return this._cost
+    }
+
     public constructor (machines?: Machine[], factories?: Factory[], topFactory?: Factory) {
         if (machines !== undefined) {
             this._machines = machines
@@ -41,9 +54,10 @@ export default class Factory {
         } else {
             this._factories = []
         }
+        this._name = DEFAULT_NAME
         this._inputs = []
         this._outputs = []
-        this._name = DEFAULT_NAME
+        this._cost = []
 
         this.topFactory = topFactory
         this.updateInputsAndOutputs()
@@ -91,19 +105,26 @@ export default class Factory {
     }
 
     public updateInputsAndOutputs (): void {
+        const activeMachines = this._machines.filter((machine) => machine.active)
         const allInputs: Ingredient[] = []
-        allInputs.push(...this._machines.filter((machine) => machine.active).map((machine) => machine.craft.input).flat())
+        allInputs.push(...activeMachines.map((machine) => machine.craft.input).flat())
         allInputs.push(...this._factories.map((factory) => factory.inputs).flat())
         const mergedInputs = Ingredient.mergeIngredient(allInputs)
 
         const allOutputs: Ingredient[] = []
-        allOutputs.push(...this._machines.filter((machine) => machine.active).map((machine) => machine.craft.output).flat())
+        allOutputs.push(...activeMachines.map((machine) => machine.craft.output).flat())
         allOutputs.push(...this._factories.map((factory) => factory.outputs).flat())
         const mergedOutputs = Ingredient.mergeIngredient(allOutputs)
+
+        const allCosts: Ingredient[] = []
+        allCosts.push(...activeMachines.map((machine) => machine.machineCraft.input).flat())
+        allCosts.push(...this._factories.map((factory) => factory.cost).flat())
+        const mergedCosts = Ingredient.mergeIngredient(allCosts)
 
         const [simplifiedInputs, simplifiedOutputs] = Ingredient.simplifyIngredient(mergedInputs, mergedOutputs)
         this._inputs = simplifiedInputs
         this._outputs = simplifiedOutputs
+        this._cost = mergedCosts
         this.topFactory?.updateInputsAndOutputs()
         console.log('update factory: ' + this._name)
     }
@@ -114,13 +135,5 @@ export default class Factory {
             factory.setAllMachineActive(value)
         })
         this.updateInputsAndOutputs()
-    }
-
-    public get inputs (): Ingredient[] {
-        return this._inputs
-    }
-
-    public get outputs (): Ingredient[] {
-        return this._outputs
     }
 }

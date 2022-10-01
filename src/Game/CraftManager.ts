@@ -95,7 +95,7 @@ export default class CraftManager {
         return this.getCraftByIdInList(CraftManager.getBasicCrafts(), id)
     }
 
-    private static getBasicCrafts (): Craft[] {
+    public static getBasicCrafts (): Craft[] {
         return rawCrafts.map((rawCraft: any) => {
             const input: Ingredient[] = rawCraft.input.map((rawItemStack: any) => new Ingredient(Ressources.getItemById(rawItemStack.itemId), rawItemStack.quantity))
             const outputItems: Ingredient[] = rawCraft.output.map((rawItemStack: any) => new Ingredient(Ressources.getItemById(rawItemStack.itemId), rawItemStack.quantity))
@@ -103,7 +103,7 @@ export default class CraftManager {
         })
     }
 
-    private static getBasicMachineCrafts (): MachineCraft[] {
+    public static getBasicMachineCrafts (): MachineCraft[] {
         return rawMachineCrafts.map((rawCraft: any) => {
             const input = rawCraft.input.map((rawItemStack: any) => new Ingredient(Ressources.getItemById(rawItemStack.itemId), rawItemStack.quantity))
             return new MachineCraft(rawCraft.id, rawCraft.name, input, undefined, rawCraft.output)
