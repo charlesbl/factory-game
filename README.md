@@ -1,7 +1,7 @@
 # Factory Game
 
 An idle game whose goal is to build a most optimized factory.
-You can test the game [here](http://factory.crashkiller.ovh/).
+You can test the game [here](https://factory.crashkiller.ovh/).
 
 ## Available Scripts
 
