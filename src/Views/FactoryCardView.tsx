@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import '../css/FactoryCardView.css'
 import Factory from '../Game/Factory'
 import IngredientsView from './IngredientsView'
@@ -10,11 +10,23 @@ interface IFactoryProps {
 }
 
 const FactoryCardView = (props: IFactoryProps): JSX.Element => {
+    const [isEditTitle, setIsEditTitle] = useState(false)
+
+    const handleTitleChange = (e: React.FocusEvent<HTMLInputElement>): void => {
+        setIsEditTitle(false)
+        props.factory.name = e.target.value
+    }
+
     return (
         <div className="factory">
             <div className="factory-header">
-                <div className="name">Factory</div>
-                {/* TODO */}<button className="btn btn-primary btn-modify"><i className="fas fa-edit fa-xs"></i></button>
+                {isEditTitle
+                    ? <input autoFocus={true} onBlur={handleTitleChange} defaultValue={props.factory.name} />
+                    : <>
+                        <div className="name">{props.factory.name}</div>
+                        <button className="btn btn-primary btn-modify" onClick={() => setIsEditTitle(true)}><i className="fas fa-edit fa-xs"></i></button>
+                    </>}
+
             </div>
 
             <div className="factory-wrapper">

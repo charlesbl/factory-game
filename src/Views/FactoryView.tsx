@@ -35,10 +35,8 @@ const FactoryView = (props: IFactoryProps): JSX.Element => {
 
             <button className="btn btn-primary" onClick={() => props.factory.updateInputsAndOutputs()}>Refresh</button>
             <div className="row">
-                {machines}
-            </div>
-            <div className="row">
                 {factories}
+                {machines}
             </div>
         </div>
     )

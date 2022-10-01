@@ -39,18 +39,8 @@ const GameView = (props: IBaseProps): JSX.Element => {
                 }}>
                     Return
             </button>
-            <FactoryView
-                game={props.game}
-                factory={currentFactory}
-                onSelectedFactory={(factory) => {
-                    setFactories([...factories, factory])
-                }}/>
 
             <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2">
-                <button className="btn btn-primary"
-                    onClick={() => currentFactory.addSubFactory()}>
-                        Add factory
-                </button>
                 <SelectMachineView onChange={(machineCraft) => selectMachineCraft(machineCraft)} />
                 <button className="btn btn-primary"
                     onClick={() => {
@@ -59,7 +49,18 @@ const GameView = (props: IBaseProps): JSX.Element => {
                     }}>
                         Add machine
                 </button>
+                <button className="btn btn-primary"
+                    onClick={() => currentFactory.addSubFactory()}>
+                        Add factory
+                </button>
             </div>
+
+            <FactoryView
+                game={props.game}
+                factory={currentFactory}
+                onSelectedFactory={(factory) => {
+                    setFactories([...factories, factory])
+                }}/>
         </div>
     )
 }

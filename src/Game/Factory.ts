@@ -3,12 +3,15 @@ import Craft from './Craft'
 import MachineCraft from './MachineCraft'
 import Ingredient from './Ingredient'
 
+const DEFAULT_NAME = 'New Factory'
+
 export default class Factory {
     private _machines: Machine[]
     private _factories: Factory[]
     private _inputs: Ingredient[]
     private _outputs: Ingredient[]
     private topFactory?: Factory
+    private _name: string
 
     public get machines (): Machine[] {
         return this._machines
@@ -16,6 +19,14 @@ export default class Factory {
 
     public get factories (): Factory[] {
         return this._factories
+    }
+
+    public get name (): string {
+        return this._name
+    }
+
+    public set name (value: string) {
+        this._name = value
     }
 
     public constructor (machines?: Machine[], factories?: Factory[], topFactory?: Factory) {
@@ -32,6 +43,7 @@ export default class Factory {
         }
         this._inputs = []
         this._outputs = []
+        this._name = DEFAULT_NAME
 
         this.topFactory = topFactory
         this.updateInputsAndOutputs()

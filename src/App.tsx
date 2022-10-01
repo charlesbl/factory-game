@@ -37,7 +37,7 @@ const App = (): JSX.Element => {
         setState((n) => n + 1)
     }
     useEffect(() => {
-        const stopLoop = startGameLoop(GAME, () => updateGame(), saveGame)
+        const stopLoop = startGameLoop(GAME, updateGame, saveGame)
         return () => {
             stopLoop()
         }
