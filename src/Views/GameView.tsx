@@ -4,7 +4,6 @@ import IBaseProps from './IBaseProps'
 import Factory from '../Game/Factory'
 import InventoryView from './InventoryView'
 import SelectMachineView from './SelectMachineView'
-import MachineCraft from '../Game/MachineCraft'
 import Machine from '../Game/Machine'
 import MachineView from './MachineView'
 
@@ -17,7 +16,6 @@ const renderManualMachine = (machine: Machine, index: number): JSX.Element => {
 }
 
 const GameView = (props: IBaseProps): JSX.Element => {
-    const [selectedMachineCraft, selectMachineCraft] = useState<MachineCraft | undefined>(undefined)
     const [factories, setFactories] = useState<Factory[]>([props.game.factory])
     const currentFactory = factories[factories.length - 1]
 
@@ -41,16 +39,10 @@ const GameView = (props: IBaseProps): JSX.Element => {
             </button>
 
             <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2">
-                <SelectMachineView onChange={(machineCraft) => selectMachineCraft(machineCraft)} />
-                <button className="btn btn-primary"
-                    onClick={() => {
-                        if (selectedMachineCraft === undefined) return
-                        currentFactory.buildMachine(selectedMachineCraft)
-                    }}>
-                        Add machine
-                </button>
-                <button className="btn btn-primary"
-                    onClick={() => currentFactory.addSubFactory()}>
+                <SelectMachineView onAddClicked={(mc) => {
+                    currentFactory.buildMachine(mc)
+                }}/>
+                <button className="btn btn-primary" onClick={() => currentFactory.addSubFactory()}>
                         Add factory
                 </button>
             </div>

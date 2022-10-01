@@ -13,9 +13,3 @@ if (rootElement != null) {
     )
     serviceWorker.register()
 }
-
-function notImplemented (): never {
-    throw new Error('not Implemented')
-}
-
-export { notImplemented }
