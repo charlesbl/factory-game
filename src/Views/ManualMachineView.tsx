@@ -1,15 +1,17 @@
 import React from 'react'
 import '../css/Machine.css'
+import Inventory from '../Game/Inventory'
 import Machine from '../Game/Machine'
 import IngredientsView from './IngredientsView'
 
 interface IManualMachineProps {
     machine: Machine
+    inventory: Inventory
 }
 
 const ManualMachineView = (props: IManualMachineProps): JSX.Element => {
     const actions: JSX.Element[] = []
-    const canCraft = true // TODO implement if user can manually craft
+    const canCraft = props.machine.craft.canCraft(props.inventory, 1) // TODO implement if user can manually craft
 
     const craftBtn = <button onMouseDown={() => { props.machine.active = true }}
         onMouseUp={() => { props.machine.active = false }}

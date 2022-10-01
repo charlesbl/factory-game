@@ -6,11 +6,12 @@ import InventoryView from './InventoryView'
 import SelectMachineView from './SelectMachineView'
 import Machine from '../Game/Machine'
 import ManualMachineView from './ManualMachineView'
+import Inventory from '../Game/Inventory'
 
-const renderManualMachine = (machine: Machine, index: number): JSX.Element => {
+const renderManualMachine = (machine: Machine, index: number, inventory: Inventory): JSX.Element => {
     return (
         <div key={index} className="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2 machine-container">
-            <ManualMachineView machine={machine}/>
+            <ManualMachineView machine={machine} inventory={inventory}/>
         </div>
     )
 }
@@ -19,7 +20,7 @@ const GameView = (props: IBaseProps): JSX.Element => {
     const [factories, setFactories] = useState<Factory[]>([props.game.factory])
     const currentFactory = factories[factories.length - 1]
 
-    const manualMachines = props.game.manualMachines.map((machine, i) => renderManualMachine(machine, i))
+    const manualMachines = props.game.manualMachines.map((machine, i) => renderManualMachine(machine, i, props.game.inventory))
 
     return (
         <div>
