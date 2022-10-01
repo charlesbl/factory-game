@@ -14,7 +14,7 @@ interface IFactoryProps extends IBaseProps {
 const renderMachine = (machine: Machine, index: number, onDeleteMachine: () => void, onTogglePauseMachine: () => void): JSX.Element => {
     return (
         <div key={index} className="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2 machine-container">
-            <MachineView machine={machine} onDeleteMachine={onDeleteMachine} manual={false} onTogglePauseMachine={onTogglePauseMachine}/>
+            <MachineView machine={machine} onDeleteMachine={onDeleteMachine} onTogglePauseMachine={onTogglePauseMachine}/>
         </div>
     )
 }

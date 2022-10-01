@@ -6,8 +6,8 @@ import Machine from './Machine'
 import MachineCraft from './MachineCraft'
 import Ressources from './Resources/Ressources'
 
-// TODO Rename Factory
-// TODO Energy system
+// TODO Custom machines = custom craft, use custom craft as normal craft to create a new machine
+// TODO create/edit/delete custom machines
 // TODO rework crafts
 // TODO Download and load save
 // TODO config menu
@@ -86,7 +86,6 @@ export default class Game {
 
     private tryConsumeFactory (factory: Factory, productionTimeInSec: number): boolean {
         const [inputs, outputs] = Ingredient.simplifyIngredient(factory.inputs, factory.outputs)
-        console.log(factory.inputs)
         const success = this.tryConsumeCraft(new Craft('temp', 'temp', inputs, outputs), productionTimeInSec)
         if (!success) {
             factory.machines.forEach((m) => {

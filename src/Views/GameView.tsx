@@ -5,12 +5,12 @@ import Factory from '../Game/Factory'
 import InventoryView from './InventoryView'
 import SelectMachineView from './SelectMachineView'
 import Machine from '../Game/Machine'
-import MachineView from './MachineView'
+import ManualMachineView from './ManualMachineView'
 
 const renderManualMachine = (machine: Machine, index: number): JSX.Element => {
     return (
         <div key={index} className="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2 machine-container">
-            <MachineView machine={machine} manual={true}/>
+            <ManualMachineView machine={machine}/>
         </div>
     )
 }
