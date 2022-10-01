@@ -4,7 +4,6 @@ import rawMachineCrafts from './MachineCrafts.json'
 import Item from '../Item'
 import Craft from '../Craft'
 import Ingredient from '../Ingredient'
-import ItemStack from '../ItemStack'
 import MachineCraft from '../MachineCraft'
 
 let items: Item[]
@@ -32,7 +31,7 @@ const getCrafts = (): Craft[] => {
 const getMachineCrafts = (): MachineCraft[] => {
     if (machineCrafts == null) {
         machineCrafts = rawMachineCrafts.map((rawCraft: any) => {
-            const input = rawCraft.input.map((rawItemStack: any) => new ItemStack(getItemById(rawItemStack.itemId), rawItemStack.quantity))
+            const input = rawCraft.input.map((rawItemStack: any) => new Ingredient(getItemById(rawItemStack.itemId), rawItemStack.quantity))
             const outputCraft: Craft = getCraftById(rawCraft.output)
             return new MachineCraft(rawCraft.id, rawCraft.name, input, outputCraft)
         })
