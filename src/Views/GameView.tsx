@@ -39,8 +39,8 @@ const GameView = (props: IBaseProps): JSX.Element => {
             </button>
 
             <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2">
-                <SelectMachineView onAddClicked={(mc) => {
-                    currentFactory.buildMachine(mc)
+                <SelectMachineView inventory={props.game.inventory} onAddClicked={(mc) => {
+                    props.game.tryConsumeMachineCraft(mc, currentFactory)
                 }}/>
                 <button className="btn btn-primary" onClick={() => currentFactory.addSubFactory()}>
                         Add factory

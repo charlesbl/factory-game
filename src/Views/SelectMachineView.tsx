@@ -1,10 +1,12 @@
 import React, { useState } from 'react'
 import '../css/Factory.css'
+import Inventory from '../Game/Inventory'
 import MachineCraft from '../Game/MachineCraft'
 import Ressources from '../Game/Resources/Ressources'
 
 interface ISelectMachineProps {
     onAddClicked: (machineCraft: MachineCraft) => void
+    inventory: Inventory
 }
 
 const renderOption = (machineCraft: MachineCraft): JSX.Element => {
@@ -24,6 +26,9 @@ const changeSelect = (value: string, onChange: (machineCraft?: MachineCraft) => 
 const SelectMachineView = (props: ISelectMachineProps): JSX.Element => {
     const [selectedMachineCraft, selectMachineCraft] = useState<MachineCraft | undefined>(undefined)
 
+    // eslint-disable-next-line @typescript-eslint/prefer-optional-chain
+    const canCraft = selectedMachineCraft != null && selectedMachineCraft.canCraft(props.inventory)
+
     const options = Ressources.getMachineCrafts().map((machineCraft) => renderOption(machineCraft))
     return (
         <div>
@@ -33,8 +38,9 @@ const SelectMachineView = (props: ISelectMachineProps): JSX.Element => {
             </select>
 
             <button className="btn btn-primary"
+                disabled={!canCraft}
                 onClick={() => {
-                    if (selectedMachineCraft == null) return
+                    if (selectedMachineCraft == null || !canCraft) return
                     props.onAddClicked(selectedMachineCraft)
                 }}>
             Add machine
