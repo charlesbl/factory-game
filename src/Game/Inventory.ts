@@ -1,82 +1,67 @@
-import Game from './Game'
-import ItemStack, { IItemStackSave } from './ItemStack'
-import Item from './Item';
-import Factory from './Factory';
+import ItemStack from './ItemStack'
+import Item from './Item'
+import Ressources from './Resources/Ressources'
 
-export interface IInventorySave {
-    itemStacks: { [key: string]: IItemStackSave }
+export interface ItemStackList {
+    // key = itemId
+    [key: string]: ItemStack
 }
 
 export default class Inventory {
-    itemStacks: { [key: string]: ItemStack }
-    factory?: Factory;
-    constructor(factory?: Factory) {
-        this.factory = factory;
-        this.itemStacks = {};
-        Game.items.forEach((item: Item) => {
-            this.itemStacks[item.id] = new ItemStack(item, 0);
-        });
+    private _itemStacks: ItemStackList
+    public constructor () {
+        this._itemStacks = {}
+        Ressources.getItems().forEach((item: Item) => {
+            this._itemStacks[item.id] = new ItemStack(item, 0)
+        })
     }
 
-    getSave(): IInventorySave {
-        var result: { [key: string]: IItemStackSave } = {};
-        Object.entries(this.itemStacks).forEach(([id, itemStack]) => result[id] = itemStack.getSave());
-        return {
-            itemStacks: result
-        }
+    public getItemStackList (): ItemStack[] {
+        return Object.entries(this._itemStacks).map(([id, itemStack]) => itemStack)
     }
 
-    static fromSave(save: IInventorySave, factory: Factory) {
-        var inventory = new Inventory(factory);
-        Object.entries(save.itemStacks).forEach(([id, itemStackSave]) => {
-            inventory.add(ItemStack.fromSave(itemStackSave));
-            inventory.itemStacks[itemStackSave.itemId].exchangeDirection = itemStackSave.exchangeDirection;
-        });
-        return inventory;
+    public get itemStacks (): ItemStackList {
+        return this._itemStacks
     }
 
-    getItemStackList() {
-        return Object.entries(this.itemStacks).map(([id, itemStack]) => itemStack);
+    public remove (itemStack: ItemStack, count: number = 1): void {
+        this._itemStacks[itemStack.item.id].quantity -= itemStack.quantity * count
     }
 
-    remove(itemStack: ItemStack, count: number = 1) {
-        this.itemStacks[itemStack.item.id].quantity -= itemStack.quantity * count;
+    public add (itemStack: ItemStack, count: number = 1): void {
+        this._itemStacks[itemStack.item.id].quantity += itemStack.quantity * count
     }
 
-    add(itemStack: ItemStack, count: number = 1) {
-        this.itemStacks[itemStack.item.id].quantity += itemStack.quantity * count;
+    public addItem (item: Item, count: number = 1): void {
+        this._itemStacks[item.id].quantity += count
     }
 
-    addItem(item: Item, count: number = 1) {
-        this.itemStacks[item.id].quantity += count;
-    }
-
-    removeItem(item: Item, count: number = 1): boolean {
-        if (this.itemStacks[item.id].quantity - count >= 0) {
-            this.itemStacks[item.id].quantity -= count;
-            return true;
+    public removeItem (item: Item, count: number = 1): boolean {
+        if (this._itemStacks[item.id].quantity - count >= 0) {
+            this._itemStacks[item.id].quantity -= count
+            return true
         } else {
-            return false;
+            return false
         }
     }
 
-    contains(itemStack: ItemStack) {
-        return this.itemStacks[itemStack.item.id].quantity >= itemStack.quantity;
+    public contains (itemStack: ItemStack): boolean {
+        return this._itemStacks[itemStack.item.id].quantity >= itemStack.quantity
     }
 
-    getQuantity(item: Item) {
-        return this.itemStacks[item.id].quantity;
+    public getQuantity (item: Item): number {
+        return this._itemStacks[item.id].quantity
     }
 
-    addInventory(inventory: Inventory, count: number = 1) {
+    public addInventory (inventory: Inventory, count: number = 1): void {
         for (let i = 0; i < count; i++) {
-            inventory.getItemStackList().forEach((itemStack) => this.add(itemStack));
+            inventory.getItemStackList().forEach((itemStack) => this.add(itemStack))
         }
     }
 
-    removeInventory(inventory: Inventory, count: number = 1) {
+    public removeInventory (inventory: Inventory, count: number = 1): void {
         for (let i = 0; i < count; i++) {
-            inventory.getItemStackList().forEach((itemStack) => this.remove(itemStack));
+            inventory.getItemStackList().forEach((itemStack) => this.remove(itemStack))
         }
     }
 }

@@ -1,88 +1,59 @@
-import React from 'react';
-import './css/App.css';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import React, { useEffect, useState } from 'react'
+import './css/App.css'
 import Game from './Game/Game'
+import startGameLoop from './Game/GameLoop'
+import GameSave from './Game/Save/GameSave'
 import GameView from './Views/GameView'
 
-const REFRESH_RATE: number = 50;
-const TICK_BETWEEN_SAVE: number = 20;
-const STORAGE_NAME: string = 'game';
+const STORAGE_NAME: string = 'game'
 
-interface IAppState {
-    game: Game;
+const saveGame = (): void => {
+    const save = new GameSave(GAME)
+    localStorage.setItem(STORAGE_NAME, JSON.stringify(save))
 }
 
-export default class App extends React.Component<any, IAppState> {
-    private stop: boolean;
-
-    constructor(props: any) {
-        super(props);
-        this.stop = false;
-        this.state = {
-            game: this.loadGame()
-        };
+const loadGame = (): Game => {
+    const stringSave = localStorage.getItem(STORAGE_NAME)
+    if (stringSave !== null && stringSave !== '') {
+        const save = new GameSave(undefined, JSON.parse(stringSave))
+        return save.getObj()
+    } else {
+        return new Game()
     }
+}
 
-    componentDidMount() {
-        setTimeout(() => this.gameLoop());
+const clearGame = (): void => {
+    localStorage.setItem(STORAGE_NAME, '')
+    window.location.reload()
+}
+
+const GAME = loadGame()
+
+const App = (): JSX.Element => {
+    const [, setState] = useState(0)
+
+    const updateGame = (): void => {
+        setState((n) => n + 1)
     }
-
-    componentWillUnmount() {
-        this.stop = true;
-    }
-
-    async gameLoop() {
-        var tickCount = 0;
-        while (!this.stop) {
-            var startTime = Date.now();
-            this.tick();
-            tickCount++;
-            if (tickCount >= TICK_BETWEEN_SAVE) {
-                tickCount = 0;
-                this.saveGame();
-            }
-            var tickTime = Date.now() - startTime;
-            if (tickTime <= REFRESH_RATE)
-                await sleep(REFRESH_RATE - tickTime);
+    useEffect(() => {
+        const stopLoop = startGameLoop(GAME, updateGame, saveGame)
+        return () => {
+            stopLoop()
         }
-    }
+    }, [])
 
-    tick() {
-        this.state.game.update();
-        this.setState({
-            game: this.state.game
-        });
-    }
+    return (
+        <div className="container-fluid">
+            <button className="btn btn-primary" onClick={() => clearGame()}>Clear save</button>
 
-    saveGame() {
-        var save = this.state.game.getSave();
-        localStorage.setItem(STORAGE_NAME, JSON.stringify(save));
-    }
-
-    loadGame(): Game {
-        var stringSave = localStorage.getItem(STORAGE_NAME);
-        if (stringSave !== null && stringSave !== "") {
-            var save = JSON.parse(stringSave);
-            return Game.fromSave(save);
-        } else {
-            return new Game();
-        }
-    }
-
-    clearGame() {
-        localStorage.setItem(STORAGE_NAME, "");
-        window.location.reload();
-    }
-
-    render() {
-        return (
-            <div className="container-fluid">
-                <button className="btn btn-primary" onClick={() => this.clearGame()}>Clear save</button>
-                <GameView game={this.state.game} />
-            </div>
-        );
-    }
+            <button className="btn btn-primary" onClick={() => {
+                GAME.cheatMoney()
+                console.log('cheat')
+            }}>Cheat 1000€</button>
+            <GameView game={GAME} />
+        </div>
+    )
 }
 
-function sleep(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+export default App

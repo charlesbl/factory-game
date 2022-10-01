@@ -1,3 +1,6 @@
 .machine-container {
     padding: 10px;
 }
+.factory-header input {
+    background-color: transparent;
+}

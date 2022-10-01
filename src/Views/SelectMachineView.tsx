@@ -1,33 +1,52 @@
-import React, { ChangeEvent } from 'react';
+import React, { useState } from 'react'
 import '../css/Factory.css'
-import Game from '../Game/Game';
-import MachineCraft from '../Game/MachineCraft';
+import Inventory from '../Game/Inventory'
+import MachineCraft from '../Game/MachineCraft'
+import Ressources from '../Game/Resources/Ressources'
 
 interface ISelectMachineProps {
-    onChange: (machineCraft?: MachineCraft) => void;
+    onAddClicked: (machineCraft: MachineCraft) => void
+    inventory: Inventory
 }
 
-export default class SelectMachineView extends React.Component<ISelectMachineProps> {
-    renderOption(machineCraft: MachineCraft) {
-        return (
-            <option key={machineCraft.id} value={machineCraft.id}>{machineCraft.name} {machineCraft.cost.toFixed(2)}€</option>
-        );
-    }
+const renderOption = (machineCraft: MachineCraft): JSX.Element => {
+    return (
+        <option key={machineCraft.id} value={machineCraft.id}>{machineCraft.name} 0€</option>
+    )
+}
 
-    changeSelect(event: ChangeEvent<HTMLSelectElement>) {
-        if (event.target.value !== "none")
-            this.props.onChange(Game.getMachineCraftById(event.target.value));
-        else
-            this.props.onChange(undefined);
+const changeSelect = (value: string, onChange: (machineCraft?: MachineCraft) => void): void => {
+    if (value !== 'none') {
+        onChange(Ressources.getMachineCraftById(value))
+    } else {
+        onChange()
     }
+}
 
-    render() {
-        var options = Game.machineCrafts.map((machineCraft) => this.renderOption(machineCraft));
-        return (
-            <select onChange={(event) => this.changeSelect(event)} className="custom-select custom-select-sm">
+const SelectMachineView = (props: ISelectMachineProps): JSX.Element => {
+    const [selectedMachineCraft, selectMachineCraft] = useState<MachineCraft | undefined>(undefined)
+
+    // eslint-disable-next-line @typescript-eslint/prefer-optional-chain
+    const canCraft = selectedMachineCraft != null && selectedMachineCraft.canCraft(props.inventory)
+
+    const options = Ressources.getMachineCrafts().map((machineCraft) => renderOption(machineCraft))
+    return (
+        <div>
+            <select onChange={(event) => changeSelect(event.target.value, (mc) => selectMachineCraft(mc))} className="custom-select custom-select-sm">
                 <option value="none">Open this select menu</option>
                 {options}
             </select>
-        );
-    }
+
+            <button className="btn btn-primary"
+                disabled={!canCraft}
+                onClick={() => {
+                    if (selectedMachineCraft == null || !canCraft) return
+                    props.onAddClicked(selectedMachineCraft)
+                }}>
+            Add machine
+            </button>
+        </div>
+    )
 }
+
+export default SelectMachineView

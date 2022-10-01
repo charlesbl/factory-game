@@ -1,40 +1,61 @@
-import React from 'react';
-import FactoryView from './FactoryView';
-import IBaseProps from './IBaseProps';
-import Factory from '../Game/Factory';
+import React, { useState } from 'react'
+import FactoryView from './FactoryView'
+import IBaseProps from './IBaseProps'
+import Factory from '../Game/Factory'
+import InventoryView from './InventoryView'
+import SelectMachineView from './SelectMachineView'
+import Machine from '../Game/Machine'
+import ManualMachineView from './ManualMachineView'
+import Inventory from '../Game/Inventory'
 
-interface IGameState {
-    selectedFactory: Factory;
+const renderManualMachine = (machine: Machine, index: number, inventory: Inventory): JSX.Element => {
+    return (
+        <div key={index} className="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2 machine-container">
+            <ManualMachineView machine={machine} inventory={inventory}/>
+        </div>
+    )
 }
 
-export default class GameView extends React.Component<IBaseProps, IGameState> {
+const GameView = (props: IBaseProps): JSX.Element => {
+    const [factories, setFactories] = useState<Factory[]>([props.game.factory])
+    const currentFactory = factories[factories.length - 1]
 
-    constructor(props: Readonly<IBaseProps>) {
-        super(props);
-        this.state = { selectedFactory: this.props.game.factory };
-    }
+    const manualMachines = props.game.manualMachines.map((machine, i) => renderManualMachine(machine, i, props.game.inventory))
 
-    changeFactory(factory: Factory) {
-        this.setState({
-            selectedFactory: factory
-        });
-    }
+    return (
+        <div>
+            <span>{props.game.money.toFixed(2)}€</span>
+            <InventoryView inventory={props.game.inventory} />
 
-    goBack() {
-        if (this.state.selectedFactory.topFactory)
-            this.changeFactory(this.state.selectedFactory.topFactory);
-    }
-
-    render() {
-        return (
-            <div>
-                <span>{this.props.game.money.toFixed(2)}€</span>
-                <FactoryView
-                    game={this.props.game}
-                    factory={this.state.selectedFactory}
-                    onSelectedFactory={(factory) => this.changeFactory(factory)}
-                    onGoBack={() => this.goBack()} />
+            <div className="row">
+                {manualMachines}
             </div>
-        );
-    }
+            <button className="btn btn-primary"
+                disabled={factories.length === 1}
+                onClick={() => {
+                    factories.pop()
+                    setFactories([...factories])
+                }}>
+                    Return
+            </button>
+
+            <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2">
+                <SelectMachineView inventory={props.game.inventory} onAddClicked={(mc) => {
+                    props.game.tryConsumeMachineCraft(mc, currentFactory)
+                }}/>
+                <button className="btn btn-primary" onClick={() => currentFactory.addSubFactory()}>
+                        Add factory
+                </button>
+            </div>
+
+            <FactoryView
+                game={props.game}
+                factory={currentFactory}
+                onSelectedFactory={(factory) => {
+                    setFactories([...factories, factory])
+                }}/>
+        </div>
+    )
 }
+
+export default GameView

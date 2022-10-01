@@ -1,8 +1,29 @@
 [
     {
+        "id": "ironDrill",
+        "name": "Iron Drill",
+        "input": [],
+        "output": [
+            {
+                "itemId": "ironOre",
+                "quantity": 1
+            }
+        ]
+    },
+    {
+        "id": "copperDrill",
+        "name": "Copper Drill",
+        "input": [],
+        "output": [
+            {
+                "itemId": "copperOre",
+                "quantity": 1
+            }
+        ]
+    },
+    {
         "id": "ironIngot",
         "name": "Iron Ingot",
-        "duration": 2500,
         "input": [
             {
                 "itemId": "ironOre",
@@ -19,7 +40,6 @@
     {
         "id": "ironPlate",
         "name": "Iron ironIngot",
-        "duration": 2000,
         "input": [
             {
                 "itemId": "ironIngot",
@@ -36,7 +56,6 @@
     {
         "id": "copperIngot",
         "name": "Copper Ingot",
-        "duration": 2500,
         "input": [
             {
                 "itemId": "copperOre",
@@ -53,7 +72,6 @@
     {
         "id": "copperPlate",
         "name": "Copper Plate",
-        "duration": 3000,
         "input": [
             {
                 "itemId": "copperIngot",
@@ -70,7 +88,6 @@
     {
         "id": "copperWire",
         "name": "Copper Wire",
-        "duration": 5000,
         "input": [
             {
                 "itemId": "copperPlate",
@@ -87,7 +104,6 @@
     {
         "id": "circuit",
         "name": "Electronic Circuit",
-        "duration": 10000,
         "input": [
             {
                 "itemId": "copperWire",

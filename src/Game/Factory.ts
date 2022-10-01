@@ -1,162 +1,126 @@
-import Machine, { IMachineSave } from './Machine'
-import Inventory, { IInventorySave } from './Inventory'
-import Id from './Id';
-import Game from './Game';
-import Pattern, { IPatternSave } from './Pattern';
-import Craft from './Craft';
-import MachineCraft from './MachineCraft';
-import { ExchangeDirection } from './ItemStack';
+import Machine from './Machine'
+import Craft from './Craft'
+import MachineCraft from './MachineCraft'
+import Ingredient from './Ingredient'
 
-export interface IFactorySave {
-    inventory: IInventorySave;
-    machines: IMachineSave[];
-    factories: IFactorySave[];
-    pattern?: IPatternSave;
-    pause: boolean;
-}
+const DEFAULT_NAME = 'New Factory'
 
-const TRANSFER_THRESHOLD = 10;
+export default class Factory {
+    private _machines: Machine[]
+    private _factories: Factory[]
+    private _inputs: Ingredient[]
+    private _outputs: Ingredient[]
+    private topFactory?: Factory
+    private _name: string
 
-export default class Factory extends Id {
-    game: Game;
-    topFactory?: Factory;
-    machines: Machine[];
-    factories: Factory[];
-    inventory: Inventory;
-    pattern?: Pattern;
-    pause: boolean;
-
-    constructor(game: Game, topFactory?: Factory, pattern?: Pattern) {
-        super();
-        this.game = game;
-        this.topFactory = topFactory;
-        this.pause = false;
-        this.machines = [];
-        this.factories = [];
-        this.inventory = new Inventory(this);
-
-        if (pattern !== undefined) {
-            this.pattern = pattern;
-            Object.entries(pattern.machinesCount).forEach(([id, count]) => {
-                var machineCraft = Game.getMachineCraftById(id);
-                for (let i = 0; i < count; i++) {
-                    machineCraft.produce(this);
-                }
-            });
-            Object.entries(pattern.patternsCount).forEach(([id, count]) => {
-                var subPattern = game.getPatternById(Number.parseInt(id));
-                for (let i: number = 0; i < count; i++) {
-                    this.buildSubFactory(subPattern);
-                }
-            });
-        }
+    public get machines (): Machine[] {
+        return this._machines
     }
 
-    getSave(): IFactorySave {
-        return {
-            inventory: this.inventory.getSave(),
-            machines: this.machines.map((machine) => machine.getSave()),
-            factories: this.factories.map((factory) => factory.getSave()),
-            pattern: this.pattern !== undefined ? this.pattern.getSave() : undefined,
-            pause: this.pause
-        };
+    public get factories (): Factory[] {
+        return this._factories
     }
 
-    static fromSave(game: Game, save: IFactorySave, topFactory?: Factory): Factory {
-        var factory = new Factory(game);
-        factory.topFactory = topFactory;
-        factory.machines = save.machines.map((machineSave) => Machine.fromSave(factory, machineSave));
-        factory.inventory = Inventory.fromSave(save.inventory, factory);
-        factory.factories = save.factories.map((factorySave) => Factory.fromSave(game, factorySave, factory))
-        //TODO save patternID instead of full pattern already saved in game
-        if (save.pattern !== undefined)
-            factory.pattern = Pattern.fromSave(game, save.pattern);
-        return factory;
+    public get name (): string {
+        return this._name
     }
 
-    buildSubFactory(pattern?: Pattern) {
-        this.factories.push(new Factory(this.game, this, pattern));
-        this.game.money -= pattern ? pattern?.costPrice : 0;
+    public set name (value: string) {
+        this._name = value
     }
 
-    buildMachine(machineCraft: MachineCraft, manual = false): Machine {
-        var machine = new Machine(machineCraft.name, machineCraft.outputCraft, this, machineCraft, manual);
-        this.machines.push(machine);
-        return machine;
-    }
-
-    destroyMachine(machine: Machine) {
-        this.machines = this.machines.filter((elem) => {
-            return elem !== machine;
-        });
-    }
-
-    updateImportExport() {
-        this.inventory.getItemStackList().forEach((itemStack) => {
-                const extraQuantity = TRANSFER_THRESHOLD - itemStack.quantity;
-            if (itemStack.exchangeDirection === ExchangeDirection.export && itemStack.quantity > TRANSFER_THRESHOLD) {
-                if (this.topFactory) {
-                    if (this.inventory.removeItem(itemStack.item, -extraQuantity))
-                        this.topFactory.inventory.addItem(itemStack.item, -extraQuantity);
-                } else {
-                    itemStack.trySell(this.game, -extraQuantity);
-                }
-            } else if (itemStack.exchangeDirection === ExchangeDirection.import && itemStack.quantity < TRANSFER_THRESHOLD) {
-                if (this.topFactory) {
-                    if (this.topFactory.inventory.removeItem(itemStack.item, extraQuantity))
-                        this.inventory.addItem(itemStack.item, extraQuantity);
-                } else {
-                    itemStack.tryBuy(this.game, extraQuantity);
-                }
-            }
-        });
-    }
-
-    update(delta: number) {
-        this.updateImportExport();
-        this.machines.forEach(machine => {
-            machine.update(delta);
-        });
-        this.factories.forEach(factory => {
-            factory.update(delta);
-        });
-    }
-
-    getMachinesOfType(machineCraft: Craft): Machine[] {
-        return this.machines.filter((machine) => machine.craft.id === machineCraft.id);
-    }
-
-    destroy() {
-        this.factories.forEach((factory) => factory.destroy());
-        this.machines.forEach((machine) => this.destroyMachine(machine));
-        if (this.topFactory) {
-            this.topFactory.factories = this.topFactory.factories.filter((elem) => {
-                return elem !== this;
-            });
-        }
-    }
-
-    stop() {
-        this.pause = true;
-        this.factories.forEach((factory) => factory.stop());
-        this.machines.forEach((machine) => machine.stop());
-    }
-
-    start() {
-        this.pause = false;
-        this.factories.forEach((factory) => factory.start());
-        this.machines.forEach((machine) => machine.start());
-    }
-
-    togglePause() {
-        if (this.pause) {
-            this.start();
+    public constructor (machines?: Machine[], factories?: Factory[], topFactory?: Factory) {
+        if (machines !== undefined) {
+            this._machines = machines
         } else {
-            this.stop();
+            this._machines = []
         }
+
+        if (factories !== undefined) {
+            this._factories = factories
+        } else {
+            this._factories = []
+        }
+        this._inputs = []
+        this._outputs = []
+        this._name = DEFAULT_NAME
+
+        this.topFactory = topFactory
+        this.updateInputsAndOutputs()
     }
 
-    savePattern() {
-        Pattern.createFromFactory(this.game, this);
+    public togglePauseMachine (machine: Machine): void {
+        machine.active = !machine.active
+        this.updateInputsAndOutputs()
+    }
+
+    public setTopFactory (factory: Factory): void {
+        this.topFactory = factory
+    }
+
+    public addSubFactory (): void {
+        this._factories.push(new Factory(undefined, undefined, this))
+        this.updateInputsAndOutputs()
+    }
+
+    public buildMachine (machineCraft: MachineCraft): Machine {
+        const machine = new Machine(machineCraft.name, machineCraft.outputCraft)
+        this._machines.push(machine)
+        this.updateInputsAndOutputs()
+        return machine
+    }
+
+    public destroyMachine (machine: Machine): void {
+        this._machines = this._machines.filter((elem) => {
+            return elem !== machine
+        })
+        this.updateInputsAndOutputs()
+    }
+
+    public getMachinesOfType (machineCraft: Craft): Machine[] {
+        return this._machines.filter((machine) => machine.craft.id === machineCraft.id)
+    }
+
+    public destroySubFactory (subFactory: Factory): void {
+        subFactory._machines.forEach((machine) => subFactory.destroyMachine(machine))
+        subFactory._factories.forEach((factory) => subFactory.destroySubFactory(factory))
+        this._factories = this._factories.filter((elem) => {
+            return elem !== subFactory
+        })
+        this.updateInputsAndOutputs()
+    }
+
+    public updateInputsAndOutputs (): void {
+        const allInputs: Ingredient[] = []
+        allInputs.push(...this._machines.filter((machine) => machine.active).map((machine) => machine.craft.input).flat())
+        allInputs.push(...this._factories.map((factory) => factory.inputs).flat())
+        const mergedInputs = Ingredient.mergeIngredient(allInputs)
+
+        const allOutputs: Ingredient[] = []
+        allOutputs.push(...this._machines.filter((machine) => machine.active).map((machine) => machine.craft.output).flat())
+        allOutputs.push(...this._factories.map((factory) => factory.outputs).flat())
+        const mergedOutputs = Ingredient.mergeIngredient(allOutputs)
+
+        const [simplifiedInputs, simplifiedOutputs] = Ingredient.simplifyIngredient(mergedInputs, mergedOutputs)
+        this._inputs = simplifiedInputs
+        this._outputs = simplifiedOutputs
+        this.topFactory?.updateInputsAndOutputs()
+        console.log('update f')
+    }
+
+    public setAllMachineActive (value: boolean): void {
+        this._machines.forEach((machine) => { machine.active = value })
+        this._factories.forEach((factory) => {
+            factory.setAllMachineActive(value)
+        })
+        this.updateInputsAndOutputs()
+    }
+
+    public get inputs (): Ingredient[] {
+        return this._inputs
+    }
+
+    public get outputs (): Ingredient[] {
+        return this._outputs
     }
 }
