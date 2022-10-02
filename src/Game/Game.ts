@@ -7,8 +7,8 @@ import Machine from './Machine'
 import MachineCraft from './MachineCraft'
 import Ressources from './Resources/Ressources'
 
-// TODO Custom machines = custom craft, use custom craft as normal craft to create a new machine
 // TODO create/edit/delete custom machines
+// TODO Construction time for machines and factories
 // TODO rework crafts
 // TODO Download and load save
 // TODO config menu

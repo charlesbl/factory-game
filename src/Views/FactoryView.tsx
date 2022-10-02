@@ -6,11 +6,13 @@ import FactoryCardView from './FactoryCardView'
 import Craft from '../Game/Craft'
 import CraftManager from '../Game/CraftManager'
 import MachineCraft from '../Game/MachineCraft'
+import Inventory from '../Game/Inventory'
 
 interface IFactoryProps {
     factory: Factory
     onSelectedFactory: (factory: Factory) => void
     craftManager: CraftManager
+    inventory: Inventory
 }
 
 const FactoryView = (props: IFactoryProps): JSX.Element => {
@@ -29,13 +31,19 @@ const FactoryView = (props: IFactoryProps): JSX.Element => {
                     return <div key={i} className="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2 machine-container">
                         <FactoryCardView factory={factory}
                             onClickEnter={() => props.onSelectedFactory(factory)}
-                            onDeleteFactory={() => props.factory.destroySubFactory(factory)} />
+                            onDeleteFactory={() => {
+                                factory.cost.forEach((ingredient) => props.inventory.addItem(ingredient.item, ingredient.quantityPerSecond))
+                                props.factory.destroySubFactory(factory)
+                            }} />
                     </div>
                 })}
                 {props.factory.machines.map((machine, i) => {
                     return <div key={i} className="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2 machine-container">
                         <MachineView machine={machine}
-                            onDeleteMachine={() => props.factory.destroyMachine(machine)}
+                            onDeleteMachine={() => {
+                                machine.machineCraft.input.forEach((ingredient) => props.inventory.addItem(ingredient.item, ingredient.quantityPerSecond))
+                                props.factory.destroyMachine(machine)
+                            }}
                             onTogglePauseMachine={() => props.factory.togglePauseMachine(machine)}/>
                     </div>
                 })}
