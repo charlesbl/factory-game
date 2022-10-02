@@ -10,12 +10,6 @@ interface ISelectMachineProps {
     craftManager: CraftManager
 }
 
-const renderOption = (machineCraft: MachineCraft): JSX.Element => {
-    return (
-        <option key={machineCraft.id} value={machineCraft.id}>{machineCraft.name}: {machineCraft.input.map((i) => `${i.quantityPerSecond} ${i.item.name}`).join(' - ')}</option>
-    )
-}
-
 const changeSelect = (value: string, onChange: (machineCraft?: MachineCraft) => void, craftManager: CraftManager): void => {
     if (value !== 'none') {
         onChange(craftManager.getMachineCraftById(value))
@@ -30,12 +24,13 @@ const SelectMachineView = (props: ISelectMachineProps): JSX.Element => {
     // eslint-disable-next-line @typescript-eslint/prefer-optional-chain
     const canCraft = selectedMachineCraft != null && selectedMachineCraft.canCraft(props.inventory)
 
-    const options = props.craftManager.machineCrafts.map((machineCraft) => renderOption(machineCraft))
     return (
         <div>
             <select onChange={(event) => changeSelect(event.target.value, (mc) => selectMachineCraft(mc), props.craftManager)} className="custom-select custom-select-sm">
                 <option value="none">Open this select menu</option>
-                {options}
+                {props.craftManager.machineCrafts.map((machineCraft) => {
+                    return <option key={machineCraft.id} value={machineCraft.id}>{machineCraft.name}: {machineCraft.input.map((i) => `${i.quantityPerSecond} ${i.item.name}`).join(' - ')}</option>
+                })}
             </select>
 
             <button className="btn btn-primary"

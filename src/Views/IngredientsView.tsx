@@ -5,19 +5,15 @@ interface IItemsCraftProps {
     ingredients: Ingredient[]
 }
 
-const renderItemStack = (ingredient: Ingredient, index: number): JSX.Element => {
-    return (
-        <div key={index} className="item">
-            <div>{ingredient.item.name}</div>
-            <div>{ingredient.quantityPerSecond.toFixed(2)}/s</div>
-        </div>
-    )
-}
-
 const IngredientsView = (props: IItemsCraftProps): JSX.Element => {
     return (
         <div className="item-list">
-            {props.ingredients.map((itemStack, i) => renderItemStack(itemStack, i))}
+            {props.ingredients.map((ingredient, i) => {
+                return <div key={i} className="item">
+                    <div>{ingredient.item.name}</div>
+                    <div>{ingredient.quantityPerSecond.toFixed(2)}/s</div>
+                </div>
+            })}
         </div>
     )
 }

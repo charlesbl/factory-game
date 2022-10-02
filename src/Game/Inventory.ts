@@ -2,13 +2,13 @@ import ItemStack from './ItemStack'
 import Item from './Item'
 import Ressources from './Resources/Ressources'
 
-export interface ItemStackList {
+export interface ItemStackDictionary {
     // key = itemId
     [key: string]: ItemStack
 }
 
 export default class Inventory {
-    private _itemStacks: ItemStackList
+    private _itemStacks: ItemStackDictionary
     public constructor () {
         this._itemStacks = {}
         Ressources.getItems().forEach((item: Item) => {
@@ -20,7 +20,7 @@ export default class Inventory {
         return Object.entries(this._itemStacks).map(([id, itemStack]) => itemStack)
     }
 
-    public get itemStacks (): ItemStackList {
+    public get itemStacks (): ItemStackDictionary {
         return this._itemStacks
     }
 

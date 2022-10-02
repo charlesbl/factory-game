@@ -4,27 +4,15 @@ import IBaseProps from './IBaseProps'
 import Factory from '../Game/Factory'
 import InventoryView from './InventoryView'
 import SelectMachineView from './SelectMachineView'
-import Machine from '../Game/Machine'
 import ManualMachineView from './ManualMachineView'
-import Inventory from '../Game/Inventory'
 import Craft from '../Game/Craft'
 import Ingredient from '../Game/Ingredient'
 import Ressources from '../Game/Resources/Ressources'
 import MachineCraft from '../Game/MachineCraft'
 
-const renderManualMachine = (machine: Machine, index: number, inventory: Inventory): JSX.Element => {
-    return (
-        <div key={index} className="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2 machine-container">
-            <ManualMachineView machine={machine} inventory={inventory}/>
-        </div>
-    )
-}
-
 const GameView = (props: IBaseProps): JSX.Element => {
     const [factories, setFactories] = useState<Factory[]>([props.game.factory])
     const currentFactory = factories[factories.length - 1]
-
-    const manualMachines = props.game.manualMachines.map((machine, i) => renderManualMachine(machine, i, props.game.inventory))
 
     return (
         <div>
@@ -32,7 +20,11 @@ const GameView = (props: IBaseProps): JSX.Element => {
             <InventoryView inventory={props.game.inventory} />
 
             <div className="row">
-                {manualMachines}
+                {props.game.manualMachines.map((machine, i) => {
+                    return <div key={i} className="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2 machine-container">
+                        <ManualMachineView machine={machine} inventory={props.game.inventory}/>
+                    </div>
+                })}
             </div>
             <button className="btn btn-primary"
                 disabled={factories.length === 1}
