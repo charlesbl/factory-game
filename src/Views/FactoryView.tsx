@@ -39,7 +39,9 @@ const FactoryView = (props: IFactoryProps): JSX.Element => {
                             console.log(props.factory.cost)
                             props.craftManager.addMachineCraft(machineCraft)
                         }}>create custom machine from this factory</button>
-                    <SelectMachineView machineCrafts={props.craftManager.machineCrafts}
+                    <SelectMachineView
+                        machineCrafts={props.craftManager.machineCrafts}
+                        inventory={props.inventory}
                         onAdd={(mc) => mc.tryConsumeMachineCraft(props.inventory, props.factory)}
                         onRemove={(mc) => props.craftManager.removeMachineCraft(mc.id)}/>
                 </div>
