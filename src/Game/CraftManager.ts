@@ -4,6 +4,7 @@ import MachineCraft from './MachineCraft'
 import Ressources from './Resources/Ressources'
 import rawCrafts from './Resources/Crafts.json'
 import rawMachineCrafts from './Resources/MachineCrafts.json'
+import Factory from './Factory'
 
 export default class CraftManager {
     private _customCrafts: Craft[]
@@ -94,6 +95,15 @@ export default class CraftManager {
 
     private machineCraftExist (id: string): boolean {
         return this.machineCrafts.filter((craft) => craft.id === id).length > 0
+    }
+
+    public createCustomMachineFromFactory (factory: Factory): MachineCraft {
+        const craft = new Craft(factory.name, factory.name, factory.inputs, factory.outputs, true)
+        this.addCraft(craft)
+        const machineCraft = new MachineCraft('machine' + factory.name, factory.name, true, factory.cost, craft)
+        console.log(factory.cost)
+        this.addMachineCraft(machineCraft)
+        return machineCraft
     }
 
     private static getCraftByIdInList (crafts: Craft[], id: string): Craft {

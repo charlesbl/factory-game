@@ -7,6 +7,7 @@ interface IFactoryProps {
     factory: Factory
     onClickEnter: () => void
     onDeleteFactory: () => void
+    onCreateCustomMachine: () => void
 }
 
 const FactoryCardView = (props: IFactoryProps): JSX.Element => {
@@ -37,6 +38,7 @@ const FactoryCardView = (props: IFactoryProps): JSX.Element => {
                         <button className="btn btn-primary" onClick={() => props.onClickEnter()}>Enter</button>
                         <button className="btn btn-primary" onClick={() => props.factory.setAllMachineActive(true)}>On</button>
                         <button className="btn btn-primary" onClick={() => props.factory.setAllMachineActive(false)}>Off</button>
+                        <button className="btn btn-primary" onClick={() => props.onCreateCustomMachine()}>Create custom machine</button>
                         <button className="btn btn-danger btn-destroy" onClick={() => props.onDeleteFactory()}><i className="fas fa-trash fa-xs"></i></button>
                     </div>
                 </div>
