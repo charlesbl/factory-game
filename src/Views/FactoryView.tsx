@@ -4,11 +4,14 @@ import Factory from '../Game/Factory'
 import Machine from '../Game/Machine'
 import MachineView from './MachineView'
 import FactoryCardView from './FactoryCardView'
-import IBaseProps from './IBaseProps'
+import Craft from '../Game/Craft'
+import CraftManager from '../Game/CraftManager'
+import MachineCraft from '../Game/MachineCraft'
 
-interface IFactoryProps extends IBaseProps {
+interface IFactoryProps {
     factory: Factory
     onSelectedFactory: (factory: Factory) => void
+    craftManager: CraftManager
 }
 
 const renderMachine = (machine: Machine, index: number, onDeleteMachine: () => void, onTogglePauseMachine: () => void): JSX.Element => {
@@ -32,8 +35,14 @@ const FactoryView = (props: IFactoryProps): JSX.Element => {
     const factories = props.factory.factories.map((factory, i) => renderFactoryCard(factory, i, () => props.onSelectedFactory(factory), () => props.factory.destroySubFactory(factory)))
     return (
         <div>
-
             <button className="btn btn-primary" onClick={() => props.factory.updateInputsAndOutputs()}>Refresh</button>
+            <button className="btn btn-primary" onClick={() => {
+                const craft = new Craft(props.factory.name, props.factory.name, props.factory.inputs, props.factory.outputs)
+                props.craftManager.addCraft(craft)
+                const machineCraft = new MachineCraft('machine' + props.factory.name, props.factory.name, props.factory.cost, craft)
+                console.log(props.factory.cost)
+                props.craftManager.addMachineCraft(machineCraft)
+            }}>create custom machine from this factory</button>
             <div className="row">
                 {factories}
                 {machines}

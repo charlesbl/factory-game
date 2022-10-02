@@ -2,13 +2,14 @@ import Factory from '../Factory'
 import Machine from '../Machine'
 import Saveable from './Saveable'
 import MachineSave from './MachineSave'
+import CraftManager from '../CraftManager'
 
 export default class FactorySave extends Saveable<Factory> {
     private machines!: MachineSave[]
     private factories!: FactorySave[]
     private name!: string
 
-    public constructor (obj?: Factory, blob?: any) {
+    public constructor (obj?: Factory, blob?: FactorySave) {
         super()
         this.init(obj, blob)
     }
@@ -25,8 +26,8 @@ export default class FactorySave extends Saveable<Factory> {
         this.name = blob.name
     }
 
-    public getObj = (): Factory => {
-        const factory = new Factory(this.machines.map((machineSave: MachineSave) => machineSave.getObj()), this.factories.map((factorySave: FactorySave) => factorySave.getObj()))
+    public getObj = (craftManager: CraftManager): Factory => {
+        const factory = new Factory(this.machines.map((machineSave: MachineSave) => machineSave.getObj(craftManager)), this.factories.map((factorySave: FactorySave) => factorySave.getObj(craftManager)))
         factory.factories.forEach((f) => f.setTopFactory(factory))
         factory.name = this.name
         return factory

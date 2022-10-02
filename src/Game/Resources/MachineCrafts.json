@@ -11,17 +11,6 @@
         "output": "ironDrill"
     },
     {
-        "id": "copperDrill",
-        "name": "Copper Drill",
-        "input": [
-            {
-                "itemId": "ironPlate",
-                "quantity": 10
-            }
-        ],
-        "output": "copperDrill"
-    },
-    {
         "id": "ironFurnace",
         "name": "Iron Furnace",
         "duration": 5000,
@@ -48,6 +37,17 @@
             }
         ],
         "output": "ironPlate"
+    },
+    {
+        "id": "copperDrill",
+        "name": "Copper Drill",
+        "input": [
+            {
+                "itemId": "ironPlate",
+                "quantity": 10
+            }
+        ],
+        "output": "copperDrill"
     },
     {
         "id": "copperFurnace",

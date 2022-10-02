@@ -1,9 +1,17 @@
 import Craft from './Craft'
+import MachineCraft from './MachineCraft'
 
 export default class Machine {
-    public readonly name: string
-    public readonly craft: Craft
+    public readonly machineCraft: MachineCraft
     private _active: boolean
+
+    public get craft (): Craft {
+        return this.machineCraft.outputCraft
+    }
+
+    public get name (): string {
+        return this.machineCraft.name
+    }
 
     public get active (): boolean {
         return this._active
@@ -13,9 +21,8 @@ export default class Machine {
         this._active = value
     }
 
-    public constructor (name: string, craft: Craft) {
-        this.name = name
-        this.craft = craft
+    public constructor (machineCraft: MachineCraft) {
+        this.machineCraft = machineCraft
         this._active = true
     }
 }

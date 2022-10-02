@@ -1,23 +1,24 @@
 import React, { useState } from 'react'
 import '../css/Factory.css'
+import CraftManager from '../Game/CraftManager'
 import Inventory from '../Game/Inventory'
 import MachineCraft from '../Game/MachineCraft'
-import Ressources from '../Game/Resources/Ressources'
 
 interface ISelectMachineProps {
     onAddClicked: (machineCraft: MachineCraft) => void
     inventory: Inventory
+    craftManager: CraftManager
 }
 
 const renderOption = (machineCraft: MachineCraft): JSX.Element => {
     return (
-        <option key={machineCraft.id} value={machineCraft.id}>{machineCraft.name} 0€</option>
+        <option key={machineCraft.id} value={machineCraft.id}>{machineCraft.name}: {machineCraft.input.map((i) => `${i.quantityPerSecond} ${i.item.name}`).join(' - ')}</option>
     )
 }
 
-const changeSelect = (value: string, onChange: (machineCraft?: MachineCraft) => void): void => {
+const changeSelect = (value: string, onChange: (machineCraft?: MachineCraft) => void, craftManager: CraftManager): void => {
     if (value !== 'none') {
-        onChange(Ressources.getMachineCraftById(value))
+        onChange(craftManager.getMachineCraftById(value))
     } else {
         onChange()
     }
@@ -29,10 +30,10 @@ const SelectMachineView = (props: ISelectMachineProps): JSX.Element => {
     // eslint-disable-next-line @typescript-eslint/prefer-optional-chain
     const canCraft = selectedMachineCraft != null && selectedMachineCraft.canCraft(props.inventory)
 
-    const options = Ressources.getMachineCrafts().map((machineCraft) => renderOption(machineCraft))
+    const options = props.craftManager.machineCrafts.map((machineCraft) => renderOption(machineCraft))
     return (
         <div>
-            <select onChange={(event) => changeSelect(event.target.value, (mc) => selectMachineCraft(mc))} className="custom-select custom-select-sm">
+            <select onChange={(event) => changeSelect(event.target.value, (mc) => selectMachineCraft(mc), props.craftManager)} className="custom-select custom-select-sm">
                 <option value="none">Open this select menu</option>
                 {options}
             </select>

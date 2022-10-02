@@ -1,13 +1,20 @@
 import Craft from './Craft'
+import CraftManager from './CraftManager'
 import Ingredient from './Ingredient'
 import Inventory from './Inventory'
 
 export default class MachineCraft extends Craft {
     public readonly outputCraft: Craft
 
-    public constructor (id: string, name: string, input: Ingredient[], outputCraft: Craft) {
+    public constructor (id: string, name: string, input: Ingredient[], craft?: Craft, outputCraftId?: string) {
         super(id, name, input, [])
-        this.outputCraft = outputCraft
+        if (craft !== undefined) {
+            this.outputCraft = craft
+        } else if (outputCraftId !== undefined) {
+            this.outputCraft = CraftManager.getBasicCraftById(outputCraftId)
+        } else {
+            throw Error('no data passed, need craft or outputCraftId')
+        }
     }
 
     public canCraft (inventory: Inventory): boolean {
