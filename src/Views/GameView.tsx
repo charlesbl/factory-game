@@ -14,37 +14,55 @@ const GameView = (props: IBaseProps): JSX.Element => {
 
     return (
         <div>
-            <span>{props.game.money.toFixed(2)}€</span>
+            <span>
+                {props.game.money.toFixed(2)}
+                €
+            </span>
+
             <InventoryView inventory={props.game.inventory} />
 
-            <button className="btn btn-primary" onClick={() => setShowManualMachines(!showManualMachines)}>
+            <button
+                className="btn btn-primary"
+                onClick={() => setShowManualMachines(!showManualMachines)}
+            >
                     toggle manual machines
             </button>
+
             <div className={`row ${showManualMachines ? '' : 'hide'}`}>
-                {props.game.manualMachines.map((machine, i) => {
-                    return <div key={i} className="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2 machine-container">
-                        <ManualMachineView machine={machine} inventory={props.game.inventory}/>
-                    </div>
+                { props.game.manualMachines.map((machine, i) => {
+                    return (
+                        <div
+                            className="col-12 col-sm-6 col-md-4 col-lg-3 col-xl-2 machine-container"
+                            key={i}
+                        >
+                            <ManualMachineView
+                                inventory={props.game.inventory}
+                                machine={machine}
+                            />
+                        </div>
+                    )
                 })}
             </div>
 
-            <button className="btn btn-primary"
+            <button
+                className="btn btn-primary"
                 disabled={isMainFactory}
                 onClick={() => {
                     factories.pop()
                     setFactories([...factories])
-                }}>
+                }}
+            >
                     Return
             </button>
 
             <FactoryView
-                factory={currentFactory}
-                isMainFactory={isMainFactory}
                 craftManager={props.game.craftManager}
+                factory={currentFactory}
                 inventory={props.game.inventory}
                 onSelectedFactory={(factory) => {
                     setFactories([...factories, factory])
-                }}/>
+                }}
+            />
         </div>
     )
 }

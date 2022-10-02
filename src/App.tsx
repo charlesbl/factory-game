@@ -31,7 +31,7 @@ const clearGame = (): void => {
 const GAME = loadGame()
 
 const App = (): JSX.Element => {
-    const [, setState] = useState(0)
+    const [state, setState] = useState(0)
 
     const updateGame = (): void => {
         setState((n) => n + 1)
@@ -45,12 +45,23 @@ const App = (): JSX.Element => {
 
     return (
         <div className="container-fluid">
-            <button className="btn btn-primary" onClick={() => clearGame()}>Clear save</button>
+            <button
+                className="btn btn-primary"
+                onClick={() => clearGame()}
+            >
+                Clear save
+            </button>
 
-            <button className="btn btn-primary" onClick={() => {
-                GAME.cheatMoney()
-                console.log('cheat')
-            }}>Cheat 1000€</button>
+            <button
+                className="btn btn-primary"
+                onClick={() => {
+                    GAME.cheatMoney()
+                    console.log('cheat')
+                }}
+            >
+                Cheat 1000€
+            </button>
+
             <GameView game={GAME} />
         </div>
     )

@@ -12,17 +12,39 @@ interface IMachineProps {
 const MachineView = (props: IMachineProps): JSX.Element => {
     return (
         <div className="machine">
-            <div className="name">{props.machine.name}</div>
+            <div className="name">
+                {props.machine.name}
+            </div>
+
             <div className="wrapper">
                 <IngredientsView ingredients={props.machine.craft.input} />
+
                 <div>
-                    <div className="arrow"><i className="fas fa-arrow-right fa-10px"></i></div>
-                    <div>58%</div>
+                    <div className="arrow">
+                        <i className="fas fa-arrow-right fa-10px" />
+                    </div>
+
+                    <div>
+                        58%
+                    </div>
+
                     <div className="btn-wrapper">
-                        <button onClick={() => props.onTogglePauseMachine?.()} className="btn btn-warning btn-side">{!props.machine.active ? <i className="fas fa-play fa-xs"></i> : <i className="fas fa-pause fa-xs"></i>}</button>
-                        <button onClick={() => props.onDeleteMachine?.()} className="btn btn-danger btn-side"><i className="fas fa-trash fa-xs"></i></button>
+                        <button
+                            className="btn btn-warning btn-side"
+                            onClick={() => props.onTogglePauseMachine?.()}
+                        >
+                            {!props.machine.active ? <i className="fas fa-play fa-xs" /> : <i className="fas fa-pause fa-xs" />}
+                        </button>
+
+                        <button
+                            className="btn btn-danger btn-side"
+                            onClick={() => props.onDeleteMachine?.()}
+                        >
+                            <i className="fas fa-trash fa-xs" />
+                        </button>
                     </div>
                 </div>
+
                 <IngredientsView ingredients={props.machine.craft.output} />
             </div>
         </div>

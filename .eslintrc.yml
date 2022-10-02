@@ -13,5 +13,40 @@ plugins:
   - react
 rules: {
   "@typescript-eslint/indent": ["error", 4],
-  "@typescript-eslint/explicit-member-accessibility": "error"
+  "@typescript-eslint/explicit-member-accessibility": "error",
+  "react/function-component-definition": ["error", {
+    "namedComponents": "arrow-function",
+    "unnamedComponents": "arrow-function"
+    }],
+  "react/hook-use-state": ["error"],
+  "react/no-unused-prop-types": ["error"],
+  "react/prefer-stateless-function": ["error"],
+  "react/self-closing-comp": ["error"],
+  "react/jsx-closing-bracket-location": ["error"],
+  "react/jsx-curly-brace-presence": ["error"],
+  "react/jsx-curly-newline": ["error"],
+  "react/jsx-curly-spacing": ["error"],
+  "react/jsx-equals-spacing": ["error", "never"],
+  "react/jsx-first-prop-new-line": ["error"],
+  "react/jsx-handler-names": ["error"],
+  "react/jsx-key": ["error"],
+  "react/jsx-max-props-per-line": ["error"],
+  "react/jsx-newline": ["error"],
+  "react/jsx-one-expression-per-line": ["error"],
+  "react/jsx-pascal-case": ["error"],
+  "react/jsx-sort-props": ["error"],
+  "react/jsx-tag-spacing": ["error"],
+  "react/jsx-wrap-multilines": ["error", {
+      "declaration": "parens-new-line",
+      "assignment": "parens-new-line",
+      "return": "parens-new-line",
+      "arrow": "parens-new-line",
+      "condition": "parens-new-line",
+      "logical": "parens-new-line",
+      "prop": "parens-new-line"
+    }],
+  "react/no-adjacent-inline-elements": ["error"]
 }
+settings:
+  react:
+    version: detect

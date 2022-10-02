@@ -9,10 +9,21 @@ const IngredientsView = (props: IItemsCraftProps): JSX.Element => {
     return (
         <div className="item-list">
             {props.ingredients.map((ingredient, i) => {
-                return <div key={i} className="item">
-                    <div>{ingredient.item.name}</div>
-                    <div>{ingredient.quantityPerSecond.toFixed(2)}/s</div>
-                </div>
+                return (
+                    <div
+                        className="item"
+                        key={i}
+                    >
+                        <div>
+                            {ingredient.item.name}
+                        </div>
+
+                        <div>
+                            {ingredient.quantityPerSecond.toFixed(2)}
+                            /s
+                        </div>
+                    </div>
+                )
             })}
         </div>
     )
