@@ -16,7 +16,7 @@
         "input": [
             {
                 "itemId": "ironOre",
-                "quantity": 5
+                "quantity": 2
             }
         ],
         "output": [
@@ -59,7 +59,7 @@
         "input": [
             {
                 "itemId": "copperOre",
-                "quantity": 5
+                "quantity": 2
             }
         ],
         "output": [

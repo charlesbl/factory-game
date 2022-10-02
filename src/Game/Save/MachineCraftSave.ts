@@ -29,6 +29,6 @@ export default class MachineCraftSave extends Saveable<MachineCraft> {
     }
 
     public readonly getObj = (craftManeger: CraftManager): MachineCraft => {
-        return new MachineCraft(this.id, this.name, this.input.map((ing) => ing.getObj()), craftManeger.getCraftById(this.outputCraftId))
+        return new MachineCraft(this.id, this.name, true, this.input.map((ing) => ing.getObj()), craftManeger.getCraftById(this.outputCraftId))
     }
 }

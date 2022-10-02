@@ -4,11 +4,10 @@ import CraftManager from './CraftManager'
 import Ingredient from './Ingredient'
 import Inventory from './Inventory'
 import Machine from './Machine'
-import MachineCraft from './MachineCraft'
 import Ressources from './Resources/Ressources'
 
-// TODO Custom machines = custom craft, use custom craft as normal craft to create a new machine
-// TODO create/edit/delete custom machines
+// TODO View for create/edit/delete custom machines
+// TODO Construction time for machines and factories
 // TODO rework crafts
 // TODO Download and load save
 // TODO config menu
@@ -64,37 +63,9 @@ export default class Game {
         })
     }
 
-    public tryConsumeMachineCraft (craft: MachineCraft, factory: Factory): boolean {
-        if (craft.canCraft(this.inventory)) {
-            craft.input.forEach((ingredient) => {
-                const cost = ingredient.quantityPerSecond
-                this.inventory.removeItem(ingredient.item, cost)
-            })
-            factory.buildMachine(craft)
-            return true
-        } else {
-            return false
-        }
-    }
-
-    private tryConsumeCraft (craft: Craft, productionTimeInSec: number): boolean {
-        if (craft.canCraft(this.inventory, productionTimeInSec)) {
-            craft.input.forEach((ingredient) => {
-                const cost = ingredient.quantityPerSecond * productionTimeInSec
-                this.inventory.removeItem(ingredient.item, cost)
-            })
-            craft.output.forEach((ingredient) => {
-                this.inventory.addItem(ingredient.item, ingredient.quantityPerSecond * productionTimeInSec)
-            })
-            return true
-        } else {
-            return false
-        }
-    }
-
     private tryConsumeManualCraft (machine: Machine, productionTimeInSec: number): boolean {
         if (machine.active) {
-            return this.tryConsumeCraft(machine.craft, productionTimeInSec * MANUAL_CRAFTING_FACTOR)
+            return machine.craft.tryConsumeCraft(this.inventory, productionTimeInSec * MANUAL_CRAFTING_FACTOR)
         } else {
             return false
         }
@@ -102,10 +73,10 @@ export default class Game {
 
     private tryConsumeFactory (factory: Factory, productionTimeInSec: number): boolean {
         const [inputs, outputs] = Ingredient.simplifyIngredient(factory.inputs, factory.outputs)
-        const success = this.tryConsumeCraft(new Craft('temp', 'temp', inputs, outputs), productionTimeInSec)
+        const success = new Craft('temp', 'temp', inputs, outputs, true).tryConsumeCraft(this.inventory, productionTimeInSec)
         if (!success) {
             factory.machines.forEach((m) => {
-                m.active = this.tryConsumeCraft(m.craft, productionTimeInSec)
+                m.active = m.craft.tryConsumeCraft(this.inventory, productionTimeInSec)
             })
             factory.factories.forEach((f) => {
                 this.tryConsumeFactory(f, productionTimeInSec)

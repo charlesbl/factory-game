@@ -4,10 +4,11 @@ import MachineCraft from './MachineCraft'
 import Ressources from './Resources/Ressources'
 import rawCrafts from './Resources/Crafts.json'
 import rawMachineCrafts from './Resources/MachineCrafts.json'
+import Factory from './Factory'
 
 export default class CraftManager {
-    private readonly _customCrafts: Craft[]
-    private readonly _customMachineCrafts: MachineCraft[]
+    private _customCrafts: Craft[]
+    private _customMachineCrafts: MachineCraft[]
 
     private _crafts: Craft[]
     private _machineCrafts: MachineCraft[]
@@ -47,28 +48,33 @@ export default class CraftManager {
     }
 
     public addCraft (craft: Craft): void {
-        // TODO check if id exist
+        if (this.craftExist(craft.id)) {
+            throw new Error(`craft id "${craft.id}" alrealy exist`)
+        }
         this._customCrafts.push(craft)
         this.updateCraftList()
     }
 
-    public removeCraft (craftId: string): void {
-        // TODO
-        this.updateCraftList()
-        throw new Error('Not implemented')
-    }
-
     public addMachineCraft (machineCraft: MachineCraft): void {
-        // TODO check if id exist
+        if (this.machineCraftExist(machineCraft.id)) {
+            throw new Error(`MachineCraft id "${machineCraft.id}" alrealy exist`)
+        }
         this._customMachineCrafts.push(machineCraft)
         this.updateMachineCraftList()
     }
 
-    public removeMachineCraft (machineCraftId: string): void {
-        // TODO
+    public removeCraft (craftId: string): void {
+        this._customCrafts = this._customCrafts.filter((elem) => {
+            return elem.id !== craftId
+        })
+        this.updateCraftList()
+    }
 
+    public removeMachineCraft (machineCraftId: string): void {
+        this._customMachineCrafts = this._customMachineCrafts.filter((elem) => {
+            return elem.id !== machineCraftId
+        })
         this.updateMachineCraftList()
-        throw new Error('Not implemented')
     }
 
     public getCraftById (id: string): Craft {
@@ -81,6 +87,23 @@ export default class CraftManager {
             throw new Error(`MachineCraft id "${id}" found ${req.length} times`)
         }
         return req[0]
+    }
+
+    private craftExist (id: string): boolean {
+        return this.crafts.filter((craft) => craft.id === id).length > 0
+    }
+
+    private machineCraftExist (id: string): boolean {
+        return this.machineCrafts.filter((craft) => craft.id === id).length > 0
+    }
+
+    public createCustomMachineFromFactory (factory: Factory): MachineCraft {
+        const craft = new Craft(factory.name, factory.name, factory.inputs, factory.outputs, true)
+        this.addCraft(craft)
+        const machineCraft = new MachineCraft('machine' + factory.name, factory.name, true, factory.cost, craft)
+        console.log(factory.cost)
+        this.addMachineCraft(machineCraft)
+        return machineCraft
     }
 
     private static getCraftByIdInList (crafts: Craft[], id: string): Craft {
@@ -99,14 +122,14 @@ export default class CraftManager {
         return rawCrafts.map((rawCraft: any) => {
             const input: Ingredient[] = rawCraft.input.map((rawItemStack: any) => new Ingredient(Ressources.getItemById(rawItemStack.itemId), rawItemStack.quantity))
             const outputItems: Ingredient[] = rawCraft.output.map((rawItemStack: any) => new Ingredient(Ressources.getItemById(rawItemStack.itemId), rawItemStack.quantity))
-            return new Craft(rawCraft.id, rawCraft.name, input, outputItems)
+            return new Craft(rawCraft.id, rawCraft.name, input, outputItems, false)
         })
     }
 
     public static getBasicMachineCrafts (): MachineCraft[] {
         return rawMachineCrafts.map((rawCraft: any) => {
             const input = rawCraft.input.map((rawItemStack: any) => new Ingredient(Ressources.getItemById(rawItemStack.itemId), rawItemStack.quantity))
-            return new MachineCraft(rawCraft.id, rawCraft.name, input, undefined, rawCraft.output)
+            return new MachineCraft(rawCraft.id, rawCraft.name, false, input, undefined, rawCraft.output)
         })
     }
 }

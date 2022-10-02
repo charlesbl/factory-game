@@ -1,0 +1,15 @@
+.select-machine {
+    padding: 0.5em;
+}
+.select-machine select {
+    display: inline-block;
+    width: 80%;
+}
+.select-machine .add {
+    width: 10%;
+    margin: 0.2em;
+    padding: 0.5em;
+}
+.select-machine .btn {
+    display: inline-block;
+}
