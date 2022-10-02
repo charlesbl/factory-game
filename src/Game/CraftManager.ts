@@ -6,8 +6,8 @@ import rawCrafts from './Resources/Crafts.json'
 import rawMachineCrafts from './Resources/MachineCrafts.json'
 
 export default class CraftManager {
-    private readonly _customCrafts: Craft[]
-    private readonly _customMachineCrafts: MachineCraft[]
+    private _customCrafts: Craft[]
+    private _customMachineCrafts: MachineCraft[]
 
     private _crafts: Craft[]
     private _machineCrafts: MachineCraft[]
@@ -63,16 +63,17 @@ export default class CraftManager {
     }
 
     public removeCraft (craftId: string): void {
-        // TODO
+        this._customCrafts = this._customCrafts.filter((elem) => {
+            return elem.id !== craftId
+        })
         this.updateCraftList()
-        throw new Error('Not implemented')
     }
 
     public removeMachineCraft (machineCraftId: string): void {
-        // TODO
-
+        this._customMachineCrafts = this._customMachineCrafts.filter((elem) => {
+            return elem.id !== machineCraftId
+        })
         this.updateMachineCraftList()
-        throw new Error('Not implemented')
     }
 
     public getCraftById (id: string): Craft {

@@ -2,6 +2,7 @@ import Machine from './Machine'
 import Craft from './Craft'
 import MachineCraft from './MachineCraft'
 import Ingredient from './Ingredient'
+import Inventory from './Inventory'
 
 const DEFAULT_NAME = 'New Factory'
 
@@ -84,6 +85,10 @@ export default class Factory {
         return machine
     }
 
+    public getMachinesOfType (machineCraft: Craft): Machine[] {
+        return this._machines.filter((machine) => machine.craft.id === machineCraft.id)
+    }
+
     public destroyMachine (machine: Machine): void {
         this._machines = this._machines.filter((elem) => {
             return elem !== machine
@@ -91,8 +96,9 @@ export default class Factory {
         this.updateInputsAndOutputs()
     }
 
-    public getMachinesOfType (machineCraft: Craft): Machine[] {
-        return this._machines.filter((machine) => machine.craft.id === machineCraft.id)
+    public dismantleMachine (machine: Machine, inventory: Inventory): void {
+        machine.machineCraft.input.forEach((ingredient) => inventory.addItem(ingredient.item, ingredient.quantityPerSecond))
+        this.destroyMachine(machine)
     }
 
     public destroySubFactory (subFactory: Factory): void {
@@ -102,6 +108,18 @@ export default class Factory {
             return elem !== subFactory
         })
         this.updateInputsAndOutputs()
+    }
+
+    public dismantleSubFactory (subFactory: Factory, inventory: Inventory): void {
+        subFactory.getCostWithInactiveMachine().forEach((ingredient) => inventory.addItem(ingredient.item, ingredient.quantityPerSecond))
+        this.destroySubFactory(subFactory)
+    }
+
+    public getCostWithInactiveMachine (): Ingredient[] {
+        const allCosts: Ingredient[] = []
+        allCosts.push(...this._machines.map((machine) => machine.machineCraft.input).flat())
+        allCosts.push(...this._factories.map((factory) => factory.getCostWithInactiveMachine()).flat())
+        return Ingredient.mergeIngredient(allCosts)
     }
 
     public updateInputsAndOutputs (): void {
