@@ -28,6 +28,6 @@ export default class CraftSave extends Saveable<Craft> {
     }
 
     public readonly getObj = (): Craft => {
-        return new Craft(this.id, this.name, this.input.map((ing) => ing.getObj()), this.output.map((ing) => ing.getObj()))
+        return new Craft(this.id, this.name, this.input.map((ing) => ing.getObj()), this.output.map((ing) => ing.getObj()), true)
     }
 }

@@ -6,8 +6,8 @@ import Inventory from './Inventory'
 export default class MachineCraft extends Craft {
     public readonly outputCraft: Craft
 
-    public constructor (id: string, name: string, input: Ingredient[], craft?: Craft, outputCraftId?: string) {
-        super(id, name, input, [])
+    public constructor (id: string, name: string, isCustom: boolean, input: Ingredient[], craft?: Craft, outputCraftId?: string) {
+        super(id, name, input, [], isCustom)
         if (craft !== undefined) {
             this.outputCraft = craft
         } else if (outputCraftId !== undefined) {

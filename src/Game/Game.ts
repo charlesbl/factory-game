@@ -102,7 +102,7 @@ export default class Game {
 
     private tryConsumeFactory (factory: Factory, productionTimeInSec: number): boolean {
         const [inputs, outputs] = Ingredient.simplifyIngredient(factory.inputs, factory.outputs)
-        const success = this.tryConsumeCraft(new Craft('temp', 'temp', inputs, outputs), productionTimeInSec)
+        const success = this.tryConsumeCraft(new Craft('temp', 'temp', inputs, outputs, true), productionTimeInSec)
         if (!success) {
             factory.machines.forEach((m) => {
                 m.active = this.tryConsumeCraft(m.craft, productionTimeInSec)

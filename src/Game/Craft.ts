@@ -6,12 +6,14 @@ class Craft {
     public readonly name: string
     public readonly input: Ingredient[]
     public readonly output: Ingredient[]
+    public readonly isCustom: boolean
 
-    public constructor (id: string, name: string, input: Ingredient[], output: Ingredient[]) {
+    public constructor (id: string, name: string, input: Ingredient[], output: Ingredient[], isCustom: boolean) {
         this.id = id
         this.name = name
         this.input = input
         this.output = output
+        this.isCustom = isCustom
     }
 
     public canCraft (inventory: Inventory, productionTimeInSec: number): boolean {

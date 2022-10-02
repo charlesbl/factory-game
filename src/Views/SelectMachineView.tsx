@@ -24,6 +24,9 @@ const SelectMachineView = (props: ISelectMachineProps): JSX.Element => {
     // eslint-disable-next-line @typescript-eslint/prefer-optional-chain
     const canCraft = selectedMachineCraft != null && selectedMachineCraft.canCraft(props.inventory)
 
+    // eslint-disable-next-line @typescript-eslint/prefer-optional-chain
+    const canRemove = selectedMachineCraft != null && selectedMachineCraft.isCustom
+
     return (
         <div>
             <select onChange={(event) => changeSelect(event.target.value, (mc) => selectMachineCraft(mc), props.craftManager)} className="custom-select custom-select-sm">
@@ -36,10 +39,20 @@ const SelectMachineView = (props: ISelectMachineProps): JSX.Element => {
             <button className="btn btn-primary"
                 disabled={!canCraft}
                 onClick={() => {
-                    if (selectedMachineCraft == null || !canCraft) return
+                    if (!canCraft) return
                     props.onAddClicked(selectedMachineCraft)
                 }}>
-            Add machine
+                Add machine
+            </button>
+
+            <button className="btn btn-primary"
+                disabled={!canRemove}
+                onClick={() => {
+                    if (!canRemove) return
+                    props.craftManager.removeMachineCraft(selectedMachineCraft.id)
+                    props.craftManager.removeCraft(selectedMachineCraft.outputCraft.id)
+                }}>
+                Remove custom machine
             </button>
         </div>
     )

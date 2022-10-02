@@ -47,21 +47,25 @@ export default class CraftManager {
     }
 
     public addCraft (craft: Craft): void {
-        // TODO check if id exist
+        if (this.craftExist(craft.id)) {
+            throw new Error(`craft id "${craft.id}" alrealy exist`)
+        }
         this._customCrafts.push(craft)
         this.updateCraftList()
+    }
+
+    public addMachineCraft (machineCraft: MachineCraft): void {
+        if (this.machineCraftExist(machineCraft.id)) {
+            throw new Error(`MachineCraft id "${machineCraft.id}" alrealy exist`)
+        }
+        this._customMachineCrafts.push(machineCraft)
+        this.updateMachineCraftList()
     }
 
     public removeCraft (craftId: string): void {
         // TODO
         this.updateCraftList()
         throw new Error('Not implemented')
-    }
-
-    public addMachineCraft (machineCraft: MachineCraft): void {
-        // TODO check if id exist
-        this._customMachineCrafts.push(machineCraft)
-        this.updateMachineCraftList()
     }
 
     public removeMachineCraft (machineCraftId: string): void {
@@ -83,6 +87,14 @@ export default class CraftManager {
         return req[0]
     }
 
+    private craftExist (id: string): boolean {
+        return this.crafts.filter((craft) => craft.id === id).length > 0
+    }
+
+    private machineCraftExist (id: string): boolean {
+        return this.machineCrafts.filter((craft) => craft.id === id).length > 0
+    }
+
     private static getCraftByIdInList (crafts: Craft[], id: string): Craft {
         const req = crafts.filter((craft) => craft.id === id)
         if (req.length !== 1) {
@@ -99,14 +111,14 @@ export default class CraftManager {
         return rawCrafts.map((rawCraft: any) => {
             const input: Ingredient[] = rawCraft.input.map((rawItemStack: any) => new Ingredient(Ressources.getItemById(rawItemStack.itemId), rawItemStack.quantity))
             const outputItems: Ingredient[] = rawCraft.output.map((rawItemStack: any) => new Ingredient(Ressources.getItemById(rawItemStack.itemId), rawItemStack.quantity))
-            return new Craft(rawCraft.id, rawCraft.name, input, outputItems)
+            return new Craft(rawCraft.id, rawCraft.name, input, outputItems, false)
         })
     }
 
     public static getBasicMachineCrafts (): MachineCraft[] {
         return rawMachineCrafts.map((rawCraft: any) => {
             const input = rawCraft.input.map((rawItemStack: any) => new Ingredient(Ressources.getItemById(rawItemStack.itemId), rawItemStack.quantity))
-            return new MachineCraft(rawCraft.id, rawCraft.name, input, undefined, rawCraft.output)
+            return new MachineCraft(rawCraft.id, rawCraft.name, false, input, undefined, rawCraft.output)
         })
     }
 }

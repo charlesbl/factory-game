@@ -20,9 +20,9 @@ const FactoryView = (props: IFactoryProps): JSX.Element => {
         <div>
             <button className="btn btn-primary" onClick={() => props.factory.updateInputsAndOutputs()}>Refresh</button>
             <button className="btn btn-primary" onClick={() => {
-                const craft = new Craft(props.factory.name, props.factory.name, props.factory.inputs, props.factory.outputs)
+                const craft = new Craft(props.factory.name, props.factory.name, props.factory.inputs, props.factory.outputs, true)
                 props.craftManager.addCraft(craft)
-                const machineCraft = new MachineCraft('machine' + props.factory.name, props.factory.name, props.factory.cost, craft)
+                const machineCraft = new MachineCraft('machine' + props.factory.name, props.factory.name, true, props.factory.cost, craft)
                 console.log(props.factory.cost)
                 props.craftManager.addMachineCraft(machineCraft)
             }}>create custom machine from this factory</button>

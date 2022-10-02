@@ -5,10 +5,6 @@ import Factory from '../Game/Factory'
 import InventoryView from './InventoryView'
 import SelectMachineView from './SelectMachineView'
 import ManualMachineView from './ManualMachineView'
-import Craft from '../Game/Craft'
-import Ingredient from '../Game/Ingredient'
-import Ressources from '../Game/Resources/Ressources'
-import MachineCraft from '../Game/MachineCraft'
 
 const GameView = (props: IBaseProps): JSX.Element => {
     const [factories, setFactories] = useState<Factory[]>([props.game.factory])
@@ -33,16 +29,6 @@ const GameView = (props: IBaseProps): JSX.Element => {
                     setFactories([...factories])
                 }}>
                     Return
-            </button>
-            <button className="btn btn-primary" onClick={() => {
-                const randName = (Math.random() * 1000).toFixed()
-                const randQuantity = Math.random() * 10
-                const craft = new Craft(randName, randName, [new Ingredient(Ressources.getItems()[0], randQuantity)], [new Ingredient(Ressources.getItems()[1], randQuantity)])
-                props.game.craftManager.addCraft(craft)
-                const machineCraft = new MachineCraft('machine' + randName, randName, [], craft)
-                props.game.craftManager.addMachineCraft(machineCraft)
-            }}>
-                    add random craft
             </button>
 
             <div className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-2">
