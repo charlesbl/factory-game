@@ -1,5 +1,6 @@
 import Craft from './Craft'
 import CraftManager from './CraftManager'
+import Factory from './Factory'
 import Ingredient from './Ingredient'
 import Inventory from './Inventory'
 
@@ -19,5 +20,14 @@ export default class MachineCraft extends Craft {
 
     public canCraft (inventory: Inventory): boolean {
         return super.canCraft(inventory, 1)
+    }
+
+    public tryConsumeMachineCraft (inventory: Inventory, factory: Factory): boolean {
+        if (super.tryConsumeCraft(inventory, 1)) {
+            factory.buildMachine(this)
+            return true
+        } else {
+            return false
+        }
     }
 }

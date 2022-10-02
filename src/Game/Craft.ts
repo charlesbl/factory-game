@@ -26,5 +26,20 @@ class Craft {
         })
         return ressourcesAvailable
     }
+
+    public tryConsumeCraft (inventory: Inventory, productionTimeInSec: number): boolean {
+        if (this.canCraft(inventory, productionTimeInSec)) {
+            this.input.forEach((ingredient) => {
+                const cost = ingredient.quantityPerSecond * productionTimeInSec
+                inventory.removeItem(ingredient.item, cost)
+            })
+            this.output.forEach((ingredient) => {
+                inventory.addItem(ingredient.item, ingredient.quantityPerSecond * productionTimeInSec)
+            })
+            return true
+        } else {
+            return false
+        }
+    }
 }
 export default Craft
