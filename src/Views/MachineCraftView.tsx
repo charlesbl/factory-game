@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react'
+import React from 'react'
 import MachineCraft from '../Game/MachineCraft'
 import IngredientsView from './IngredientsView'
 import '../css/MachineCraft.css'
@@ -11,8 +11,6 @@ interface IMachineCraftProps {
 }
 
 const MachineCraftView = (props: IMachineCraftProps): JSX.Element => {
-    const onAdd = useCallback(() => props.onAdd(props.machineCraft), [])
-    const onRemove = useCallback(() => props.onRemove(props.machineCraft), [])
     return (
         <div className="machine-craft">
             <div className="name">
@@ -35,7 +33,7 @@ const MachineCraftView = (props: IMachineCraftProps): JSX.Element => {
                         <button
                             className="btn btn-primary"
                             disabled={!props.afordable}
-                            onClick={onAdd}
+                            onClick={() => props.onAdd(props.machineCraft)}
                         >
                         +
                         </button>
@@ -43,7 +41,7 @@ const MachineCraftView = (props: IMachineCraftProps): JSX.Element => {
                         {props.machineCraft.isCustom && (
                             <button
                                 className="btn btn-danger"
-                                onClick={onRemove}
+                                onClick={() => props.onRemove(props.machineCraft)}
                             >
                                 <i className="fas fa-trash fa-xs" />
                             </button>

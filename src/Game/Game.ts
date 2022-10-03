@@ -82,7 +82,6 @@ export default class Game {
                 this.tryConsumeFactory(f, productionTimeInSec)
             })
             factory.updateInputsAndOutputs()
-            console.log('update factory')
         }
         return success
     }

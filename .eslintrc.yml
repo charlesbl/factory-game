@@ -18,7 +18,6 @@ rules: {
     "namedComponents": "arrow-function",
     "unnamedComponents": "arrow-function"
     }],
-  "react/hook-use-state": ["error"],
   "react/no-unused-prop-types": ["error"],
   "react/prefer-stateless-function": ["error"],
   "react/self-closing-comp": ["error"],

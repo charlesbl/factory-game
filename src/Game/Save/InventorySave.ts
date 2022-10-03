@@ -31,7 +31,8 @@ export default class InventorySave extends Saveable<Inventory> {
     public getObj = (): Inventory => {
         const inventory = new Inventory()
         Object.entries(this.itemStacks).forEach(([id, itemStackSave]) => {
-            inventory.add(itemStackSave.getObj())
+            const itemStack = itemStackSave.getObj()
+            inventory.addItem(itemStack.item, itemStack.quantity)
         })
         return inventory
     }

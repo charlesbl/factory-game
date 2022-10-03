@@ -1,4 +1,4 @@
-import React, { } from 'react'
+import React from 'react'
 import '../css/SelectMachine.css'
 import Inventory from '../Game/Inventory'
 import MachineCraft from '../Game/MachineCraft'
@@ -25,8 +25,8 @@ const SelectMachineView = (props: ISelectMachineProps): JSX.Element => {
                             afordable={machineCraft.canCraft(props.inventory)}
                             key={machineCraft.id}
                             machineCraft={machineCraft}
-                            onAdd={() => props.onAdd(machineCraft)}
-                            onRemove={() => props.onRemove(machineCraft)}
+                            onAdd={props.onAdd}
+                            onRemove={props.onRemove}
                         />
                     )
                 }

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useReducer, useState } from 'react'
 import './css/App.css'
 import Game from './Game/Game'
 import startGameLoop from './Game/GameLoop'
@@ -31,10 +31,10 @@ const clearGame = (): void => {
 const GAME = loadGame()
 
 const App = (): JSX.Element => {
-    const [state, setState] = useState(0)
+    const forceUpdate = useReducer(() => ({}), {})[1] as () => void
 
     const updateGame = (): void => {
-        setState((n) => n + 1)
+        forceUpdate()
     }
     useEffect(() => {
         const stopLoop = startGameLoop(GAME, updateGame, saveGame)
