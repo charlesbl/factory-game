@@ -24,14 +24,6 @@ export default class Inventory {
         return this._itemStacks
     }
 
-    public remove (itemStack: ItemStack, count: number = 1): void {
-        this._itemStacks[itemStack.item.id].quantity -= itemStack.quantity * count
-    }
-
-    public add (itemStack: ItemStack, count: number = 1): void {
-        this._itemStacks[itemStack.item.id].quantity += itemStack.quantity * count
-    }
-
     public addItem (item: Item, count: number = 1): void {
         this._itemStacks[item.id].quantity += count
     }
@@ -51,17 +43,5 @@ export default class Inventory {
 
     public getQuantity (item: Item): number {
         return this._itemStacks[item.id].quantity
-    }
-
-    public addInventory (inventory: Inventory, count: number = 1): void {
-        for (let i = 0; i < count; i++) {
-            inventory.getItemStackList().forEach((itemStack) => this.add(itemStack))
-        }
-    }
-
-    public removeInventory (inventory: Inventory, count: number = 1): void {
-        for (let i = 0; i < count; i++) {
-            inventory.getItemStackList().forEach((itemStack) => this.remove(itemStack))
-        }
     }
 }

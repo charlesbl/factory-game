@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useReducer } from 'react'
 import './css/App.css'
 import Game from './Game/Game'
 import startGameLoop from './Game/GameLoop'
@@ -31,10 +30,10 @@ const clearGame = (): void => {
 const GAME = loadGame()
 
 const App = (): JSX.Element => {
-    const [, setState] = useState(0)
+    const forceUpdate = useReducer(() => ({}), {})[1] as () => void
 
     const updateGame = (): void => {
-        setState((n) => n + 1)
+        forceUpdate()
     }
     useEffect(() => {
         const stopLoop = startGameLoop(GAME, updateGame, saveGame)
@@ -45,12 +44,23 @@ const App = (): JSX.Element => {
 
     return (
         <div className="container-fluid">
-            <button className="btn btn-primary" onClick={() => clearGame()}>Clear save</button>
+            <button
+                className="btn btn-primary"
+                onClick={() => clearGame()}
+            >
+                Clear save
+            </button>
 
-            <button className="btn btn-primary" onClick={() => {
-                GAME.cheatMoney()
-                console.log('cheat')
-            }}>Cheat 1000€</button>
+            <button
+                className="btn btn-primary"
+                onClick={() => {
+                    GAME.cheatMoney()
+                    console.log('cheat')
+                }}
+            >
+                Cheat 1000€
+            </button>
+
             <GameView game={GAME} />
         </div>
     )

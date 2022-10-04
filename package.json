@@ -4,7 +4,8 @@
     "private": true,
     "scripts": {
         "start": "react-scripts start",
-        "build": "react-scripts build"
+        "build": "react-scripts build",
+        "lint": "eslint ./src/**/*.ts ./src/**/*.tsx"
     },
     "eslintConfig": {
         "extends": "react-app"
@@ -24,11 +25,13 @@
     "dependencies": {
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
-        "react-scripts": "^5.0.1"
+        "react-scripts": "^5.0.1",
+        "use-local-storage-state": "^18.1.1",
+        "web-vitals": "^2.1.4"
     },
     "devDependencies": {
-        "@types/node": "^18.7.18",
-        "@types/react": "^18.0.20",
+        "@types/node": "^18.8.0",
+        "@types/react": "^18.0.21",
         "@types/react-dom": "^18.0.6",
         "@typescript-eslint/eslint-plugin": "^5.38.1",
         "eslint": "^8.24.0",

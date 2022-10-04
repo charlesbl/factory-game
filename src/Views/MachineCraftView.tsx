@@ -2,32 +2,75 @@ import React from 'react'
 import MachineCraft from '../Game/MachineCraft'
 import IngredientsView from './IngredientsView'
 import '../css/MachineCraft.css'
+import useLocalStorageState from 'use-local-storage-state'
 
 interface IMachineCraftProps {
     machineCraft: MachineCraft
     afordable: boolean
-    onAdd: () => void
-    onRemove: () => void
+    onAdd: (machineCraft: MachineCraft) => void
+    onRemove: (machineCraft: MachineCraft) => void
 }
 
 const MachineCraftView = (props: IMachineCraftProps): JSX.Element => {
-    return <div className="machine-craft">
-        <div className="name">{props.machineCraft.name}</div>
-        <div className="wrapper">
-            <IngredientsView ingredients={props.machineCraft.outputCraft.input} />
-            <div>
-                <div className="arrow"><i className="fas fa-arrow-right fa-10px"></i></div>
-                <div>58%</div>
-                <div className="btn-wrapper">
-                    <button disabled={!props.afordable} onClick={() => props.onAdd()} className="btn btn-primary">+</button>
-                    {props.machineCraft.isCustom && <button onClick={() => props.onRemove()} className="btn btn-danger"><i className="fas fa-trash fa-xs"></i></button>}
-                </div>
+    const [isMinimized, setIsMinimized] = useLocalStorageState('isMinimized' + props.machineCraft.id, { defaultValue: false })
+
+    return (
+        <div className="machine-craft">
+            <div className="name">
+                {props.machineCraft.name}
             </div>
-            <IngredientsView ingredients={props.machineCraft.outputCraft.output} />
+
+            <button
+                className='btn btn-secondary'
+                onClick={() => setIsMinimized(!isMinimized)}
+            >
+                -
+            </button>
+
+            <div
+                className="wrapper"
+                hidden={isMinimized}
+            >
+                <IngredientsView ingredients={props.machineCraft.outputCraft.input} />
+
+                <div>
+                    <div className="arrow">
+                        <i className="fas fa-arrow-right fa-10px" />
+                    </div>
+
+                    <div>
+                    58%
+                    </div>
+
+                    <div className="btn-wrapper">
+                        <button
+                            className="btn btn-primary"
+                            disabled={!props.afordable}
+                            onClick={() => props.onAdd(props.machineCraft)}
+                        >
+                        +
+                        </button>
+
+                        {props.machineCraft.isCustom && (
+                            <button
+                                className="btn btn-danger"
+                                onClick={() => props.onRemove(props.machineCraft)}
+                            >
+                                <i className="fas fa-trash fa-xs" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                <IngredientsView ingredients={props.machineCraft.outputCraft.output} />
+            </div>
+
+            <div hidden={isMinimized} >
+                <IngredientsView
+                    ingredients={props.machineCraft.input}
+                />
+            </div>
         </div>
-        <div>
-            <IngredientsView ingredients={props.machineCraft.input} />
-        </div>
-    </div>
+    )
 }
 export default MachineCraftView
