@@ -10,6 +10,7 @@ const InventoryView = (props: IInventoryProps): JSX.Element => {
     return (
         <div className="row no-gutters">
             {props.inventory.getItemStackList().map((itemStack, i) => {
+                if (itemStack.quantity <= 0) return undefined
                 return (
                     <div
                         className="col-6 col-sm-4 col-md-3 col-lg-2 col-xl-1"

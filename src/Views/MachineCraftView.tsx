@@ -2,6 +2,7 @@ import React from 'react'
 import MachineCraft from '../Game/MachineCraft'
 import IngredientsView from './IngredientsView'
 import '../css/MachineCraft.css'
+import useLocalStorageState from 'use-local-storage-state'
 
 interface IMachineCraftProps {
     machineCraft: MachineCraft
@@ -11,13 +12,25 @@ interface IMachineCraftProps {
 }
 
 const MachineCraftView = (props: IMachineCraftProps): JSX.Element => {
+    const [isMinimized, setIsMinimized] = useLocalStorageState('isMinimized' + props.machineCraft.id, { defaultValue: false })
+
     return (
         <div className="machine-craft">
             <div className="name">
                 {props.machineCraft.name}
             </div>
 
-            <div className="wrapper">
+            <button
+                className='btn btn-secondary'
+                onClick={() => setIsMinimized(!isMinimized)}
+            >
+                -
+            </button>
+
+            <div
+                className="wrapper"
+                hidden={isMinimized}
+            >
                 <IngredientsView ingredients={props.machineCraft.outputCraft.input} />
 
                 <div>
@@ -52,8 +65,10 @@ const MachineCraftView = (props: IMachineCraftProps): JSX.Element => {
                 <IngredientsView ingredients={props.machineCraft.outputCraft.output} />
             </div>
 
-            <div>
-                <IngredientsView ingredients={props.machineCraft.input} />
+            <div hidden={isMinimized} >
+                <IngredientsView
+                    ingredients={props.machineCraft.input}
+                />
             </div>
         </div>
     )

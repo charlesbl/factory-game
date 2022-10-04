@@ -101,7 +101,6 @@ export default class CraftManager {
         const craft = new Craft(factory.name, factory.name, factory.inputs, factory.outputs, true)
         this.addCraft(craft)
         const machineCraft = new MachineCraft('machine' + factory.name, factory.name, true, factory.cost, craft)
-        console.log(factory.cost)
         this.addMachineCraft(machineCraft)
         return machineCraft
     }

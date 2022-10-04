@@ -5,10 +5,11 @@ import Factory from '../Game/Factory'
 import InventoryView from './InventoryView'
 import ManualMachineView from './ManualMachineView'
 import '../css/Game.css'
+import useLocalStorageState from 'use-local-storage-state'
 
 const GameView = (props: IBaseProps): JSX.Element => {
     const [factories, setFactories] = useState<Factory[]>([props.game.factory])
-    const [showManualMachines, setShowManualMachines] = useState(true)
+    const [showManualMachines, setShowManualMachines] = useLocalStorageState('showManualMachines', { defaultValue: true })
     const currentFactory = factories[factories.length - 1]
     const isMainFactory = factories.length === 1
 

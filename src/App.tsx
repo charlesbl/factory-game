@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useEffect, useReducer, useState } from 'react'
+import React, { useEffect, useReducer } from 'react'
 import './css/App.css'
 import Game from './Game/Game'
 import startGameLoop from './Game/GameLoop'
