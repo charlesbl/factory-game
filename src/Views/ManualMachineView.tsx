@@ -1,47 +1,78 @@
 import React from 'react'
-import '../css/Machine.css'
 import Inventory from '../Game/Inventory'
 import Machine from '../Game/Machine'
 import IngredientsView from './IngredientsView'
+import { Icon, getItemVisual } from './Ui'
 
 interface IManualMachineProps {
     machine: Machine
     inventory: Inventory
 }
 
-const ManualMachineView = (props: IManualMachineProps): JSX.Element => {
-    const canCraft = props.machine.craft.canCraft(props.inventory, 1)
+const ManualMachineView = ({ machine, inventory }: IManualMachineProps): JSX.Element => {
+    const canCraft = machine.craft.canCraft(inventory, 1)
+    const product = machine.craft.output[0]?.item
+    const visual = getItemVisual(product?.id ?? '')
+
+    const startCrafting = (): void => { machine.active = canCraft }
+    const stopCrafting = (): void => { machine.active = false }
 
     return (
-        <div className="machine">
-            <div className="name">
-                {props.machine.name}
-            </div>
-
-            <div className="wrapper">
-                <IngredientsView ingredients={props.machine.craft.input} />
+        <article className={`manual-card${canCraft ? '' : ' manual-card--disabled'}`}>
+            <div className="manual-card__header">
+                <span className={`resource-symbol resource-symbol--${visual.tone}`}>
+                    {visual.code}
+                </span>
 
                 <div>
-                    <div className="arrow">
-                        <i className="fas fa-arrow-right fa-10px" />
-                    </div>
+                    <h3>
+                        {machine.name}
+                    </h3>
 
-                    <div className="btn-wrapper">
-                        <button
-                            className="btn btn-success btn-side btn-craft"
-                            disabled={!canCraft}
-                            onMouseDown={() => { props.machine.active = true }}
-                            onMouseOut={() => { props.machine.active = false }}
-                            onMouseUp={() => { props.machine.active = false }}
-                        >
-                            <i className="fas fa-hammer fa-xs" />
-                        </button>
-                    </div>
+                    <span>
+                        {canCraft ? 'Prêt à produire' : 'Ressources insuffisantes'}
+                    </span>
                 </div>
-
-                <IngredientsView ingredients={props.machine.craft.output} />
             </div>
-        </div>
+
+            <div className="recipe-flow recipe-flow--manual">
+                <IngredientsView
+                    compact
+                    emptyLabel="Sans intrant"
+                    ingredients={machine.craft.input}
+                    inventory={inventory}
+                    kind="cost"
+                />
+
+                <Icon
+                    name="arrow"
+                    size={16}
+                />
+
+                <IngredientsView
+                    compact
+                    ingredients={machine.craft.output}
+                    kind="output"
+                />
+            </div>
+
+            <button
+                className="button button--craft"
+                disabled={!canCraft}
+                onBlur={stopCrafting}
+                onKeyDown={(event) => { if (event.key === ' ' || event.key === 'Enter') startCrafting() }}
+                onKeyUp={stopCrafting}
+                onPointerCancel={stopCrafting}
+                onPointerDown={startCrafting}
+                onPointerLeave={stopCrafting}
+                onPointerUp={stopCrafting}
+                type="button"
+            >
+                <Icon name="hammer" />
+                Maintenir pour produire
+            </button>
+        </article>
     )
 }
+
 export default ManualMachineView

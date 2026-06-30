@@ -1,76 +1,112 @@
-import React from 'react'
+import React, { useState } from 'react'
 import MachineCraft from '../Game/MachineCraft'
+import Inventory from '../Game/Inventory'
 import IngredientsView from './IngredientsView'
-import '../css/MachineCraft.css'
-import useLocalStorageState from 'use-local-storage-state'
+import { Icon, getItemVisual } from './Ui'
 
 interface IMachineCraftProps {
     machineCraft: MachineCraft
-    afordable: boolean
+    inventory: Inventory
     onAdd: (machineCraft: MachineCraft) => void
     onRemove: (machineCraft: MachineCraft) => void
 }
 
-const MachineCraftView = (props: IMachineCraftProps): JSX.Element => {
-    const [isMinimized, setIsMinimized] = useLocalStorageState('isMinimized' + props.machineCraft.id, { defaultValue: false })
+const MachineCraftView = ({ machineCraft, inventory, onAdd, onRemove }: IMachineCraftProps): JSX.Element => {
+    const [confirmDelete, setConfirmDelete] = useState(false)
+    const affordable = machineCraft.canCraft(inventory)
+    const product = machineCraft.outputCraft.output[0]?.item
+    const visual = getItemVisual(product?.id ?? '')
 
     return (
-        <div className="machine-craft">
-            <div className="name">
-                {props.machineCraft.name}
-            </div>
-
-            <button
-                className='btn btn-secondary'
-                onClick={() => setIsMinimized(!isMinimized)}
-            >
-                -
-            </button>
-
-            <div
-                className="wrapper"
-                hidden={isMinimized}
-            >
-                <IngredientsView ingredients={props.machineCraft.outputCraft.input} />
+        <article className={`blueprint-card${affordable ? '' : ' blueprint-card--locked'}`}>
+            <header className="blueprint-card__header">
+                <span className={`resource-symbol resource-symbol--${visual.tone}`}>
+                    {visual.code}
+                </span>
 
                 <div>
-                    <div className="arrow">
-                        <i className="fas fa-arrow-right fa-10px" />
-                    </div>
+                    <h3>
+                        {machineCraft.name}
+                    </h3>
 
-                    <div>
-                    58%
-                    </div>
-
-                    <div className="btn-wrapper">
-                        <button
-                            className="btn btn-primary"
-                            disabled={!props.afordable}
-                            onClick={() => props.onAdd(props.machineCraft)}
-                        >
-                        +
-                        </button>
-
-                        {props.machineCraft.isCustom && (
-                            <button
-                                className="btn btn-danger"
-                                onClick={() => props.onRemove(props.machineCraft)}
-                            >
-                                <i className="fas fa-trash fa-xs" />
-                            </button>
-                        )}
-                    </div>
+                    <span>
+                        {machineCraft.isCustom ? 'Module personnalisé' : `Produit ${product?.name ?? 'une ressource'}`}
+                    </span>
                 </div>
 
-                <IngredientsView ingredients={props.machineCraft.outputCraft.output} />
-            </div>
+                {affordable && (
+                    <span
+                        className="availability-dot"
+                        title="Constructible"
+                    />
+                )}
+            </header>
 
-            <div hidden={isMinimized} >
+            <div className="blueprint-card__flow">
                 <IngredientsView
-                    ingredients={props.machineCraft.input}
+                    compact
+                    emptyLabel="Extraction"
+                    ingredients={machineCraft.outputCraft.input}
+                    kind="input"
+                />
+
+                <Icon
+                    name="arrow"
+                    size={15}
+                />
+
+                <IngredientsView
+                    compact
+                    ingredients={machineCraft.outputCraft.output}
+                    kind="output"
                 />
             </div>
-        </div>
+
+            <div className="blueprint-card__cost">
+                <span className="recipe-label">
+Coût de construction
+                </span>
+
+                <IngredientsView
+                    compact
+                    ingredients={machineCraft.input}
+                    inventory={inventory}
+                    kind="cost"
+                />
+            </div>
+
+            <div className="blueprint-card__actions">
+                <button
+                    className="button button--primary button--grow"
+                    disabled={!affordable}
+                    onClick={() => onAdd(machineCraft)}
+                    type="button"
+                >
+                    <Icon
+                        name="plus"
+                        size={16}
+                    />
+
+                    {affordable ? 'Construire' : 'Stock insuffisant'}
+                </button>
+
+                {machineCraft.isCustom && (
+                    <button
+                        className={`button button--icon ${confirmDelete ? 'button--danger-confirm' : ''}`}
+                        onBlur={() => setConfirmDelete(false)}
+                        onClick={() => {
+                            if (confirmDelete) onRemove(machineCraft)
+                            else setConfirmDelete(true)
+                        }}
+                        title="Supprimer ce plan personnalisé"
+                        type="button"
+                    >
+                        {confirmDelete ? <Icon name="check" /> : <Icon name="trash" />}
+                    </button>
+                )}
+            </div>
+        </article>
     )
 }
+
 export default MachineCraftView

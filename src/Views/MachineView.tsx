@@ -1,7 +1,7 @@
-import React from 'react'
-import '../css/Machine.css'
+import React, { useState } from 'react'
 import Machine from '../Game/Machine'
 import IngredientsView from './IngredientsView'
+import { Icon, getItemVisual } from './Ui'
 
 interface IMachineProps {
     machine: Machine
@@ -9,45 +9,103 @@ interface IMachineProps {
     onTogglePauseMachine: () => void
 }
 
-const MachineView = (props: IMachineProps): JSX.Element => {
+const MachineView = ({ machine, onDeleteMachine, onTogglePauseMachine }: IMachineProps): JSX.Element => {
+    const [confirmDelete, setConfirmDelete] = useState(false)
+    const product = machine.craft.output[0]?.item
+    const visual = getItemVisual(product?.id ?? '')
+
     return (
-        <div className="machine">
-            <div className="name">
-                {props.machine.name}
-            </div>
+        <article className={`machine-card${machine.active ? ' machine-card--active' : ' machine-card--paused'}`}>
+            <div className="machine-card__status-line" />
 
-            <div className="wrapper">
-                <IngredientsView ingredients={props.machine.craft.input} />
+            <header className="machine-card__header">
+                <span className={`resource-symbol resource-symbol--large resource-symbol--${visual.tone}`}>
+                    {visual.code}
+                </span>
 
-                <div>
-                    <div className="arrow">
-                        <i className="fas fa-arrow-right fa-10px" />
-                    </div>
+                <div className="machine-card__title">
+                    <span className="eyebrow">
+Unité de production
+                    </span>
 
-                    <div>
-                        58%
-                    </div>
-
-                    <div className="btn-wrapper">
-                        <button
-                            className="btn btn-warning btn-side"
-                            onClick={() => props.onTogglePauseMachine?.()}
-                        >
-                            {!props.machine.active ? <i className="fas fa-play fa-xs" /> : <i className="fas fa-pause fa-xs" />}
-                        </button>
-
-                        <button
-                            className="btn btn-danger btn-side"
-                            onClick={() => props.onDeleteMachine?.()}
-                        >
-                            <i className="fas fa-trash fa-xs" />
-                        </button>
-                    </div>
+                    <h3>
+                        {machine.name}
+                    </h3>
                 </div>
 
-                <IngredientsView ingredients={props.machine.craft.output} />
+                <span className={`status-badge ${machine.active ? 'status-badge--active' : 'status-badge--paused'}`}>
+                    <span className="status-dot" />
+
+                    {machine.active ? 'En service' : 'À l’arrêt'}
+                </span>
+            </header>
+
+            <div className={`activity-track${machine.active ? ' activity-track--running' : ''}`}>
+                <span />
             </div>
-        </div>
+
+            <div className="machine-card__recipe">
+                <div className="recipe-column">
+                    <span className="recipe-label">
+Consomme
+                    </span>
+
+                    <IngredientsView
+                        emptyLabel="Aucun intrant"
+                        ingredients={machine.craft.input}
+                        kind="input"
+                    />
+                </div>
+
+                <span className="recipe-arrow">
+                    <Icon name="arrow" />
+                </span>
+
+                <div className="recipe-column recipe-column--output">
+                    <span className="recipe-label">
+Produit
+                    </span>
+
+                    <IngredientsView
+                        ingredients={machine.craft.output}
+                        kind="output"
+                    />
+                </div>
+            </div>
+
+            <footer className="machine-card__footer">
+                <button
+                    className="button button--secondary button--grow"
+                    onClick={onTogglePauseMachine}
+                    type="button"
+                >
+                    <Icon
+                        name={machine.active ? 'pause' : 'play'}
+                        size={16}
+                    />
+
+                    {machine.active ? 'Arrêter' : 'Relancer'}
+                </button>
+
+                <button
+                    className={`button button--icon ${confirmDelete ? 'button--danger-confirm' : ''}`}
+                    onBlur={() => setConfirmDelete(false)}
+                    onClick={() => {
+                        if (confirmDelete) onDeleteMachine()
+                        else setConfirmDelete(true)
+                    }}
+                    title={confirmDelete ? 'Cliquer à nouveau pour confirmer' : 'Démonter la machine'}
+                    type="button"
+                >
+                    {confirmDelete ? <Icon name="check" /> : <Icon name="trash" />}
+
+                    <span className="sr-only">
+                        {confirmDelete ? 'Confirmer le démontage' : 'Démonter la machine'}
+                    </span>
+                </button>
+            </footer>
+        </article>
     )
 }
+
 export default MachineView

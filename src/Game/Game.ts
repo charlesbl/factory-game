@@ -35,7 +35,7 @@ export default class Game {
             this.factory = factory
         } else {
             this.factory = new Factory()
-            this.factory.name = 'Main'
+            this.factory.name = 'Usine principale'
         }
 
         if (money !== undefined) {
