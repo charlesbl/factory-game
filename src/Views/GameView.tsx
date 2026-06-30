@@ -5,7 +5,7 @@ import Factory from '../Game/Factory'
 import InventoryView from './InventoryView'
 import ManualMachineView from './ManualMachineView'
 import useLocalStorageState from 'use-local-storage-state'
-import { Icon, formatMoney } from './Ui'
+import { Icon } from './Ui'
 
 interface IGameViewProps extends IBaseProps {
     onReset: () => void
@@ -93,25 +93,6 @@ Sauvegarde automatique
                 </div>
 
                 <div className="topbar__actions">
-                    <div className="money-display">
-                        <span className="money-display__icon">
-                            <Icon
-                                name="wallet"
-                                size={18}
-                            />
-                        </span>
-
-                        <span>
-                            <small>
-Budget
-                            </small>
-
-                            <strong>
-                                {formatMoney(game.money)}
-                            </strong>
-                        </span>
-                    </div>
-
                     <details className="utility-menu">
                         <summary
                             aria-label="Ouvrir les paramètres"

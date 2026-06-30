@@ -1,6 +1,6 @@
 import React from 'react'
 
-export type IconName = 'arrow' | 'back' | 'box' | 'check' | 'chevron' | 'factory' | 'hammer' | 'layers' | 'menu' | 'pause' | 'play' | 'plus' | 'power' | 'search' | 'settings' | 'spark' | 'trash' | 'wallet' | 'wrench' | 'x'
+export type IconName = 'arrow' | 'back' | 'box' | 'check' | 'chevron' | 'factory' | 'hammer' | 'layers' | 'menu' | 'pause' | 'play' | 'plus' | 'power' | 'search' | 'settings' | 'spark' | 'trash' | 'wrench' | 'x'
 
 interface IIconProps {
     name: IconName
@@ -86,11 +86,6 @@ export const Icon = ({ name, size = 18, className = '' }: IIconProps): JSX.Eleme
         trash: <>
             <path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6" />
         </>,
-        wallet: <>
-            <path d="M4 6h14a2 2 0 0 1 2 2v10H4a2 2 0 0 1-2-2V6a3 3 0 0 1 3-3h11" />
-
-            <path d="M16 11h4v4h-4a2 2 0 0 1 0-4Z" />
-        </>,
         wrench: <>
             <path d="M14.5 6.5a4 4 0 0 0-5-5l2.2 2.2-2.8 2.8-2.2-2.2a4 4 0 0 0 5 5L20 17.6a1.7 1.7 0 1 1-2.4 2.4l-8.3-8.3" />
         </>,
@@ -138,10 +133,4 @@ export const getItemVisual = (itemId: string): IItemVisual => {
 export const formatQuantity = (value: number, maximumFractionDigits = 1): string => new Intl.NumberFormat('fr-FR', {
     maximumFractionDigits,
     minimumFractionDigits: value > 0 && value < 1 ? 1 : 0
-}).format(value)
-
-export const formatMoney = (value: number): string => new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0
 }).format(value)

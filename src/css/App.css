@@ -116,7 +116,6 @@ p {
 .brand,
 .topbar__actions,
 .topbar__status,
-.money-display,
 .brand__mark {
     display: flex;
     align-items: center;
@@ -181,40 +180,6 @@ p {
 .topbar__actions {
     justify-content: flex-end;
     gap: 10px;
-}
-
-.money-display {
-    gap: 10px;
-    padding-right: 14px;
-    border-right: 1px solid var(--border);
-}
-
-.money-display__icon {
-    display: grid;
-    place-items: center;
-    width: 34px;
-    height: 34px;
-    border-radius: var(--radius-sm);
-    color: var(--accent-bright);
-    background: var(--accent-soft);
-}
-
-.money-display small,
-.money-display strong {
-    display: block;
-}
-
-.money-display small {
-    color: var(--muted);
-    font-size: 0.64rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
-
-.money-display strong {
-    margin-top: 1px;
-    font-family: var(--mono);
-    font-size: 0.9rem;
 }
 
 .button {
@@ -1533,8 +1498,6 @@ p {
     .topbar { min-height: 62px; padding: 8px 14px; }
     .brand__mark { width: 37px; height: 37px; }
     .brand span:last-child { display: none; }
-    .money-display__icon { display: none; }
-    .money-display { padding-right: 10px; }
     .game-main { padding: 22px 12px 45px; }
     .command-header { display: block; }
     .command-stats { margin-top: 18px; }

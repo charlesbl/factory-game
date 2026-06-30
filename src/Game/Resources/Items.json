@@ -1,44 +1,34 @@
 [
     {
         "id": "ironOre",
-        "name": "Iron Ore",
-        "cost": 1,
-        "buyable": true
+        "name": "Iron Ore"
     },
     {
         "id": "ironIngot",
-        "name": "Iron Ingot",
-        "cost": 7
+        "name": "Iron Ingot"
     },
     {
         "id": "ironPlate",
-        "name": "Iron Plate",
-        "cost": 16
+        "name": "Iron Plate"
     },
     {
         "id": "copperOre",
-        "name": "Copper Ore",
-        "cost": 1,
-        "buyable": true
+        "name": "Copper Ore"
     },
     {
         "id": "copperIngot",
-        "name": "Copper Ingot",
-        "cost": 7
+        "name": "Copper Ingot"
     },
     {
         "id": "copperPlate",
-        "name": "Copper Plate",
-        "cost": 16
+        "name": "Copper Plate"
     },
     {
         "id": "copperWire",
-        "name": "Copper Wire",
-        "cost": 4
+        "name": "Copper Wire"
     },
     {
         "id": "circuit",
-        "name": "Electronic Circuit",
-        "cost": 80
+        "name": "Electronic Circuit"
     }
 ]

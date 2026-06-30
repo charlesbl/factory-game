@@ -47,7 +47,7 @@ const App = (): JSX.Element => {
     return (
         <GameView
             game={GAME}
-            onGrantResources={() => GAME.cheatMoney()}
+            onGrantResources={() => GAME.grantResources()}
             onReset={clearGame}
         />
     )

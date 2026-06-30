@@ -12,36 +12,24 @@ import Ressources from './Resources/Ressources'
 // TODO Download and load save
 // TODO config menu
 
-const INIT_MONEY = 1000
 const MANUAL_CRAFTING_FACTOR = 20
 
 export default class Game {
     public readonly factory: Factory
     public readonly inventory: Inventory
     public readonly manualMachines: Machine[]
-    private _money: number
     private readonly _craftManager: CraftManager
-
-    public get money (): number {
-        return this._money
-    }
 
     public get craftManager (): CraftManager {
         return this._craftManager
     }
 
-    public constructor (factory?: Factory, money?: number, inventory?: Inventory, craftManager?: CraftManager) {
+    public constructor (factory?: Factory, inventory?: Inventory, craftManager?: CraftManager) {
         if (factory !== undefined) {
             this.factory = factory
         } else {
             this.factory = new Factory()
             this.factory.name = 'Usine principale'
-        }
-
-        if (money !== undefined) {
-            this._money = money
-        } else {
-            this._money = INIT_MONEY
         }
 
         if (inventory !== undefined) {
@@ -94,8 +82,7 @@ export default class Game {
         this.tryConsumeFactory(this.factory, deltaSecond)
     }
 
-    public cheatMoney (): void {
-        this._money += 1000
+    public grantResources (): void {
         Ressources.getItems().forEach((i) => this.inventory.addItem(i, 100))
     }
 };

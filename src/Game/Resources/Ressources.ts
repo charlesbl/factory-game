@@ -5,7 +5,7 @@ let items: Item[]
 
 const getItems = (): Item[] => {
     if (items == null) {
-        items = rawItems.map((rawItem) => new Item(rawItem.id, rawItem.name, rawItem.cost, rawItem.buyable))
+        items = rawItems.map((rawItem) => new Item(rawItem.id, rawItem.name))
     }
     return items
 }
