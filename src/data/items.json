@@ -1,0 +1,10 @@
+[
+  { "id": "ironOre", "name": "Iron ore" },
+  { "id": "ironIngot", "name": "Iron ingot" },
+  { "id": "ironPlate", "name": "Iron plate" },
+  { "id": "copperOre", "name": "Copper ore" },
+  { "id": "copperIngot", "name": "Copper ingot" },
+  { "id": "copperPlate", "name": "Copper plate" },
+  { "id": "copperWire", "name": "Copper wire" },
+  { "id": "circuit", "name": "Electronic circuit" }
+]

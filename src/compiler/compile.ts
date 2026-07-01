@@ -1,0 +1,128 @@
+import { boundingRect, polylineLength, RATE_SCALE, recipeById, ratioFromRate, scaleRate } from '../domain'
+import type { EdgeId, FixedRatio, NodeId, RateRaw, ResourceId } from '../domain'
+import type { BlueprintEdge, BlueprintNode, FactoryBlueprint } from '../editor'
+import { canonicalBlueprint } from '../editor'
+import type { FactoryContract } from './contract'
+import type { CompileDiagnostic } from './diagnostics'
+import { validateBlueprint } from './validate'
+import { projectExternalPorts } from './footprint'
+
+export interface FlowSolver { solve(blueprint: FactoryBlueprint, hash: string): FactoryContract | readonly CompileDiagnostic[] }
+const addRate = (map: Map<ResourceId, RateRaw>, id: ResourceId, value: RateRaw): void => { map.set(id, (map.get(id) ?? 0n) + value) }
+const edgeOrder = (blueprint: FactoryBlueprint, edge: BlueprintEdge): readonly [number, number, number, string] => {
+  const target = blueprint.nodes.get(edge.targetNodeId)
+  return [polylineLength(edge.points), target?.position.y ?? 0, target?.position.x ?? 0, edge.id]
+}
+const compareEdge = (blueprint: FactoryBlueprint) => (a: BlueprintEdge, b: BlueprintEdge): number => {
+  const ak = edgeOrder(blueprint, a); const bk = edgeOrder(blueprint, b)
+  return ak[0] - bk[0] || ak[1] - bk[1] || ak[2] - bk[2] || ak[3].localeCompare(bk[3])
+}
+
+export class ExactDagFlowSolver implements FlowSolver {
+  constructor(private readonly childContracts: ReadonlyMap<string, FactoryContract> = new Map()) {}
+  solve(blueprint: FactoryBlueprint, hash: string): FactoryContract | readonly CompileDiagnostic[] {
+    const validation = validateBlueprint(blueprint)
+    if (!validation.ok) return validation.diagnostics
+    const edgeFlows = new Map<EdgeId, RateRaw>(); const activity = new Map<NodeId, FixedRatio>(); const diagnostics: CompileDiagnostic[] = []
+    const incomingByNode = new Map<NodeId, Map<ResourceId, RateRaw>>()
+    const allocate = (node: BlueprintNode, available: Map<ResourceId, RateRaw>): void => {
+      for (const resourceId of [...available.keys()].sort()) {
+        let remaining = available.get(resourceId) ?? 0n
+        const edges = [...blueprint.edges.values()].filter((edge) => edge.sourceNodeId === node.id && edge.resourceId === resourceId).sort(compareEdge(blueprint))
+        for (const edge of edges) {
+          const flow = remaining < edge.capacity ? remaining : edge.capacity
+          edgeFlows.set(edge.id, flow); remaining -= flow
+          const target = incomingByNode.get(edge.targetNodeId) ?? new Map<ResourceId, RateRaw>()
+          addRate(target, resourceId, flow); incomingByNode.set(edge.targetNodeId, target)
+        }
+        if (remaining > 0n && node.kind === 'machine') diagnostics.push({ code: 'LIMITED_OUTPUT', severity: 'warning', entity: { nodeId: node.id, resourceId }, details: { value: resourceId } })
+      }
+    }
+    for (const nodeId of validation.graph.order) {
+      const node = blueprint.nodes.get(nodeId)!; const incoming = incomingByNode.get(nodeId) ?? new Map<ResourceId, RateRaw>()
+      if (node.kind === 'external-input') {
+        const available = new Map<ResourceId, RateRaw>(); for (const port of node.ports.filter((item) => item.direction === 'output')) addRate(available, port.resourceId, port.capacity)
+        allocate(node, available)
+      } else if (node.kind === 'junction') allocate(node, incoming)
+      else if (node.kind === 'sub-factory') {
+        const child = this.childContracts.get(node.contractId)
+        if (child === undefined) return [{ code: 'MISSING_CHILD_CONTRACT', severity: 'error', entity: { nodeId: node.id } }]
+        let ratio = RATE_SCALE
+        for (const [resource, rate] of child.inputRates) { const available = incoming.get(resource) ?? 0n; const inputRatio = ratioFromRate(available, rate); if (inputRatio < ratio) ratio = inputRatio }
+        for (const [resource, rate] of child.outputRates) { const capacity = [...blueprint.edges.values()].filter((edge) => edge.sourceNodeId === node.id && edge.resourceId === resource).reduce((sum, edge) => sum + edge.capacity, 0n); const outputRatio = ratioFromRate(capacity, rate); if (outputRatio < ratio) ratio = outputRatio }
+        activity.set(node.id, ratio)
+        for (const [resource, rate] of child.inputRates) {
+          let required = scaleRate(rate, ratio)
+          for (const edge of [...blueprint.edges.values()].filter((item) => item.targetNodeId === node.id && item.resourceId === resource).sort(compareEdge(blueprint))) { const allocated = edgeFlows.get(edge.id) ?? 0n; const consumed = allocated < required ? allocated : required; edgeFlows.set(edge.id, consumed); required -= consumed }
+        }
+        const available = new Map<ResourceId, RateRaw>(); for (const [resource, rate] of child.outputRates) available.set(resource, scaleRate(rate, ratio)); allocate(node, available)
+      }
+      else if (node.kind === 'machine') {
+        const recipe = recipeById.get(node.recipeId); if (recipe === undefined) return [{ code: 'INTERNAL_VERIFICATION', severity: 'error', entity: { nodeId } }]
+        let ratio = RATE_SCALE
+        for (const input of recipe.inputs) ratio = ratio < ratioFromRate(incoming.get(input.resourceId) ?? 0n, input.rate) ? ratio : ratioFromRate(incoming.get(input.resourceId) ?? 0n, input.rate)
+        for (const output of recipe.outputs) {
+          const capacity = [...blueprint.edges.values()].filter((edge) => edge.sourceNodeId === node.id && edge.resourceId === output.resourceId).reduce((sum, edge) => sum + edge.capacity, 0n)
+          const outputRatio = ratioFromRate(capacity, output.rate); if (outputRatio < ratio) ratio = outputRatio
+        }
+        if (ratio > RATE_SCALE) ratio = RATE_SCALE
+        activity.set(node.id, ratio)
+        for (const input of recipe.inputs) {
+          let required = scaleRate(input.rate, ratio)
+          const inputEdges = [...blueprint.edges.values()].filter((edge) => edge.targetNodeId === node.id && edge.resourceId === input.resourceId).sort(compareEdge(blueprint))
+          for (const edge of inputEdges) {
+            const allocated = edgeFlows.get(edge.id) ?? 0n
+            const consumed = allocated < required ? allocated : required
+            edgeFlows.set(edge.id, consumed); required -= consumed
+          }
+        }
+        if (ratio < RATE_SCALE) diagnostics.push({ code: 'LIMITED_INPUT', severity: 'warning', entity: { nodeId }, details: { value: recipe.inputs.find((input) => (incoming.get(input.resourceId) ?? 0n) < input.rate)?.resourceId ?? 'capacity' } })
+        const available = new Map<ResourceId, RateRaw>(); for (const output of recipe.outputs) addRate(available, output.resourceId, scaleRate(output.rate, ratio))
+        allocate(node, available)
+      }
+    }
+    const retainFlow = (edges: readonly BlueprintEdge[], demand: RateRaw): boolean => {
+      let remaining = demand
+      for (const edge of [...edges].sort(compareEdge(blueprint))) { const allocated = edgeFlows.get(edge.id) ?? 0n; const retained = allocated < remaining ? allocated : remaining; edgeFlows.set(edge.id, retained); remaining -= retained }
+      return remaining === 0n
+    }
+    for (const nodeId of [...validation.graph.order].reverse()) {
+      const node = blueprint.nodes.get(nodeId)!
+      if (node.kind === 'junction') {
+        const required = new Map<ResourceId, RateRaw>()
+        for (const edge of blueprint.edges.values()) if (edge.sourceNodeId === node.id) addRate(required, edge.resourceId, edgeFlows.get(edge.id) ?? 0n)
+        for (const [resource, demand] of required) if (!retainFlow([...blueprint.edges.values()].filter((edge) => edge.targetNodeId === node.id && edge.resourceId === resource), demand)) return [{ code: 'INTERNAL_VERIFICATION', severity: 'error', entity: { nodeId: node.id, resourceId: resource }, details: { value: 'junction conservation' } }]
+      } else if (node.kind === 'machine') {
+        const recipe = recipeById.get(node.recipeId)!; let ratio = activity.get(node.id) ?? 0n
+        for (const output of recipe.outputs) { const delivered = [...blueprint.edges.values()].filter((edge) => edge.sourceNodeId === node.id && edge.resourceId === output.resourceId).reduce((sum, edge) => sum + (edgeFlows.get(edge.id) ?? 0n), 0n); const outputRatio = ratioFromRate(delivered, output.rate); if (outputRatio < ratio) ratio = outputRatio }
+        activity.set(node.id, ratio)
+        for (const output of recipe.outputs) retainFlow([...blueprint.edges.values()].filter((edge) => edge.sourceNodeId === node.id && edge.resourceId === output.resourceId), scaleRate(output.rate, ratio))
+        for (const input of recipe.inputs) if (!retainFlow([...blueprint.edges.values()].filter((edge) => edge.targetNodeId === node.id && edge.resourceId === input.resourceId), scaleRate(input.rate, ratio))) return [{ code: 'INTERNAL_VERIFICATION', severity: 'error', entity: { nodeId: node.id, resourceId: input.resourceId }, details: { value: 'machine conservation' } }]
+      } else if (node.kind === 'sub-factory') {
+        const child = this.childContracts.get(node.contractId); if (child === undefined) continue; let ratio = activity.get(node.id) ?? 0n
+        for (const [resource, rate] of child.outputRates) { const delivered = [...blueprint.edges.values()].filter((edge) => edge.sourceNodeId === node.id && edge.resourceId === resource).reduce((sum, edge) => sum + (edgeFlows.get(edge.id) ?? 0n), 0n); const outputRatio = ratioFromRate(delivered, rate); if (outputRatio < ratio) ratio = outputRatio }
+        activity.set(node.id, ratio)
+        for (const [resource, rate] of child.outputRates) retainFlow([...blueprint.edges.values()].filter((edge) => edge.sourceNodeId === node.id && edge.resourceId === resource), scaleRate(rate, ratio))
+        for (const [resource, rate] of child.inputRates) if (!retainFlow([...blueprint.edges.values()].filter((edge) => edge.targetNodeId === node.id && edge.resourceId === resource), scaleRate(rate, ratio))) return [{ code: 'INTERNAL_VERIFICATION', severity: 'error', entity: { nodeId: node.id, resourceId: resource }, details: { value: 'sub-factory conservation' } }]
+      }
+    }
+    const inputRates = new Map<ResourceId, RateRaw>(); const outputRates = new Map<ResourceId, RateRaw>()
+    for (const edge of blueprint.edges.values()) {
+      const flow = edgeFlows.get(edge.id) ?? 0n; const source = blueprint.nodes.get(edge.sourceNodeId); const target = blueprint.nodes.get(edge.targetNodeId)
+      if (source?.kind === 'external-input') addRate(inputRates, edge.resourceId, flow)
+      if (target?.kind === 'external-output') addRate(outputRates, edge.resourceId, flow)
+    }
+    const points = [...blueprint.nodes.values()].flatMap((node) => [node.position, { x: node.position.x + node.footprint.width, y: node.position.y + node.footprint.height }]).concat([...blueprint.edges.values()].flatMap((edge) => [...edge.points]))
+    const footprint = boundingRect(points, 2)
+    const boundaryPorts = projectExternalPorts(blueprint, footprint)
+    return { schemaVersion: 1, blueprintHash: hash, inputRates, outputRates, inputPorts: boundaryPorts.filter((port) => port.direction === 'input'), outputPorts: boundaryPorts.filter((port) => port.direction === 'output'), footprint, machineActivity: activity, edgeFlows, diagnostics }
+  }
+}
+
+const weakHash = (value: string): string => {
+  let hash = 2166136261
+  for (let index = 0; index < value.length; index += 1) hash = Math.imul(hash ^ value.charCodeAt(index), 16777619)
+  return `local-${(hash >>> 0).toString(16).padStart(8, '0')}`
+}
+export const compileBlueprint = (blueprint: FactoryBlueprint, solver: FlowSolver = new ExactDagFlowSolver()): FactoryContract | readonly CompileDiagnostic[] => solver.solve(blueprint, weakHash(canonicalBlueprint(blueprint)))
+export const isContract = (value: FactoryContract | readonly CompileDiagnostic[]): value is FactoryContract => !Array.isArray(value)
