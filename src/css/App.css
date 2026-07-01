@@ -396,6 +396,15 @@ p {
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
 }
 
+.factory-navigation--embedded {
+    margin: 0;
+    border: 0;
+    border-bottom: 1px solid rgba(104, 169, 255, 0.2);
+    border-radius: 0;
+    background: linear-gradient(105deg, rgba(104, 169, 255, 0.09), rgba(17, 22, 28, 0.4) 45%);
+    box-shadow: none;
+}
+
 .factory-navigation__back {
     min-height: 44px;
 }

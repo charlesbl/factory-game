@@ -13,9 +13,10 @@ interface IFactoryProps {
     onSelectedFactory: (factory: Factory) => void
     craftManager: CraftManager
     inventory: Inventory
+    navigation: React.ReactNode
 }
 
-const FactoryView = ({ factory, onSelectedFactory, craftManager, inventory }: IFactoryProps): JSX.Element => {
+const FactoryView = ({ factory, onSelectedFactory, craftManager, inventory, navigation }: IFactoryProps): JSX.Element => {
     const activeMachines = factory.machines.filter((machine) => machine.active).length
     const totalUnits = factory.machines.length + factory.factories.length
 
@@ -32,6 +33,8 @@ const FactoryView = ({ factory, onSelectedFactory, craftManager, inventory }: IF
             />
 
             <div className="factory-floor">
+                {navigation}
+
                 <header className="floor-header">
                     <div>
                         <span className="section-kicker">
