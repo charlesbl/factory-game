@@ -1,24 +1,32 @@
 # Factory Game
 
-An idle game whose goal is to build a most optimized factory.
-You can test the game [here](https://factory.crashkiller.ovh/).
+An idle factory game centred on designing and optimising production systems.
 
-## Available Scripts
+You can try the deployed game [here](https://factory.crashkiller.ovh/).
 
-In the project directory, you can run:
+## Development
 
-### `npm run dev`
+Install the dependencies:
 
-Runs the app in the development mode.<br />
-Open [http://localhost:5173](http://localhost:5173) to view it in the browser.
+```sh
+npm install
+```
 
-The page will reload if you make edits.<br />
-You will also see any lint errors in the console.
+Start the development server:
 
-### `npm run build`
+```sh
+npm run dev
+```
 
-Builds the app for production to the `build` folder.<br />
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Then open [http://localhost:5173](http://localhost:5173).
 
-The build is minified and the filenames include the hashes.<br />
-Your app is ready to be deployed!
+Create a production build:
+
+```sh
+npm run build
+```
+
+The detailed factory graph design is available in
+[`docs/factory-graph-design.md`](docs/factory-graph-design.md). The staged
+implementation roadmap starts in
+[`docs/implementation-plan/README.md`](docs/implementation-plan/README.md).
