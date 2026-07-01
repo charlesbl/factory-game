@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { asId, parseRate } from '../domain'
-import type { NodeId, ResourceId } from '../domain'
+import type { EdgeId, NodeId, PortId, ResourceId } from '../domain'
 import { createDemoBlueprint } from '../ui/demo-blueprint'
 import { compileBlueprint, isContract } from './compile'
 import { topologicalSort } from './topological-sort'
@@ -22,5 +22,25 @@ describe('deterministic compilation', () => {
     const blueprint = createDemoBlueprint(); const edge = blueprint.edges.get(asId('edge-ore'))!
     const cyclic = { ...blueprint, edges: new Map(blueprint.edges).set(asId('edge-back'), { ...edge, id: asId('edge-back'), sourceNodeId: edge.targetNodeId, targetNodeId: edge.sourceNodeId }) }
     expect(topologicalSort(cyclic).cyclic.length).toBeGreaterThan(0)
+  })
+  it('explains when two routes exceed a shared destination port limit', () => {
+    const blueprint = createDemoBlueprint()
+    const furnace = blueprint.nodes.get(asId<NodeId>('node-furnace'))!
+    const secondFurnace = {
+      ...furnace,
+      id: asId<NodeId>('node-furnace-2'),
+      ports: furnace.ports.map((port, index) => ({ ...port, id: asId<PortId>(`port-furnace-2-${index}`) })),
+    }
+    const ore = blueprint.edges.get(asId<EdgeId>('edge-ore'))!
+    const ingot = blueprint.edges.get(asId<EdgeId>('edge-ingot'))!
+    const secondOre = { ...ore, id: asId<EdgeId>('edge-ore-2'), targetNodeId: secondFurnace.id, targetPortId: secondFurnace.ports[0]!.id }
+    const secondIngot = { ...ingot, id: asId<EdgeId>('edge-ingot-2'), sourceNodeId: secondFurnace.id, sourcePortId: secondFurnace.ports[1]!.id }
+    const invalid = { ...blueprint, nodes: new Map(blueprint.nodes).set(secondFurnace.id, secondFurnace), edges: new Map(blueprint.edges).set(secondOre.id, secondOre).set(secondIngot.id, secondIngot) }
+
+    const compiled = compileBlueprint(invalid)
+
+    expect(isContract(compiled)).toBe(false)
+    if (isContract(compiled)) return
+    expect(compiled).toContainEqual(expect.objectContaining({ code: 'CONNECTION_LIMIT', details: { connected: '2', limit: '1' } }))
   })
 })

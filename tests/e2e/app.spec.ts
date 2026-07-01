@@ -57,3 +57,22 @@ test('filters the machine catalogue', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Wire drawing/i })).toBeVisible()
   await expect(page.getByRole('button', { name: /Circuit assembly/i })).toBeVisible()
 })
+
+test('highlights the conflicting paths when two routes share a single-connection port', async ({ page }) => {
+  await page.goto('/'); await expect(page.getByText('Contract ready')).toBeVisible()
+  await page.getByRole('button', { name: /Iron smelting/i }).click()
+  const nodes = page.locator('.graph-node')
+  const secondFurnace = nodes.filter({ hasText: 'Iron smelting' })
+  const intake = nodes.filter({ hasText: 'Iron ore intake' })
+  const dispatch = nodes.filter({ hasText: 'Ingot dispatch' })
+  await page.locator('.react-flow__minimap').evaluate((element) => element.remove())
+
+  await intake.getByLabel('output Iron ore').dragTo(secondFurnace.getByLabel('input Iron ore'))
+  await secondFurnace.getByLabel('output Iron ingot').dragTo(dispatch.getByLabel('input Iron ingot'))
+
+  await expect(page.getByText('Invalid graph')).toBeVisible()
+  await expect(page.getByText('This port accepts 1 route, but 2 are connected.').first()).toBeVisible()
+  await expect(page.locator('.diagnostic-edge--error')).toHaveCount(2)
+  await expect(page.locator('.diagnostic-edge--blocked')).toHaveCount(2)
+  await expect(dispatch).toHaveClass(/has-error/)
+})

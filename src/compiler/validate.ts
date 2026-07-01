@@ -23,7 +23,13 @@ export const validateBlueprint = (blueprint: FactoryBlueprint): ValidationResult
     try { if (polylineLength(edge.points) === 0) diagnostics.push({ code: 'ZERO_LENGTH', severity: 'error', entity: { edgeId: edge.id } }) } catch { diagnostics.push({ code: 'ZERO_LENGTH', severity: 'error', entity: { edgeId: edge.id } }) }
     usage.set(source.id, (usage.get(source.id) ?? 0) + 1); usage.set(target.id, (usage.get(target.id) ?? 0) + 1)
   }
-  for (const node of blueprint.nodes.values()) for (const port of node.ports) if ((usage.get(port.id) ?? 0) > port.maxConnections) diagnostics.push({ code: 'CONNECTION_LIMIT', severity: 'error', entity: { nodeId: node.id, portId: port.id } })
+  for (const node of blueprint.nodes.values()) for (const port of node.ports) {
+    const connected = usage.get(port.id) ?? 0
+    if (connected > port.maxConnections) diagnostics.push({
+      code: 'CONNECTION_LIMIT', severity: 'error', entity: { nodeId: node.id, portId: port.id },
+      details: { connected: connected.toString(), limit: port.maxConnections.toString() },
+    })
+  }
   for (const node of blueprint.nodes.values()) {
     const incoming = [...blueprint.edges.values()].filter((edge) => edge.targetNodeId === node.id)
     const outgoing = [...blueprint.edges.values()].filter((edge) => edge.sourceNodeId === node.id)

@@ -2,13 +2,13 @@ import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import { formatRate, resourceById } from '../domain'
 import type { BlueprintNode } from '../editor'
 
-export interface FactoryNodeData extends Record<string, unknown> { readonly node: BlueprintNode; readonly activity?: number; readonly diagnostic?: string }
+export interface FactoryNodeData extends Record<string, unknown> { readonly node: BlueprintNode; readonly activity?: number; readonly diagnostic?: string; readonly issueSeverity?: 'error' | 'warning' | 'info' }
 export type FactoryFlowNode = Node<FactoryNodeData, 'factory'>
 
 const kindIcon: Record<BlueprintNode['kind'], string> = { machine: '⬡', junction: '◆', 'external-input': '→', 'external-output': '←', 'sub-factory': '▣' }
 export const FactoryNodeView = ({ data, selected }: NodeProps<FactoryFlowNode>) => {
   const { node } = data
-  return <article className={`graph-node graph-node--${node.kind}${selected ? ' is-selected' : ''}`} aria-label={`${node.kind}: ${node.name}`}>
+  return <article className={`graph-node graph-node--${node.kind}${selected ? ' is-selected' : ''}${data.issueSeverity !== undefined ? ` has-${data.issueSeverity}` : ''}`} aria-label={`${node.kind}: ${node.name}${data.diagnostic === undefined ? '' : `. ${data.diagnostic}`}`}>
     <header><span className="graph-node__icon" aria-hidden="true">{kindIcon[node.kind]}</span><span>{node.name}</span></header>
     {node.kind === 'machine' && <div className="activity"><span style={{ width: `${data.activity ?? 0}%` }} /><small>{Math.round(data.activity ?? 0)}%</small></div>}
     <div className="ports">
@@ -21,6 +21,6 @@ export const FactoryNodeView = ({ data, selected }: NodeProps<FactoryFlowNode>) 
         </div>
       })}
     </div>
-    {data.diagnostic !== undefined && <p className="node-diagnostic">{data.diagnostic}</p>}
+    {data.diagnostic !== undefined && <p className={`node-diagnostic node-diagnostic--${data.issueSeverity ?? 'info'}`}><b aria-hidden="true">!</b>{data.diagnostic}</p>}
   </article>
 }

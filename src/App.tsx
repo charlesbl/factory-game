@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { asId, createIdFactory, formatRate, gridPoint, parseRate, recipes, resourceById, resources } from './domain'
 import type { RecipeId, ResourceId } from './domain'
-import type { FactoryContract } from './compiler'
+import type { CompileDiagnostic, FactoryContract } from './compiler'
 import { diagnosticText } from './compiler'
 import type { BlueprintNode, FactoryBlueprint } from './editor'
 import { addNode, BlueprintHistory, disconnectEdge, duplicateNodes, removeNode, transaction, type EditCommand } from './editor'
@@ -20,6 +20,7 @@ const App = () => {
   const [history] = useState(() => new BlueprintHistory(createDemoBlueprint()))
   const [blueprint, setBlueprint] = useState<FactoryBlueprint>(() => history.current)
   const [contract, setContract] = useState<FactoryContract>()
+  const [diagnostics, setDiagnostics] = useState<readonly CompileDiagnostic[]>([])
   const [compileState, setCompileState] = useState<'compiling' | 'ready' | 'invalid'>('compiling')
   const [diagnosticsVisible, setDiagnosticsVisible] = useState(true)
   const [view, setView] = useState<'factory' | 'world'>('factory')
@@ -36,9 +37,9 @@ const App = () => {
   const instance = runtime?.instance
   const scheduler = runtime?.scheduler
 
-  const execute = useCallback((command: EditCommand) => { setCompileState('compiling'); setBlueprint(history.execute(command)) }, [history])
-  const undo = useCallback(() => { setCompileState('compiling'); setBlueprint(history.undo()) }, [history])
-  const redo = useCallback(() => { setCompileState('compiling'); setBlueprint(history.redo()) }, [history])
+  const execute = useCallback((command: EditCommand) => { setDiagnostics([]); setCompileState('compiling'); setBlueprint(history.execute(command)) }, [history])
+  const undo = useCallback(() => { setDiagnostics([]); setCompileState('compiling'); setBlueprint(history.undo()) }, [history])
+  const redo = useCallback(() => { setDiagnostics([]); setCompileState('compiling'); setBlueprint(history.redo()) }, [history])
 
   useEffect(() => {
     let active = true
@@ -53,6 +54,7 @@ const App = () => {
     let active = true
     void compiler.compile(blueprint).then((result) => {
       if (!active || result.stale) return
+      setDiagnostics(result.diagnostics)
       if (result.contract === undefined) { setContract(undefined); setCompileState('invalid'); return }
       setContract(result.contract); setLogicalTime(0n); setCompileState('ready')
     })
@@ -114,7 +116,7 @@ const App = () => {
   const selectedNode = selection.nodeIds.length === 1 ? blueprint.nodes.get(selection.nodeIds[0]!) : undefined
   const selectedEdge = selection.edgeIds.length === 1 && selection.nodeIds.length === 0 ? blueprint.edges.get(selection.edgeIds[0]!) : undefined
   const selectionCount = selection.nodeIds.length + selection.edgeIds.length
-  const issueCount = contract?.diagnostics.length ?? (compileState === 'invalid' ? 1 : 0)
+  const issueCount = diagnostics.length
   const snapshot = instance?.getSnapshot()
   const rates = useMemo(() => ({ inputs: [...(contract?.inputRates ?? [])], outputs: [...(contract?.outputRates ?? [])] }), [contract])
   const filteredRecipes = useMemo(() => {
@@ -151,8 +153,8 @@ const App = () => {
       </aside>
       <section className="canvas-stack">
         <div className="canvas-caption"><span>Factory interior</span><small>Grid unit: 1 m · shortest path has priority</small></div>
-        <FactoryGraphEditor blueprint={blueprint} contract={contract} diagnosticsVisible={diagnosticsVisible} onCommand={execute} onSelection={setSelection} />
-        <div className="canvas-legend"><span><i className="line active" /> Active flow</span><span><i className="line saturated" /> Saturated</span><span><i className="line idle" /> Available route</span></div>
+        <FactoryGraphEditor blueprint={blueprint} contract={contract} diagnostics={diagnostics} diagnosticsVisible={diagnosticsVisible} onCommand={execute} onSelection={setSelection} />
+        <div className="canvas-legend">{diagnostics.some((item) => item.severity === 'error') ? <><span><i className="line problem" /> Problem route</span><span><i className="line blocked" /> Blocked by graph error</span></> : <><span><i className="line active" /> Active flow</span><span><i className="line saturated" /> Saturated</span><span><i className="line idle" /> Available route</span></>}</div>
       </section>
       <aside className="inspector panel">
         <div className="panel-heading"><div><span className="eyebrow">Inspect</span><h2>{selectedNode?.name ?? (selectedEdge === undefined ? 'Factory contract' : 'Selected route')}</h2></div><span>⌘</span></div>
@@ -165,7 +167,7 @@ const App = () => {
           {snapshot?.inputs.map((buffer) => <div className="buffer" key={`in-${buffer.resourceId}`}><span>{resourceById.get(buffer.resourceId)?.name} input</span><b>{buffer.quantity}/{buffer.capacity}</b><div><i style={{ width: `${buffer.quantity / buffer.capacity * 100}%` }} /></div></div>)}
           {snapshot?.outputs.map((buffer) => <div className="buffer output" key={`out-${buffer.resourceId}`}><span>{resourceById.get(buffer.resourceId)?.name} output</span><b>{buffer.quantity}/{buffer.capacity}</b><div><i style={{ width: `${buffer.quantity / buffer.capacity * 100}%` }} /></div></div>)}
         </section>
-        <section className="inspector-card diagnostics"><h3>Diagnostics</h3>{contract?.diagnostics.length === 0 && <p className="diagnostic-ok">✓ Exact conservation verified</p>}{contract?.diagnostics.map((item, index) => <p key={`${item.code}-${index}`}><span>!</span>{diagnosticText(item)}</p>)}{compileState === 'invalid' && <p><span>!</span>The graph must be repaired before it can compile.</p>}</section>
+        <section className="inspector-card diagnostics"><h3>Diagnostics</h3>{compileState === 'ready' && diagnostics.length === 0 && <p className="diagnostic-ok">✓ Exact conservation verified</p>}{diagnostics.map((item, index) => <p key={`${item.code}-${index}`}><span>!</span>{diagnosticText(item)}</p>)}{compileState === 'invalid' && <p><span>!</span>The highlighted routes must be repaired before the graph can compile.</p>}</section>
       </aside>
     </div> : <WorldView blueprint={blueprint} contract={contract} compileState={compileState} snapshot={snapshot} logicalTime={logicalTime} scheduledEvents={scheduler?.scheduledEvents ?? 0} sleepingActors={scheduler?.sleepingActors ?? 0} onOpenFactory={() => setView('factory')} onSupply={supplyInputs} onAdvance={() => advance(5)} onCollect={collectOutputs} />}
   </main>
