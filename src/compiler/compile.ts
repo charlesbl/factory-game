@@ -1,7 +1,7 @@
 import { boundingRect, polylineLength, RATE_SCALE, recipeById, ratioFromRate, scaleRate } from '../domain'
-import type { EdgeId, FixedRatio, NodeId, RateRaw, ResourceId } from '../domain'
+import type { EdgeId, FixedRatio, NodeId, PortId, RateRaw, ResourceId } from '../domain'
 import type { BlueprintEdge, BlueprintNode, FactoryBlueprint } from '../editor'
-import { canonicalBlueprint } from '../editor'
+import { canonicalBlueprint, effectiveEdgePoints, findPort } from '../editor'
 import type { FactoryContract } from './contract'
 import type { CompileDiagnostic } from './diagnostics'
 import { validateBlueprint } from './validate'
@@ -11,7 +11,7 @@ export interface FlowSolver { solve(blueprint: FactoryBlueprint, hash: string): 
 const addRate = (map: Map<ResourceId, RateRaw>, id: ResourceId, value: RateRaw): void => { map.set(id, (map.get(id) ?? 0n) + value) }
 const edgeOrder = (blueprint: FactoryBlueprint, edge: BlueprintEdge): readonly [number, number, number, string] => {
   const target = blueprint.nodes.get(edge.targetNodeId)
-  return [polylineLength(edge.points), target?.position.y ?? 0, target?.position.x ?? 0, edge.id]
+  return [polylineLength(effectiveEdgePoints(blueprint, edge)), target?.position.y ?? 0, target?.position.x ?? 0, edge.id]
 }
 const compareEdge = (blueprint: FactoryBlueprint) => (a: BlueprintEdge, b: BlueprintEdge): number => {
   const ak = edgeOrder(blueprint, a); const bk = edgeOrder(blueprint, b)
@@ -25,13 +25,28 @@ export class ExactDagFlowSolver implements FlowSolver {
     if (!validation.ok) return validation.diagnostics
     const edgeFlows = new Map<EdgeId, RateRaw>(); const activity = new Map<NodeId, FixedRatio>(); const diagnostics: CompileDiagnostic[] = []
     const incomingByNode = new Map<NodeId, Map<ResourceId, RateRaw>>()
+    const portFlows = new Map<PortId, RateRaw>()
+    const nominalInputDemand = (node: BlueprintNode, resourceId: ResourceId): RateRaw | undefined => {
+      if (node.kind === 'machine') return recipeById.get(node.recipeId)?.inputs.filter((input) => input.resourceId === resourceId).reduce((total, input) => total + input.rate, 0n)
+      if (node.kind === 'sub-factory') return this.childContracts.get(node.contractId)?.inputRates.get(resourceId)
+      return undefined
+    }
     const allocate = (node: BlueprintNode, available: Map<ResourceId, RateRaw>): void => {
       for (const resourceId of [...available.keys()].sort()) {
         let remaining = available.get(resourceId) ?? 0n
         const edges = [...blueprint.edges.values()].filter((edge) => edge.sourceNodeId === node.id && edge.resourceId === resourceId).sort(compareEdge(blueprint))
         for (const edge of edges) {
-          const flow = remaining < edge.capacity ? remaining : edge.capacity
+          const sourcePort = findPort(blueprint, edge.sourceNodeId, edge.sourcePortId); const targetPort = findPort(blueprint, edge.targetNodeId, edge.targetPortId)
+          if (sourcePort === undefined || targetPort === undefined) continue
+          const sourceRemaining = sourcePort.capacity - (portFlows.get(sourcePort.id) ?? 0n)
+          const targetRemaining = targetPort.capacity - (portFlows.get(targetPort.id) ?? 0n)
+          const targetNode = blueprint.nodes.get(edge.targetNodeId)
+          const nominalDemand = targetNode === undefined ? undefined : nominalInputDemand(targetNode, resourceId)
+          const demandRemaining = nominalDemand === undefined ? undefined : nominalDemand - (incomingByNode.get(edge.targetNodeId)?.get(resourceId) ?? 0n)
+          const limits = demandRemaining === undefined ? [remaining, edge.capacity, sourceRemaining, targetRemaining] : [remaining, edge.capacity, sourceRemaining, targetRemaining, demandRemaining]
+          const flow = limits.reduce((minimum, value) => value < minimum ? value : minimum)
           edgeFlows.set(edge.id, flow); remaining -= flow
+          portFlows.set(sourcePort.id, (portFlows.get(sourcePort.id) ?? 0n) + flow); portFlows.set(targetPort.id, (portFlows.get(targetPort.id) ?? 0n) + flow)
           const target = incomingByNode.get(edge.targetNodeId) ?? new Map<ResourceId, RateRaw>()
           addRate(target, resourceId, flow); incomingByNode.set(edge.targetNodeId, target)
         }
@@ -89,9 +104,12 @@ export class ExactDagFlowSolver implements FlowSolver {
     for (const nodeId of [...validation.graph.order].reverse()) {
       const node = blueprint.nodes.get(nodeId)!
       if (node.kind === 'junction') {
-        const required = new Map<ResourceId, RateRaw>()
-        for (const edge of blueprint.edges.values()) if (edge.sourceNodeId === node.id) addRate(required, edge.resourceId, edgeFlows.get(edge.id) ?? 0n)
-        for (const [resource, demand] of required) if (!retainFlow([...blueprint.edges.values()].filter((edge) => edge.targetNodeId === node.id && edge.resourceId === resource), demand)) return [{ code: 'INTERNAL_VERIFICATION', severity: 'error', entity: { nodeId: node.id, resourceId: resource }, details: { value: 'junction conservation' } }]
+        const resources = new Set<ResourceId>()
+        for (const edge of blueprint.edges.values()) if (edge.sourceNodeId === node.id || edge.targetNodeId === node.id) resources.add(edge.resourceId)
+        for (const resource of resources) {
+          const demand = [...blueprint.edges.values()].filter((edge) => edge.sourceNodeId === node.id && edge.resourceId === resource).reduce((sum, edge) => sum + (edgeFlows.get(edge.id) ?? 0n), 0n)
+          if (!retainFlow([...blueprint.edges.values()].filter((edge) => edge.targetNodeId === node.id && edge.resourceId === resource), demand)) return [{ code: 'INTERNAL_VERIFICATION', severity: 'error', entity: { nodeId: node.id, resourceId: resource }, details: { value: 'junction conservation' } }]
+        }
       } else if (node.kind === 'machine') {
         const recipe = recipeById.get(node.recipeId)!; let ratio = activity.get(node.id) ?? 0n
         for (const output of recipe.outputs) { const delivered = [...blueprint.edges.values()].filter((edge) => edge.sourceNodeId === node.id && edge.resourceId === output.resourceId).reduce((sum, edge) => sum + (edgeFlows.get(edge.id) ?? 0n), 0n); const outputRatio = ratioFromRate(delivered, output.rate); if (outputRatio < ratio) ratio = outputRatio }
@@ -112,7 +130,7 @@ export class ExactDagFlowSolver implements FlowSolver {
       if (source?.kind === 'external-input') addRate(inputRates, edge.resourceId, flow)
       if (target?.kind === 'external-output') addRate(outputRates, edge.resourceId, flow)
     }
-    const points = [...blueprint.nodes.values()].flatMap((node) => [node.position, { x: node.position.x + node.footprint.width, y: node.position.y + node.footprint.height }]).concat([...blueprint.edges.values()].flatMap((edge) => [...edge.points]))
+    const points = [...blueprint.nodes.values()].flatMap((node) => [node.position, { x: node.position.x + node.footprint.width, y: node.position.y + node.footprint.height }]).concat([...blueprint.edges.values()].flatMap((edge) => [...effectiveEdgePoints(blueprint, edge)]))
     const footprint = boundingRect(points, 2)
     const boundaryPorts = projectExternalPorts(blueprint, footprint)
     return { schemaVersion: 1, blueprintHash: hash, inputRates, outputRates, inputPorts: boundaryPorts.filter((port) => port.direction === 'input'), outputPorts: boundaryPorts.filter((port) => port.direction === 'output'), footprint, machineActivity: activity, edgeFlows, diagnostics }

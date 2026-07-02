@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { asId, createIdFactory, formatRate, gridPoint, parseRate, recipes, resourceById, resources } from './domain'
-import type { RecipeId, ResourceId } from './domain'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { asId, createIdFactory, formatRate, gridPoint, parseRate, polylineLength, recipes, resourceById, resources } from './domain'
+import type { RecipeId } from './domain'
 import type { CompileDiagnostic, FactoryContract } from './compiler'
 import { diagnosticText } from './compiler'
 import type { BlueprintNode, FactoryBlueprint } from './editor'
-import { addNode, BlueprintHistory, disconnectEdge, duplicateNodes, removeNode, transaction, type EditCommand } from './editor'
+import { addNode, BlueprintHistory, disconnectEdge, duplicateNodes, effectiveEdgePoints, removeNode, transaction, type EditCommand } from './editor'
 import { deserializeBlueprint } from './editor'
 import { EventScheduler, FactoryRuntimeInstance } from './simulation'
 import { createDemoBlueprint, createMachineNode } from './ui/demo-blueprint'
@@ -28,6 +28,8 @@ const App = () => {
   const [catalogueQuery, setCatalogueQuery] = useState('')
   const [logicalTime, setLogicalTime] = useState(0n)
   const [, renderRuntime] = useState(0)
+  const mounted = useRef(true)
+  const displayedCompilation = useRef(0)
   const runtime = useMemo(() => {
     if (contract === undefined) return undefined
     const instance = new FactoryRuntimeInstance(asId('instance-main'), contract, 24)
@@ -42,6 +44,10 @@ const App = () => {
   const redo = useCallback(() => { setDiagnostics([]); setCompileState('compiling'); setBlueprint(history.redo()) }, [history])
 
   useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  useEffect(() => {
     let active = true
     void import('./persistence').then(async ({ database }) => database.blueprints.get('factory-main')).then((record) => {
         if (!active || record === undefined) return
@@ -51,14 +57,14 @@ const App = () => {
     return () => { active = false }
   }, [history])
   useEffect(() => {
-    let active = true
     void compiler.compile(blueprint).then((result) => {
-      if (!active || result.stale) return
+      if (!mounted.current || result.generation < displayedCompilation.current) return
+      if (result.stale && result.contract === undefined) return
+      displayedCompilation.current = result.generation
       setDiagnostics(result.diagnostics)
       if (result.contract === undefined) { setContract(undefined); setCompileState('invalid'); return }
-      setContract(result.contract); setLogicalTime(0n); setCompileState('ready')
+      setContract(result.contract); setLogicalTime(0n); setCompileState(result.stale ? 'compiling' : 'ready')
     })
-    return () => { active = false }
   }, [blueprint])
   useEffect(() => {
     if (instance === undefined) return undefined
@@ -79,10 +85,9 @@ const App = () => {
   }
   const addJunction = () => {
     const id = idFactory.next('NodeId'); const inputId = idFactory.next('PortId'); const outputId = idFactory.next('PortId')
-    const resourceId = asId<ResourceId>('ironOre')
-    const node: BlueprintNode = { id, kind: 'junction', name: 'Iron ore junction', position: gridPoint(10, 10), footprint: { x: 0, y: 0, width: 2, height: 2 }, ports: [
-      { id: inputId, direction: 'input', resourceId, capacity: parseRate('12'), anchor: gridPoint(0, 1), maxConnections: 4 },
-      { id: outputId, direction: 'output', resourceId, capacity: parseRate('12'), anchor: gridPoint(2, 1), maxConnections: 4 },
+    const node: BlueprintNode = { id, kind: 'junction', name: 'Junction', position: gridPoint(10, 10), footprint: { x: 0, y: 0, width: 2, height: 2 }, ports: [
+      { id: inputId, direction: 'input', capacity: parseRate('12'), anchor: gridPoint(0, 1), maxConnections: 4 },
+      { id: outputId, direction: 'output', capacity: parseRate('12'), anchor: gridPoint(2, 1), maxConnections: 4 },
     ] }
     execute(addNode(node))
   }
@@ -115,6 +120,8 @@ const App = () => {
   }
   const selectedNode = selection.nodeIds.length === 1 ? blueprint.nodes.get(selection.nodeIds[0]!) : undefined
   const selectedEdge = selection.edgeIds.length === 1 && selection.nodeIds.length === 0 ? blueprint.edges.get(selection.edgeIds[0]!) : undefined
+  const selectedEdgeLength = selectedEdge === undefined ? undefined : polylineLength(effectiveEdgePoints(blueprint, selectedEdge))
+  const selectedEdgeLengthText = selectedEdgeLength?.toLocaleString(undefined, { maximumFractionDigits: 2 })
   const selectionCount = selection.nodeIds.length + selection.edgeIds.length
   const issueCount = diagnostics.length
   const snapshot = instance?.getSnapshot()
@@ -159,7 +166,7 @@ const App = () => {
       <aside className="inspector panel">
         <div className="panel-heading"><div><span className="eyebrow">Inspect</span><h2>{selectedNode?.name ?? (selectedEdge === undefined ? 'Factory contract' : 'Selected route')}</h2></div><span>⌘</span></div>
         {selectedNode !== undefined && <section className="inspector-card"><h3>Selected node</h3><dl><div><dt>Type</dt><dd>{selectedNode.kind}</dd></div><div><dt>Grid position</dt><dd>{selectedNode.position.x}, {selectedNode.position.y}</dd></div><div><dt>Ports</dt><dd>{selectedNode.ports.length}</dd></div></dl><button className="danger-button" onClick={deleteSelection}>Delete node</button></section>}
-        {selectedEdge !== undefined && <section className="inspector-card"><h3>Selected route</h3><dl><div><dt>Resource</dt><dd>{resourceById.get(selectedEdge.resourceId)?.name}</dd></div><div><dt>Capacity</dt><dd>{formatRate(selectedEdge.capacity)}/s</dd></div></dl><button className="danger-button" onClick={deleteSelection}>Delete route</button></section>}
+        {selectedEdge !== undefined && <section className="inspector-card"><h3>Selected route</h3><dl><div><dt>Resource</dt><dd>{resourceById.get(selectedEdge.resourceId)?.name}</dd></div><div><dt>Capacity</dt><dd>{formatRate(selectedEdge.capacity)}/s</dd></div><div><dt>Route length</dt><dd>{selectedEdgeLengthText} m</dd></div></dl><button className="danger-button" onClick={deleteSelection}>Delete route</button></section>}
         <section className="inspector-card contract-card"><h3>Net programme <span className="badge">Coupled</span></h3><div className="rates"><div><span>Inputs</span>{rates.inputs.map(([id, rate]) => <p key={id}><i style={{ background: resourceById.get(id)?.colour }} />{resourceById.get(id)?.name}<b>{formatRate(rate)}/s</b></p>)}</div><div><span>Outputs</span>{rates.outputs.map(([id, rate]) => <p key={id}><i style={{ background: resourceById.get(id)?.colour }} />{resourceById.get(id)?.name}<b>{formatRate(rate)}/s</b></p>)}</div></div>{contract !== undefined && <small>Footprint {contract.footprint.width} × {contract.footprint.height} m · {contract.blueprintHash.slice(0, 10)}</small>}</section>
         <section className="inspector-card runtime-card"><h3>World runtime {instance !== undefined && <span className={`badge ${stateTone[instance.state]}`}>{instance.state.replace('_', ' ')}</span>}</h3>
           <div className="runtime-actions"><button onClick={supplyInputs}>Supply +12</button><button onClick={() => advance(5)}>Run 5 s</button><button onClick={collectOutputs}>Collect</button></div>

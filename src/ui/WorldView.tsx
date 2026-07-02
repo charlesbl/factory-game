@@ -35,10 +35,18 @@ export const WorldView = ({ blueprint, contract, compileState, snapshot, logical
   const renderBuffer = (buffer: InstanceSnapshot['inputs'][number], role: 'input' | 'output') => {
     const resource = resourceById.get(buffer.resourceId)
     const rate = role === 'input' ? contract?.inputRates.get(buffer.resourceId) : contract?.outputRates.get(buffer.resourceId)
+    const ports = role === 'input' ? contract?.inputPorts : contract?.outputPorts
+    const maximumRate = ports?.filter((port) => port.resourceId === buffer.resourceId).reduce((total, port) => total + port.capacity, 0n) ?? 0n
+    const utilisation = maximumRate === 0n || rate === undefined ? 0 : Math.min(100, Number((rate * 100n) / maximumRate))
     return <article className={`world-port world-port--${role}`} key={`${role}-${buffer.resourceId}`}>
       <div><i style={{ background: resource?.colour }} /><span>{resource?.name ?? buffer.resourceId}</span><b>{buffer.quantity}/{buffer.capacity}</b></div>
       <div className="world-buffer-track"><i style={{ width: `${buffer.capacity === 0 ? 0 : buffer.quantity / buffer.capacity * 100}%`, background: resource?.colour }} /></div>
-      <small>{role === 'input' ? 'Inbound reserve' : 'Outbound stock'} · {rate === undefined ? '0' : formatRate(rate)}/s</small>
+      <div className="world-port-rate">
+        <span>Contract rate</span>
+        <b>{rate === undefined ? '0' : formatRate(rate)}/s</b>
+        <small>max {formatRate(maximumRate)}/s · {utilisation}%</small>
+      </div>
+      <div className="world-rate-track" title={`${utilisation}% of boundary capacity`}><i style={{ width: `${utilisation}%`, background: resource?.colour }} /></div>
     </article>
   }
 

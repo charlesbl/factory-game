@@ -6,7 +6,9 @@ export interface ProjectedBoundaryPort extends CompiledPort { readonly nodeId: s
 export const projectExternalPorts = (blueprint: FactoryBlueprint, footprint: GridRect): readonly ProjectedBoundaryPort[] => {
   const occupied = new Set<string>()
   return [...blueprint.externalPorts].sort((a, b) => a.side.localeCompare(b.side) || a.offset - b.offset || a.portId.localeCompare(b.portId)).flatMap((external) => {
-    const node = blueprint.nodes.get(external.nodeId); const port = node?.ports.find((item) => item.id === external.portId); if (node === undefined || port === undefined) return []
+    const node = blueprint.nodes.get(external.nodeId)
+    if (node?.kind !== 'external-input' && node?.kind !== 'external-output') return []
+    const port = node.ports.find((item) => item.id === external.portId); if (port === undefined) return []
     const limit = external.side === 'left' || external.side === 'right' ? footprint.height : footprint.width
     let offset = Math.max(0, Math.min(limit - 1, external.offset))
     while (occupied.has(`${external.side}:${offset}`) && offset < limit - 1) offset += 1

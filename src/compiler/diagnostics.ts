@@ -23,7 +23,7 @@ export const diagnosticText = (diagnostic: CompileDiagnostic): string => {
     RESOURCE_MISMATCH: 'Connected ports carry different resources.', NON_POSITIVE_CAPACITY: 'Connection capacity must be positive.',
     CONNECTION_LIMIT: connected !== undefined && limit !== undefined ? `This port accepts ${limit} route${limit === '1' ? '' : 's'}, but ${connected} are connected.` : 'A port has too many connections.', ZERO_LENGTH: 'A connection must have a positive logical length.',
     CYCLE: 'Cycles require an explicit buffer and are not supported in V1.', UNREACHABLE_INPUT: 'A mandatory machine input has no path.',
-    UNROUTED_OUTPUT: 'A machine output has no destination.', INDEPENDENT_COMPONENT: 'A factory may contain only one productive component in V1.',
+    UNROUTED_OUTPUT: 'An output has no destination.', INDEPENDENT_COMPONENT: 'A factory may contain only one productive component in V1.',
     MISSING_CHILD_CONTRACT: 'The sub-factory contract is unavailable.', LIMITED_INPUT: `Machine activity is limited by ${value ?? 'an input'}.`,
     LIMITED_OUTPUT: `Production is limited by ${value ?? 'an output path'}.`, LONGER_PATH: 'This branch is inactive because a shorter path has priority.',
     INTERNAL_VERIFICATION: 'Exact conservation verification failed.',

@@ -1,15 +1,16 @@
 import { Background, BackgroundVariant, Controls, MarkerType, MiniMap, ReactFlow, type Connection, type Edge, type EdgeChange, type NodeChange, type OnSelectionChangeParams, applyEdgeChanges, applyNodeChanges } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useCallback, useMemo, useState } from 'react'
-import { asId, formatRate, gridPoint, resourceById } from '../domain'
-import type { EdgeId, NodeId, PortId } from '../domain'
+import { asId, gridPoint, resourceById } from '../domain'
+import type { EdgeId, NodeId, PortId, RateRaw } from '../domain'
 import type { CompileDiagnostic, FactoryContract } from '../compiler'
 import { diagnosticText } from '../compiler'
 import type { BlueprintEdge, FactoryBlueprint } from '../editor'
-import { connectPorts, disconnectEdge, moveNode, removeNode, transaction } from '../editor'
+import { connectPorts, disconnectEdge, effectivePortResource, moveNode, removeNode, transaction } from '../editor'
 import type { EditCommand } from '../editor'
 import { FactoryNodeView, type FactoryFlowNode } from './FactoryNode'
 import { buildDiagnosticOverlay } from './diagnostic-overlay'
+import { formatPortRate } from './factory-node-rates'
 import { GRID_SIZE, gridToPixel, pixelToGrid } from './grid-projection'
 
 const nodeTypes = { factory: FactoryNodeView }
@@ -18,17 +19,31 @@ export interface GraphSelection { readonly nodeIds: readonly NodeId[]; readonly 
 interface Props { readonly blueprint: FactoryBlueprint; readonly contract: FactoryContract | undefined; readonly diagnostics: readonly CompileDiagnostic[]; readonly diagnosticsVisible: boolean; readonly onCommand: (command: EditCommand) => void; readonly onSelection: (selection: GraphSelection) => void }
 export const FactoryGraphEditor = ({ blueprint, contract, diagnostics, diagnosticsVisible, onCommand, onSelection }: Props) => {
   const diagnosticOverlay = useMemo(() => buildDiagnosticOverlay(blueprint, diagnosticsVisible ? diagnostics : []), [blueprint, diagnostics, diagnosticsVisible])
+  const portFlows = useMemo(() => {
+    if (contract === undefined) return undefined
+    const flows = new Map<PortId, RateRaw>()
+    for (const edge of blueprint.edges.values()) {
+      const flow = contract.edgeFlows.get(edge.id) ?? 0n
+      flows.set(edge.sourcePortId, (flows.get(edge.sourcePortId) ?? 0n) + flow)
+      flows.set(edge.targetPortId, (flows.get(edge.targetPortId) ?? 0n) + flow)
+    }
+    return flows
+  }, [blueprint, contract])
   const projectedNodes = useMemo<FactoryFlowNode[]>(() => [...blueprint.nodes.values()].map((node) => {
     const diagnostic = diagnosticOverlay.nodeDiagnostics.get(node.id)
-    return { id: node.id, type: 'factory', position: { x: gridToPixel(node.position.x), y: gridToPixel(node.position.y) }, data: { node, activity: Number(contract?.machineActivity.get(node.id) ?? 0n) / 10_000, ...(diagnostic !== undefined ? { diagnostic: diagnosticText(diagnostic), issueSeverity: diagnostic.severity } : {}) }, draggable: true }
-  }), [blueprint, contract, diagnosticOverlay])
+    const portResources = new Map(node.ports.flatMap((port) => {
+      const resource = effectivePortResource(blueprint, node.id, port.id)
+      return resource === undefined ? [] : [[port.id, resource] as const]
+    }))
+    return { id: node.id, type: 'factory', position: { x: gridToPixel(node.position.x), y: gridToPixel(node.position.y) }, data: { node, portResources, ...(portFlows !== undefined ? { portFlows } : {}), activity: Number(contract?.machineActivity.get(node.id) ?? 0n) / 10_000, ...(diagnostic !== undefined ? { diagnostic: diagnosticText(diagnostic), issueSeverity: diagnostic.severity } : {}) }, draggable: true }
+  }), [blueprint, contract, diagnosticOverlay, portFlows])
   const projectedEdges = useMemo<Edge[]>(() => [...blueprint.edges.values()].map((edge) => {
     const flow = contract?.edgeFlows.get(edge.id) ?? 0n; const ratio = edge.capacity === 0n ? 0 : Number((flow * 100n) / edge.capacity)
     const resourceColour = resourceById.get(edge.resourceId)?.colour ?? '#8ba39a'
     const diagnostic = diagnosticOverlay.edgeDiagnostics.get(edge.id)
     const blocked = diagnosticOverlay.blockedEdges.has(edge.id)
     const colour = diagnostic?.severity === 'error' ? '#ff746d' : diagnostic?.severity === 'warning' ? '#efb15f' : blocked ? '#927052' : resourceColour
-    const rateLabel = `${formatRate(flow)}/${formatRate(edge.capacity)}/s`
+    const rateLabel = formatPortRate(flow, edge.capacity)
     const label = !diagnosticsVisible ? undefined : diagnostic !== undefined ? `${diagnostic.severity === 'error' ? 'Problem' : 'Limited'} · ${rateLabel}` : blocked ? `Blocked · ${rateLabel}` : rateLabel
     return {
       id: edge.id, type: 'straight', source: edge.sourceNodeId, sourceHandle: edge.sourcePortId, target: edge.targetNodeId, targetHandle: edge.targetPortId,
@@ -62,9 +77,14 @@ export const FactoryGraphEditor = ({ blueprint, contract, diagnostics, diagnosti
     if (connection.sourceHandle === null || connection.targetHandle === null) { setConnectionError('Choose a typed source and destination port.'); return }
     const sourceNode = blueprint.nodes.get(asId<NodeId>(connection.source)); const targetNode = blueprint.nodes.get(asId<NodeId>(connection.target))
     const sourcePort = sourceNode?.ports.find((port) => port.id === connection.sourceHandle); const targetPort = targetNode?.ports.find((port) => port.id === connection.targetHandle)
-    if (sourceNode === undefined || targetNode === undefined || sourcePort === undefined || targetPort === undefined || sourcePort.resourceId !== targetPort.resourceId) { setConnectionError('Connection rejected: ports must carry the same resource.'); return }
+    if (sourceNode === undefined || targetNode === undefined || sourcePort === undefined || targetPort === undefined) { setConnectionError('Connection rejected: ports must carry the same resource.'); return }
+    const sourceResource = effectivePortResource(blueprint, sourceNode.id, sourcePort.id)
+    const targetResource = effectivePortResource(blueprint, targetNode.id, targetPort.id)
+    if (sourceResource !== undefined && targetResource !== undefined && sourceResource !== targetResource) { setConnectionError('Connection rejected: ports must carry the same resource.'); return }
+    const resourceId = sourceResource ?? targetResource
+    if (resourceId === undefined) { setConnectionError('Connect at least one junction to a typed resource first.'); return }
     const id = asId<EdgeId>(`edge-${crypto.randomUUID()}`)
-    const edge: BlueprintEdge = { id, sourceNodeId: sourceNode.id, sourcePortId: asId<PortId>(connection.sourceHandle), targetNodeId: targetNode.id, targetPortId: asId<PortId>(connection.targetHandle), resourceId: sourcePort.resourceId, capacity: sourcePort.capacity < targetPort.capacity ? sourcePort.capacity : targetPort.capacity, points: [sourceNode.position, targetNode.position] }
+    const edge: BlueprintEdge = { id, sourceNodeId: sourceNode.id, sourcePortId: asId<PortId>(connection.sourceHandle), targetNodeId: targetNode.id, targetPortId: asId<PortId>(connection.targetHandle), resourceId, capacity: sourcePort.capacity < targetPort.capacity ? sourcePort.capacity : targetPort.capacity, points: [gridPoint(sourceNode.position.x + sourcePort.anchor.x, sourceNode.position.y + sourcePort.anchor.y), gridPoint(targetNode.position.x + targetPort.anchor.x, targetNode.position.y + targetPort.anchor.y)] }
     setConnectionError(undefined); onCommand(connectPorts(edge))
   }, [blueprint, onCommand])
   const selection = useCallback(({ nodes: selectedNodes, edges: selectedEdges }: OnSelectionChangeParams) => onSelection({ nodeIds: selectedNodes.map((node) => asId<NodeId>(node.id)), edgeIds: selectedEdges.map((edge) => asId<EdgeId>(edge.id)) }), [onSelection])

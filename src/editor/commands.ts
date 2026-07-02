@@ -1,6 +1,6 @@
 import type { GridPoint, IdFactory, NodeId, PortId, RecipeId } from '../domain'
 import type { BlueprintEdge, BlueprintNode, ExternalPort, FactoryBlueprint, SubFactoryNode } from './blueprint'
-import { findPort, updateBlueprint } from './blueprint'
+import { effectivePortResource, findPort, updateBlueprint } from './blueprint'
 
 export interface ChangeSet {
   readonly resources: ReadonlySet<string>
@@ -33,7 +33,19 @@ export const moveNode = (nodeId: NodeId, position: GridPoint): EditCommand => ({
   apply(blueprint) {
     const node = blueprint.nodes.get(nodeId)
     if (node === undefined) throw new Error(`Unknown node ${nodeId}`)
-    return result(blueprint, this, { nodes: new Map(blueprint.nodes).set(nodeId, { ...node, position }) })
+    const movedNode = { ...node, position } as BlueprintNode
+    const portPosition = (portId: PortId): GridPoint => {
+      const port = movedNode.ports.find((candidate) => candidate.id === portId)
+      return port === undefined ? position : { x: position.x + port.anchor.x, y: position.y + port.anchor.y }
+    }
+    const edges = new Map([...blueprint.edges].map(([edgeId, edge]) => {
+      if (edge.sourceNodeId !== nodeId && edge.targetNodeId !== nodeId) return [edgeId, edge]
+      const points = [...edge.points]
+      if (points.length > 0 && edge.sourceNodeId === nodeId) points[0] = portPosition(edge.sourcePortId)
+      if (points.length > 0 && edge.targetNodeId === nodeId) points[points.length - 1] = portPosition(edge.targetPortId)
+      return [edgeId, { ...edge, points }]
+    }))
+    return result(blueprint, this, { nodes: new Map(blueprint.nodes).set(nodeId, movedNode), edges })
   },
 })
 export const removeNode = (nodeId: NodeId): EditCommand => ({
@@ -52,7 +64,9 @@ export const connectPorts = (edge: BlueprintEdge): EditCommand => ({
     const source = findPort(blueprint, edge.sourceNodeId, edge.sourcePortId)
     const target = findPort(blueprint, edge.targetNodeId, edge.targetPortId)
     if (source?.direction !== 'output' || target?.direction !== 'input') throw new Error('Connections must run from an output to an input')
-    if (source.resourceId !== target.resourceId || source.resourceId !== edge.resourceId) throw new Error('Connected ports must transport the same resource')
+    const sourceResource = effectivePortResource(blueprint, edge.sourceNodeId, edge.sourcePortId)
+    const targetResource = effectivePortResource(blueprint, edge.targetNodeId, edge.targetPortId)
+    if ((sourceResource !== undefined && sourceResource !== edge.resourceId) || (targetResource !== undefined && targetResource !== edge.resourceId)) throw new Error('Connected ports must transport the same resource')
     return result(blueprint, this, { edges: new Map(blueprint.edges).set(edge.id, edge) }, changes(true, [edge.resourceId]))
   },
 })

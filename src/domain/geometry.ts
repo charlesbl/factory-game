@@ -14,9 +14,10 @@ export const gridSize = (width: number, height: number): GridSize => {
   return { width, height }
 }
 export const manhattanDistance = (a: GridPoint, b: GridPoint): number => Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
+export const euclideanDistance = (a: GridPoint, b: GridPoint): number => Math.hypot(b.x - a.x, b.y - a.y)
 export const polylineLength = (line: Polyline): number => {
   if (line.length < 2) throw new RangeError('A polyline requires at least two points')
-  return line.slice(1).reduce((total, point, index) => total + manhattanDistance(line[index]!, point), 0)
+  return line.slice(1).reduce((total, point, index) => total + euclideanDistance(line[index]!, point), 0)
 }
 
 export const boundingRect = (points: readonly GridPoint[], margin = 0): GridRect => {
