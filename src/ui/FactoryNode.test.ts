@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseRate } from '../domain'
-import { formatMachinePortRate, formatPortRate } from './factory-node-rates'
+import { formatPortFlow, formatPortRate, portUtilizationPercent } from './factory-node-rates'
 
 describe('factory node port rates', () => {
   it('distinguishes the current recipe flow from the port capacity', () => {
@@ -12,8 +12,14 @@ describe('factory node port rates', () => {
     expect(formatPortRate(undefined, parseRate('4'))).toBe('4/s')
   })
 
-  it('shows only the effective recipe flow on machines', () => {
-    expect(formatMachinePortRate(parseRate('2'), parseRate('4'))).toBe('2/s')
-    expect(formatMachinePortRate(parseRate('1'), parseRate('2'))).toBe('1/s')
+  it('formats the current flow without mixing it with capacity', () => {
+    expect(formatPortFlow(parseRate('2'))).toBe('2/s')
+    expect(formatPortFlow(undefined)).toBe('—/s')
+  })
+
+  it('calculates a bounded utilization percentage for the meter', () => {
+    expect(portUtilizationPercent(parseRate('2'), parseRate('4'))).toBe(50)
+    expect(portUtilizationPercent(parseRate('5'), parseRate('4'))).toBe(100)
+    expect(portUtilizationPercent(undefined, parseRate('4'))).toBeUndefined()
   })
 })

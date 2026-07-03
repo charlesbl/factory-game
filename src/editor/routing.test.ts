@@ -1,48 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { asId, gridPoint, parseRate } from '../domain'
-import type { NetId, ResourceId, TrackId } from '../domain'
+import { asId, gridPoint } from '../domain'
+import type { EdgeId, RouteHandleId } from '../domain'
 import { createDemoBlueprint } from '../ui/demo-blueprint'
-import type { ConveyorTrack } from './blueprint'
-import { blueprintTracks } from './blueprint'
-import { canonicalBlueprint, deserializeBlueprint } from './canonicalize'
-import { derivePhysicalGraph, orthogonalLength, validatePhysicalRouting } from './routing'
+import { addBridgeAt } from './commands'
+import { validatePhysicalRouting } from './routing'
 
-describe('PCB conveyor routing', () => {
-  it('uses visible Manhattan distance and rejects diagonal geometry', () => {
-    expect(orthogonalLength([gridPoint(0, 0), gridPoint(4, 0), gridPoint(4, 3)])).toBe(7)
-    expect(() => orthogonalLength([gridPoint(0, 0), gridPoint(3, 4)])).toThrow('orthogonal')
-  })
-
-  it('derives byte-stable segment and junction IDs', () => {
-    const blueprint = deserializeBlueprint(JSON.parse(canonicalBlueprint(createDemoBlueprint())))
-    const first = derivePhysicalGraph(blueprint)
-    const second = derivePhysicalGraph({ ...blueprint, tracks: new Map([...blueprintTracks(blueprint)].reverse()) })
-    expect(second).toEqual(first)
-  })
-
-  it('keeps the migrated default factory physically valid', () => {
-    const migrated = deserializeBlueprint(JSON.parse(canonicalBlueprint(createDemoBlueprint())))
-    expect(validatePhysicalRouting(migrated).filter((item) => item.severity === 'error')).toEqual([])
-  })
-
-  it('reports incompatible same-layer crossings without relying on colour', () => {
-    const blueprint = deserializeBlueprint(JSON.parse(canonicalBlueprint(createDemoBlueprint())))
-    const crossing: ConveyorTrack = { id: asId<TrackId>('track-crossing'), netIds: [asId<NetId>('net-crossing')], resourceId: asId<ResourceId>('copperOre'), capacity: parseRate('2'), layerId: 'primary', points: [gridPoint(5, 3), gridPoint(5, 7)] }
-    const invalid = { ...blueprint, tracks: new Map(blueprintTracks(blueprint)).set(crossing.id, crossing) }
+describe('physical route validation', () => {
+  it('rejects every same-layer contact, even for the same resource', () => {
+    const blueprint = createDemoBlueprint(); const ore = blueprint.edges.get(asId<EdgeId>('edge-ore'))!
+    const crossing = { ...ore, id: asId<EdgeId>('edge-crossing'), sourceNodeId: blueprint.edges.get(asId<EdgeId>('edge-ingot'))!.sourceNodeId, sourcePortId: blueprint.edges.get(asId<EdgeId>('edge-ingot'))!.sourcePortId, routeHandles: [{ id: asId<RouteHandleId>('cross-handle'), position: gridPoint(5, 4) }] }
+    const invalid = { ...blueprint, edges: new Map(blueprint.edges).set(crossing.id, crossing) }
     expect(validatePhysicalRouting(invalid)).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'ILLEGAL_CROSSING' })]))
   })
 
-  it('rejects duplicate persistent IDs before constructing maps', () => {
-    const serialized = JSON.parse(canonicalBlueprint(createDemoBlueprint()))
-    serialized.tracks.push(serialized.tracks[0])
-    expect(() => deserializeBlueprint(serialized)).toThrow('Duplicate track ID')
-  })
-
-  it('diagnoses shared trunk demand against one physical capacity', () => {
-    const blueprint = deserializeBlueprint(JSON.parse(canonicalBlueprint(createDemoBlueprint())))
-    const ore = blueprint.nets!.get(asId<NetId>('net-ore'))!; const second = { ...ore, id: asId<NetId>('net-ore-second') }
-    const oreTrack = blueprint.tracks!.get(asId<TrackId>('track-ore'))!
-    const shared = { ...blueprint, nets: new Map(blueprint.nets).set(second.id, second), tracks: new Map(blueprint.tracks).set(oreTrack.id, { ...oreTrack, netIds: [ore.id, second.id] }) }
-    expect(validatePhysicalRouting(shared)).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'SHARED_CAPACITY', severity: 'warning' })]))
+  it('moves the selected crossing onto the bridge layer', () => {
+    const blueprint = createDemoBlueprint(); const edge = blueprint.edges.get(asId<EdgeId>('edge-ore'))!
+    const bridged = addBridgeAt(edge.id, gridPoint(6, 5)).apply(blueprint).blueprint
+    expect(validatePhysicalRouting(bridged).filter((item) => item.code === 'INVALID_BRIDGE')).toHaveLength(0)
   })
 })

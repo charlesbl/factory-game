@@ -68,13 +68,12 @@ test('filters the machine catalogue', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Circuit assembly/i })).toBeVisible()
 })
 
-test('highlights the conflicting paths when two routes share a single-connection port', async ({ page }) => {
+test('rejects a second route on an occupied connector', async ({ page }) => {
   await page.goto('/'); await expect(page.getByText('Contract ready')).toBeVisible()
   await page.getByRole('button', { name: /Iron smelting/i }).click()
   const nodes = page.locator('.graph-node')
   const secondFurnace = nodes.filter({ hasText: 'Iron smelting' }).last()
   const intake = nodes.filter({ hasText: 'Iron ore intake' })
-  const dispatch = nodes.filter({ hasText: 'Ingot dispatch' })
   await page.locator('.react-flow__minimap').evaluate((element) => element.remove())
 
   const drag = async (from: ReturnType<typeof page.locator>, to: ReturnType<typeof page.locator>) => {
@@ -82,19 +81,9 @@ test('highlights the conflicting paths when two routes share a single-connection
     await page.mouse.move(a!.x + a!.width / 2, a!.y + a!.height / 2); await page.mouse.down(); await page.mouse.move(b!.x + b!.width / 2, b!.y + b!.height / 2, { steps: 5 }); await page.mouse.up()
   }
   await drag(intake.getByLabel('output Iron ore'), secondFurnace.getByLabel('input Iron ore'))
-  await drag(secondFurnace.getByLabel('output Iron ingot'), dispatch.getByLabel('input Iron ingot'))
-
-  await expect(page.getByText('Invalid graph')).toBeVisible()
-  await expect(page.getByText('This port accepts 1 route, but 2 are connected.').first()).toBeVisible()
-  await expect(page.locator('.diagnostic-edge--error')).toHaveCount(2)
-  await expect(page.locator('.diagnostic-edge--blocked')).toHaveCount(1)
-  await expect(dispatch).toHaveClass(/has-error/)
-  const labels = page.locator('.conveyor-label'); expect(await labels.count()).toBeGreaterThanOrEqual(3)
-  const labelLayout = await labels.evaluateAll((elements) => elements.map((element) => { const box = element.getBoundingClientRect(); const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2); return { x: box.x, y: box.y, width: box.width, height: box.height, unobscured: top === element || element.contains(top) } }))
-  for (let left = 0; left < labelLayout.length; left += 1) for (let right = left + 1; right < labelLayout.length; right += 1) {
-    const a = labelLayout[left]!; const b = labelLayout[right]!; expect(a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y).toBe(false)
-  }
-  expect(labelLayout.every((label) => label.unobscured)).toBe(true)
+  await expect(page.getByText('This connector already carries a route.')).toBeVisible()
+  await expect(page.locator('.react-flow__edge')).toHaveCount(2)
+  await expect(page.locator('.conveyor-label')).toHaveCount(0)
 })
 
 test('creates persistent loose connections without editor modes and cancels only the active gesture', async ({ page }) => {
@@ -102,14 +91,17 @@ test('creates persistent loose connections without editor modes and cancels only
   const edges = page.locator('.react-flow__edge'); await expect(edges).toHaveCount(2)
   await expect(page.getByRole('button', { name: 'Route', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Select', exact: true })).toHaveCount(0)
-  const source = page.locator('.graph-node--external-input').getByLabel('output Iron ore'); const box = await source.boundingBox(); expect(box).not.toBeNull()
+  await page.getByRole('button', { name: '→ Intake' }).click()
+  await page.getByRole('button', { name: 'Fit View' }).click()
+  const source = page.locator('.graph-node--external-input').last().getByLabel('output Iron ore'); const box = await source.boundingBox(); expect(box).not.toBeNull()
   const x = box!.x + box!.width / 2; const y = box!.y + box!.height / 2
   await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 100, y + 80, { steps: 5 }); await expect(page.locator('.route-preview')).toBeVisible(); await page.mouse.up()
-  await expect(page.locator('.loose-route')).toHaveCount(1); await expect(page.getByLabel('Free connection endpoint')).toHaveCount(1)
-  const free = await page.getByLabel('Free connection endpoint').boundingBox(); expect(free).not.toBeNull()
+  await expect(page.locator('.loose-route')).toHaveCount(1); await expect(page.getByLabel('Free route endpoint')).toHaveCount(1)
+  const free = await page.getByLabel('Free route endpoint').boundingBox(); expect(free).not.toBeNull()
   await page.mouse.move(free!.x + free!.width / 2, free!.y + free!.height / 2); await page.mouse.down(); await page.mouse.move(free!.x + 90, free!.y + 60, { steps: 5 }); await page.mouse.up()
-  await expect(page.locator('.route-connector')).toHaveCount(6)
-  const sourceAgain = await page.getByLabel('Free connection endpoint').boundingBox(); expect(sourceAgain).not.toBeNull(); const x2 = sourceAgain!.x + sourceAgain!.width / 2; const y2 = sourceAgain!.y + sourceAgain!.height / 2
+  await expect(page.locator('.route-connector')).toHaveCount(4)
+  await page.getByRole('button', { name: '→ Intake' }).click(); await page.getByRole('button', { name: 'Fit View' }).click()
+  const sourceAgain = await page.locator('.graph-node--external-input').last().getByLabel('output Iron ore').boundingBox(); expect(sourceAgain).not.toBeNull(); const x2 = sourceAgain!.x + sourceAgain!.width / 2; const y2 = sourceAgain!.y + sourceAgain!.height / 2
   await page.mouse.move(x2, y2); await page.mouse.down(); await page.mouse.move(x2 + 60, y2 - 70, { steps: 4 }); await expect(page.locator('.route-preview')).toBeVisible(); await page.keyboard.press('Escape'); await page.mouse.up()
   await expect(page.locator('.loose-route')).toHaveCount(1)
   await expect(edges).toHaveCount(2)
@@ -124,17 +116,32 @@ test('places the same boundary components used by the starter factory', async ({
   await page.getByRole('button', { name: 'Undo' }).click(); await expect(nodes).toHaveCount(3)
 })
 
+test('types a junction component and reveals the next free connector', async ({ page }) => {
+  await page.goto('/'); await expect(page.getByText('Contract ready')).toBeVisible()
+  await page.getByRole('button', { name: '→ Intake' }).click()
+  await page.getByRole('button', { name: 'Junction' }).click()
+  await page.getByRole('button', { name: 'Fit View' }).click()
+  await page.locator('.react-flow__minimap').evaluate((element) => element.remove())
+  const source = page.locator('.graph-node--external-input').last().getByLabel('output Iron ore')
+  const junction = page.locator('.graph-node--junction').last(); const target = junction.getByLabel('input Any')
+  const a = await source.boundingBox(); const b = await target.boundingBox(); expect(a).not.toBeNull(); expect(b).not.toBeNull()
+  await page.mouse.move(a!.x + a!.width / 2, a!.y + a!.height / 2); await page.mouse.down(); await page.mouse.move(b!.x + b!.width / 2, b!.y + b!.height / 2, { steps: 5 }); await page.mouse.up()
+  await expect(junction.getByLabel('input Iron ore')).toHaveCount(2)
+  await expect(junction.getByLabel('output Iron ore')).toHaveCount(1)
+  await expect(page.locator('.react-flow__edge')).toHaveCount(3)
+})
+
 test('shows, adds, moves, and removes connection handles', async ({ page }) => {
   await page.goto('/'); await expect(page.getByText('Contract ready')).toBeVisible()
-  const connectors = page.locator('.route-connector'); await expect(connectors).toHaveCount(4)
+  const connectors = page.locator('.route-connector'); await expect(connectors).toHaveCount(2)
   const path = page.locator('.conveyor-path').first(); const before = await path.getAttribute('d')
-  await page.locator('.route-segment-hit[data-edge-id="edge-ore"]').first().dblclick(); await expect(connectors).toHaveCount(5)
-  await page.keyboard.press('Delete'); await expect(connectors).toHaveCount(4)
+  await page.locator('.route-segment-hit[data-edge-id="edge-ore"]').first().dblclick(); await expect(connectors).toHaveCount(3)
+  await page.keyboard.press('Delete'); await expect(connectors).toHaveCount(2)
   const movable = connectors.first(); const box = await movable.boundingBox(); expect(box).not.toBeNull()
   await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2)
   await page.mouse.down(); await page.mouse.move(box!.x + 48, box!.y + 48, { steps: 4 }); await page.mouse.up()
   await expect.poll(() => path.getAttribute('d')).not.toBe(before)
-  await connectors.first().dblclick(); await expect(connectors).toHaveCount(3)
+  await connectors.first().dblclick(); await expect(connectors).toHaveCount(1)
 })
 
 test('adds a bridge from a contextual route action', async ({ page }) => {

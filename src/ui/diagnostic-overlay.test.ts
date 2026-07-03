@@ -12,7 +12,7 @@ describe('diagnostic overlay', () => {
     const secondEdge = { ...originalEdge, id: asId<EdgeId>('edge-ingot-2'), sourceNodeId: asId<NodeId>('node-second-furnace') }
     const blueprint = { ...original, edges: new Map(original.edges).set(secondEdge.id, secondEdge) }
     const diagnostic: CompileDiagnostic = {
-      code: 'CONNECTION_LIMIT', severity: 'error',
+      code: 'PORT_OCCUPIED', severity: 'error',
       entity: { nodeId: asId<NodeId>('node-iron-output'), portId: asId<PortId>('port-ingot-target') },
     }
 

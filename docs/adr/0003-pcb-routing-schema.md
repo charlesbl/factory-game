@@ -1,6 +1,6 @@
 # ADR 0003: PCB-style conveyor routing schema
 
-- Status: accepted
+- Status: superseded by ADR 0004
 - Date: 2026-07-02
 
 ## Context

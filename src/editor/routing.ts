@@ -1,11 +1,12 @@
-import type { GridPoint, NetId, RateRaw, ResourceId, TrackId } from '../domain'
+import type { EdgeId, GridPoint } from '../domain'
 import type { CompileDiagnostic } from '../compiler/diagnostics'
-import type { FactoryBlueprint, RoutingLayerId } from './blueprint'
-import { absolutePortPosition, blueprintNets, blueprintTracks, blueprintTransitions, effectiveTrackPoints } from './blueprint'
+import type { BlueprintEdge, FactoryBlueprint, RoutingLayerId } from './blueprint'
+import { edgeRoute } from './connector-route'
 
 const pointKey = (point: GridPoint): string => `${point.x},${point.y}`
 const samePoint = (a: GridPoint, b: GridPoint): boolean => a.x === b.x && a.y === b.y
 const inside = (point: GridPoint, rect: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }, clearance = 0): boolean => point.x >= rect.x - clearance && point.x <= rect.x + rect.width + clearance && point.y >= rect.y - clearance && point.y <= rect.y + rect.height + clearance
+
 export const orthogonalLength = (points: readonly GridPoint[]): number => {
   if (points.length < 2) throw new RangeError('A conveyor requires at least two points')
   return points.slice(1).reduce((total, point, index) => {
@@ -16,71 +17,77 @@ export const orthogonalLength = (points: readonly GridPoint[]): number => {
 }
 const cellsOnSegment = (a: GridPoint, b: GridPoint): readonly GridPoint[] => {
   if (a.x !== b.x && a.y !== b.y) return []
-  const length = Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
-  const dx = Math.sign(b.x - a.x); const dy = Math.sign(b.y - a.y)
+  const length = Math.abs(a.x - b.x) + Math.abs(a.y - b.y); const dx = Math.sign(b.x - a.x); const dy = Math.sign(b.y - a.y)
   return Array.from({ length: length + 1 }, (_, index) => ({ x: a.x + dx * index, y: a.y + dy * index }))
 }
-export const cellsOnTrack = (points: readonly GridPoint[]): readonly GridPoint[] => points.slice(1).flatMap((point, index) => cellsOnSegment(points[index]!, point).slice(index === 0 ? 0 : 1))
+export const cellsOnRoute = (points: readonly GridPoint[]): readonly GridPoint[] => points.slice(1).flatMap((point, index) => cellsOnSegment(points[index]!, point).slice(index === 0 ? 0 : 1))
 
-export interface DerivedSegment { readonly id: string; readonly trackId: TrackId; readonly layerId: RoutingLayerId; readonly resourceId: ResourceId; readonly capacity: RateRaw; readonly start: GridPoint; readonly end: GridPoint; readonly netIds: readonly NetId[] }
-export interface DerivedJunction { readonly id: string; readonly position: GridPoint; readonly layerId: RoutingLayerId; readonly trackIds: readonly TrackId[]; readonly kind: 'merge' | 'split' | 'contact' }
-export const derivePhysicalGraph = (blueprint: FactoryBlueprint): { readonly segments: readonly DerivedSegment[]; readonly junctions: readonly DerivedJunction[] } => {
-  const segments = [...blueprintTracks(blueprint).values()].sort((a, b) => a.id.localeCompare(b.id)).flatMap((track) => {
-    const cells = cellsOnTrack(effectiveTrackPoints(blueprint, track))
-    return cells.slice(1).map((end, index) => ({ id: `segment:${track.id}:${index}:${track.layerId}`, trackId: track.id, layerId: track.layerId, resourceId: track.resourceId, capacity: track.capacity, start: cells[index]!, end, netIds: [...track.netIds].sort() }))
-  })
-  const contacts = new Map<string, Set<TrackId>>()
-  for (const track of blueprintTracks(blueprint).values()) for (const point of cellsOnTrack(effectiveTrackPoints(blueprint, track))) { const key = `${track.layerId}:${pointKey(point)}`; const set = contacts.get(key) ?? new Set(); set.add(track.id); contacts.set(key, set) }
-  const junctions = [...contacts.entries()].filter(([, ids]) => ids.size > 1).sort(([a], [b]) => a.localeCompare(b)).map(([key, ids]) => {
-    const [layerId, coordinates] = key.split(':') as [RoutingLayerId, string]; const [x, y] = coordinates.split(',').map(Number)
-    const trackIds = [...ids].sort(); const endpointCount = trackIds.filter((id) => { const points = effectiveTrackPoints(blueprint, blueprintTracks(blueprint).get(id)!); return samePoint(points[0]!, { x: x!, y: y! }) || samePoint(points.at(-1)!, { x: x!, y: y! }) }).length
-    return { id: `junction:${layerId}:${x},${y}:${trackIds.join('+')}`, position: { x: x!, y: y! }, layerId, trackIds, kind: endpointCount > 1 ? 'merge' as const : endpointCount === 1 ? 'split' as const : 'contact' as const }
-  })
-  return { segments, junctions }
+const compressCells = (cells: readonly GridPoint[]): readonly GridPoint[] => {
+  const points: GridPoint[] = []
+  for (const cell of cells) {
+    const previous = points.at(-1); const before = points.at(-2)
+    if (previous !== undefined && samePoint(previous, cell)) continue
+    if (before !== undefined && previous !== undefined && (before.x === previous.x) === (previous.x === cell.x)) points[points.length - 1] = cell
+    else points.push(cell)
+  }
+  return points
 }
 
-const diagnostic = (code: CompileDiagnostic['code'], entity: CompileDiagnostic['entity'], details?: Readonly<Record<string, string>>): CompileDiagnostic => ({ code, severity: 'error', entity, ...(details === undefined ? {} : { details }) })
+export interface RouteSection { readonly layerId: RoutingLayerId; readonly points: readonly GridPoint[] }
+const bridgeIndexes = (blueprint: FactoryBlueprint, edge: BlueprintEdge): readonly number[] => {
+  const cells = cellsOnRoute(edgeRoute(blueprint, edge).points)
+  return edge.bridges.map((bridge) => cells.findIndex((cell) => samePoint(cell, bridge.position)))
+}
+export const routeSections = (blueprint: FactoryBlueprint, edge: BlueprintEdge): readonly RouteSection[] => {
+  const cells = cellsOnRoute(edgeRoute(blueprint, edge).points); if (cells.length < 2) return []
+  const indexes = new Set(bridgeIndexes(blueprint, edge).filter((index) => index >= 2 && index <= cells.length - 3))
+  const sections: { layerId: RoutingLayerId; cells: GridPoint[] }[] = []
+  for (let index = 1; index < cells.length; index += 1) {
+    const layerId: RoutingLayerId = indexes.has(index) || indexes.has(index - 1) ? 'bridge' : 'primary'
+    const current = sections.at(-1)
+    if (current?.layerId === layerId) current.cells.push(cells[index]!)
+    else sections.push({ layerId, cells: [cells[index - 1]!, cells[index]!] })
+  }
+  return sections.map((section) => ({ layerId: section.layerId, points: compressCells(section.cells) }))
+}
+export const routeBridgeMarkers = (blueprint: FactoryBlueprint, edge: BlueprintEdge): readonly GridPoint[] => {
+  const cells = cellsOnRoute(edgeRoute(blueprint, edge).points)
+  return bridgeIndexes(blueprint, edge).flatMap((index) => index >= 2 && index <= cells.length - 3 ? [cells[index - 1]!, cells[index + 1]!] : [])
+}
+export const routePhysicalLength = (blueprint: FactoryBlueprint, edge: BlueprintEdge): number => orthogonalLength(edgeRoute(blueprint, edge).points) + edge.bridges.length * 2
+
+const diagnostic = (code: CompileDiagnostic['code'], edgeId: EdgeId, details?: Readonly<Record<string, string>>): CompileDiagnostic => ({ code, severity: 'error', entity: { edgeId }, ...(details === undefined ? {} : { details }) })
 export const validatePhysicalRouting = (blueprint: FactoryBlueprint): readonly CompileDiagnostic[] => {
-  if (blueprint.tracks === undefined && blueprint.nets === undefined) return []
-  const diagnostics: CompileDiagnostic[] = []; const nets = blueprintNets(blueprint); const tracks = blueprintTracks(blueprint); const transitions = blueprintTransitions(blueprint)
-  for (const net of nets.values()) {
-    const attached = [...tracks.values()].filter((track) => track.netIds.includes(net.id))
-    if (attached.length === 0) diagnostics.push(diagnostic('UNROUTED_INTENT', { netId: net.id, resourceId: net.resourceId }))
-    else {
-      const endpoints = attached.flatMap((track) => { const points = effectiveTrackPoints(blueprint, track); return [points[0], points.at(-1)].filter((point): point is GridPoint => point !== undefined) })
-      const expected = [absolutePortPosition(blueprint, net.source), ...net.targets.map((target) => absolutePortPosition(blueprint, target))].filter((point): point is GridPoint => point !== undefined)
-      if (expected.some((point) => !endpoints.some((endpoint) => samePoint(point, endpoint)))) diagnostics.push(diagnostic('ENDPOINT_DETACHED', { netId: net.id, resourceId: net.resourceId }))
+  const diagnostics: CompileDiagnostic[] = []
+  const routes = [...blueprint.edges.values()].sort((a, b) => a.id.localeCompare(b.id))
+  for (const edge of routes) {
+    const points = edgeRoute(blueprint, edge).points
+    try { if (orthogonalLength(points) === 0) diagnostics.push(diagnostic('ZERO_LENGTH', edge.id)) } catch { diagnostics.push(diagnostic('NON_ORTHOGONAL_ROUTE', edge.id)) }
+    const cells = cellsOnRoute(points)
+    for (const bridge of edge.bridges) {
+      const index = cells.findIndex((cell) => samePoint(cell, bridge.position))
+      if (index < 2 || index > cells.length - 3) diagnostics.push(diagnostic('INVALID_BRIDGE', edge.id, { bridgeId: bridge.id }))
     }
-  }
-  for (const track of tracks.values()) {
-    if (track.netIds.length === 0 || track.netIds.some((id) => !nets.has(id))) diagnostics.push(diagnostic('ORPHANED_TRACK', { trackId: track.id }))
-    if (track.capacity <= 0n) diagnostics.push(diagnostic('NON_POSITIVE_CAPACITY', { trackId: track.id }))
-    const sharedDemand = track.netIds.reduce((total, id) => total + (nets.get(id)?.requestedCapacity ?? 0n), 0n)
-    if (sharedDemand > track.capacity) diagnostics.push({ code: 'SHARED_CAPACITY', severity: 'warning', entity: { trackId: track.id, resourceId: track.resourceId }, details: { demand: sharedDemand.toString(), capacity: track.capacity.toString() } })
-    try { if (orthogonalLength(effectiveTrackPoints(blueprint, track)) === 0) diagnostics.push(diagnostic('ZERO_LENGTH', { trackId: track.id })) } catch { diagnostics.push(diagnostic('NON_ORTHOGONAL_TRACK', { trackId: track.id })) }
-    const points = effectiveTrackPoints(blueprint, track)
-    if (points.some((point, index) => index > 0 && samePoint(point, points[index - 1]!))) diagnostics.push(diagnostic('DUPLICATE_SEGMENT', { trackId: track.id }))
-    const ownerNodes = new Set(track.netIds.flatMap((id) => { const net = nets.get(id); return net === undefined ? [] : [net.source.nodeId, ...net.targets.map((target) => target.nodeId)] }))
-    let clearanceReported = false
-    for (const point of cellsOnTrack(points).slice(1, -1)) for (const node of blueprint.nodes.values()) {
+    const ownerNodes = new Set([edge.sourceNodeId, edge.targetNodeId]); let clearanceReported = false
+    for (const point of cells.slice(1, -1)) for (const node of blueprint.nodes.values()) {
+      if (ownerNodes.has(node.id)) continue
       const rect = { x: node.position.x + node.footprint.x, y: node.position.y + node.footprint.y, width: node.footprint.width, height: node.footprint.height }
-      if (inside(point, rect)) { diagnostics.push(diagnostic('MACHINE_KEEPOUT', { trackId: track.id, nodeId: node.id }, { x: String(point.x), y: String(point.y) })); break }
-      if (!clearanceReported && !ownerNodes.has(node.id) && inside(point, rect, 1)) { diagnostics.push(diagnostic('INSUFFICIENT_CLEARANCE', { trackId: track.id, nodeId: node.id }, { x: String(point.x), y: String(point.y) })); clearanceReported = true }
+      if (inside(point, rect)) { diagnostics.push(diagnostic('MACHINE_KEEPOUT', edge.id, { nodeId: node.id, x: String(point.x), y: String(point.y) })); break }
+      if (!clearanceReported && inside(point, rect, 1)) { diagnostics.push(diagnostic('INSUFFICIENT_CLEARANCE', edge.id, { nodeId: node.id })); clearanceReported = true }
     }
   }
-  const trackList = [...tracks.values()].sort((a, b) => a.id.localeCompare(b.id))
-  for (let left = 0; left < trackList.length; left += 1) for (let right = left + 1; right < trackList.length; right += 1) {
-    const a = trackList[left]!; const b = trackList[right]!; if (a.layerId !== b.layerId) continue
-    const bCells = new Set(cellsOnTrack(effectiveTrackPoints(blueprint, b)).map(pointKey)); const contact = cellsOnTrack(effectiveTrackPoints(blueprint, a)).find((point) => bCells.has(pointKey(point)))
-    if (contact !== undefined && a.resourceId !== b.resourceId) diagnostics.push(diagnostic('ILLEGAL_CROSSING', { trackId: a.id }, { otherTrackId: b.id, x: String(contact.x), y: String(contact.y) }))
-  }
-  for (const transition of transitions.values()) {
-    if (transition.entryLayerId === transition.exitLayerId || transition.capacity <= 0n) diagnostics.push(diagnostic('INVALID_TRANSITION', { transitionId: transition.id }))
-    const transitionTracks = [...tracks.values()].filter((track) => track.netIds.some((id) => transition.netIds.includes(id)) && (track.layerId === transition.entryLayerId || track.layerId === transition.exitLayerId))
-    const touchesLayers = new Set(transitionTracks.filter((track) => { const points = effectiveTrackPoints(blueprint, track); return points[0] !== undefined && (samePoint(points[0], transition.position) || (points.at(-1) !== undefined && samePoint(points.at(-1)!, transition.position))) }).map((track) => track.layerId))
-    if (!touchesLayers.has(transition.entryLayerId) || !touchesLayers.has(transition.exitLayerId) || transition.netIds.some((id) => nets.get(id)?.resourceId !== transition.resourceId)) diagnostics.push(diagnostic('INVALID_TRANSITION', { transitionId: transition.id }))
-    const netDemand = transition.netIds.reduce((total, id) => total + (nets.get(id)?.requestedCapacity ?? 0n), 0n)
-    if (netDemand > transition.capacity) diagnostics.push({ code: 'TRANSITION_CAPACITY', severity: 'warning', entity: { transitionId: transition.id }, details: { demand: netDemand.toString(), capacity: transition.capacity.toString() } })
+  for (let left = 0; left < routes.length; left += 1) for (let right = left + 1; right < routes.length; right += 1) {
+    const a = routes[left]!; const b = routes[right]!; let contact: GridPoint | undefined
+    for (const aSection of routeSections(blueprint, a)) {
+      const aCells = cellsOnRoute(aSection.points)
+      for (const bSection of routeSections(blueprint, b)) {
+        if (aSection.layerId !== bSection.layerId) continue
+        const bCells = new Set(cellsOnRoute(bSection.points).map(pointKey)); contact = aCells.find((point) => bCells.has(pointKey(point)))
+        if (contact !== undefined) break
+      }
+      if (contact !== undefined) break
+    }
+    if (contact !== undefined) diagnostics.push(diagnostic('ILLEGAL_CROSSING', a.id, { otherEdgeId: b.id, x: String(contact.x), y: String(contact.y) }))
   }
   return diagnostics
 }

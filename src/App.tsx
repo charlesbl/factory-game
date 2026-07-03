@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { asId, createIdFactory, formatRate, gridPoint, parseRate, recipes, resourceById, resources } from './domain'
+import { asId, createIdFactory, formatRate, gridPoint, recipes, resourceById, resources } from './domain'
 import type { RecipeId, ResourceId } from './domain'
 import type { CompileDiagnostic, FactoryContract } from './compiler'
 import { diagnosticText } from './compiler'
-import type { BlueprintNode, FactoryBlueprint } from './editor'
-import { addExternalPort, addNode, blueprintNets, blueprintTracks, blueprintTransitions, BlueprintHistory, changeRouteCapacity, derivePhysicalGraph, disconnectEdge, duplicateNodes, edgeRoute, legacyNetForEdge, orthogonalLength, removeNode, transaction, type EditCommand } from './editor'
+import type { FactoryBlueprint } from './editor'
+import { addExternalPort, addNode, BlueprintHistory, createJunctionNode, disconnectEdge, duplicateNodes, removeNode, routeCapacity, routePhysicalLength, routeResource, routeSections, transaction, type EditCommand } from './editor'
 import { deserializeBlueprint } from './editor'
 import { EventScheduler, FactoryRuntimeInstance } from './simulation'
 import { createBoundaryNode, createDemoBlueprint, createMachineNode } from './ui/demo-blueprint'
@@ -52,7 +52,7 @@ const App = () => {
   useEffect(() => {
     let active = true
     void import('./persistence').then(async ({ database }) => database.blueprints.get('factory-main')).then((record) => {
-        if (!active || record === undefined) return
+        if (!active || record === undefined || record.schemaVersion !== 4) return
         try { const restored = history.replace(deserializeBlueprint(JSON.parse(record.payload))); setCompileState('compiling'); setBlueprint(restored); setCompilationBlueprint(restored) }
         catch (error) { console.error('Saved blueprint could not be loaded; the recovery record was preserved.', error) }
       })
@@ -91,12 +91,7 @@ const App = () => {
     execute(transaction(isInput ? 'Add resource intake' : 'Add resource dispatch', [addNode(node), addExternalPort({ nodeId: id, portId, side: isInput ? 'left' : 'right', offset: 1 })]))
   }
   const addJunction = () => {
-    const id = idFactory.next('NodeId'); const inputId = idFactory.next('PortId'); const outputId = idFactory.next('PortId')
-    const node: BlueprintNode = { id, kind: 'junction', name: 'Junction', position: gridPoint(10, 10), footprint: { x: 0, y: 0, width: 3, height: 2 }, ports: [
-      { id: inputId, direction: 'input', capacity: parseRate('12'), anchor: gridPoint(0, 1), maxConnections: 4 },
-      { id: outputId, direction: 'output', capacity: parseRate('12'), anchor: gridPoint(3, 1), maxConnections: 4 },
-    ] }
-    execute(addNode(node))
+    const id = idFactory.next('NodeId'); execute(addNode(createJunctionNode(id, gridPoint(10, 10))))
   }
   const supplyInputs = () => {
     if (instance === undefined) return
@@ -127,13 +122,10 @@ const App = () => {
   }
   const selectedNode = selection.nodeIds.length === 1 ? blueprint.nodes.get(selection.nodeIds[0]!) : undefined
   const selectedEdge = selection.edgeIds.length === 1 && selection.nodeIds.length === 0 ? blueprint.edges.get(selection.edgeIds[0]!) : undefined
-  const selectedNet = selectedEdge === undefined ? undefined : blueprintNets(blueprint).get(legacyNetForEdge(selectedEdge).id) ?? [...blueprintNets(blueprint).values()].find((net) => net.source.portId === selectedEdge.sourcePortId && net.targets.some((target) => target.portId === selectedEdge.targetPortId))
-  const selectedTracks = selectedNet === undefined ? [] : [...blueprintTracks(blueprint).values()].filter((track) => track.netIds.includes(selectedNet.id))
-  const selectedTransitions = selectedNet === undefined ? [] : [...blueprintTransitions(blueprint).values()].filter((transition) => transition.netIds.includes(selectedNet.id))
-  const selectedEdgeLength = selectedEdge === undefined ? undefined : orthogonalLength(edgeRoute(blueprint, selectedEdge).points) + selectedTransitions.reduce((total, transition) => total + transition.length, 0)
+  const selectedSections = selectedEdge === undefined ? [] : routeSections(blueprint, selectedEdge)
+  const selectedEdgeLength = selectedEdge === undefined ? undefined : routePhysicalLength(blueprint, selectedEdge)
   const selectedEdgeLengthText = selectedEdgeLength?.toLocaleString(undefined, { maximumFractionDigits: 2 })
   const selectionCount = selection.nodeIds.length + selection.edgeIds.length
-  const physicalGraph = useMemo(() => derivePhysicalGraph(blueprint), [blueprint])
   const issueCount = diagnostics.length
   const snapshot = instance?.getSnapshot()
   const rates = useMemo(() => ({ inputs: [...(contract?.inputRates ?? [])], outputs: [...(contract?.outputRates ?? [])] }), [contract])
@@ -178,7 +170,7 @@ const App = () => {
       <aside className="inspector panel">
         <div className="panel-heading"><div><span className="eyebrow">Inspect</span><h2>{selectedNode?.name ?? (selectedEdge === undefined ? 'Factory contract' : 'Selected route')}</h2></div><span>⌘</span></div>
         {selectedNode !== undefined && <section className="inspector-card"><h3>Selected node</h3><dl><div><dt>Type</dt><dd>{selectedNode.kind}</dd></div><div><dt>Grid position</dt><dd>{selectedNode.position.x}, {selectedNode.position.y}</dd></div><div><dt>Ports</dt><dd>{selectedNode.ports.length}</dd></div></dl><button className="danger-button" onClick={deleteSelection}>Delete node</button></section>}
-        {selectedEdge !== undefined && <section className="inspector-card"><h3>Selected route</h3><dl><div><dt>Resource</dt><dd>{resourceById.get(selectedEdge.resourceId)?.name}</dd></div><div><dt>Current / capacity</dt><dd>{formatRate(contract?.edgeFlows.get(selectedEdge.id) ?? 0n)} / {formatRate(selectedEdge.capacity)}/s</dd></div><div><dt>Physical length</dt><dd>{selectedEdgeLengthText} m</dd></div><div><dt>Connectors</dt><dd>{selectedEdge.routeConnectors?.length ?? Math.max(0, selectedEdge.points.length - 2)}</dd></div><div><dt>Layers</dt><dd>{[...new Set(selectedTracks.map((track) => track.layerId))].join(' + ') || 'primary'}</dd></div><div><dt>Transitions</dt><dd>{selectedTransitions.length}</dd></div><div><dt>Shared segments</dt><dd>{selectedTracks.filter((track) => track.netIds.length > 1).length}</dd></div><div><dt>Junctions</dt><dd>{physicalGraph.junctions.filter((junction) => junction.trackIds.some((id) => selectedTracks.some((track) => track.id === id))).length}</dd></div><div><dt>Priority</dt><dd>length → grid → ID</dd></div></dl><div className="runtime-actions route-actions"><button onClick={() => execute(changeRouteCapacity(selectedEdge.id, selectedEdge.capacity * 2n))}>Upgrade ×2</button></div><button className="danger-button" onClick={deleteSelection}>Delete route</button></section>}
+        {selectedEdge !== undefined && <section className="inspector-card"><h3>Selected route</h3><dl><div><dt>Resource</dt><dd>{resourceById.get(routeResource(blueprint, selectedEdge)!)?.name ?? 'Any'}</dd></div><div><dt>Current / capacity</dt><dd>{formatRate(contract?.edgeFlows.get(selectedEdge.id) ?? 0n)} / {formatRate(routeCapacity(blueprint, selectedEdge))}/s</dd></div><div><dt>Physical length</dt><dd>{selectedEdgeLengthText} m</dd></div><div><dt>Handles</dt><dd>{selectedEdge.routeHandles.length}</dd></div><div><dt>Layers</dt><dd>{[...new Set(selectedSections.map((section) => section.layerId))].join(' + ') || 'primary'}</dd></div><div><dt>Bridges</dt><dd>{selectedEdge.bridges.length}</dd></div><div><dt>Priority</dt><dd>length → grid → ID</dd></div></dl><button className="danger-button" onClick={deleteSelection}>Delete route</button></section>}
         <section className="inspector-card contract-card"><h3>Net programme <span className="badge">Coupled</span></h3><div className="rates"><div><span>Inputs</span>{rates.inputs.map(([id, rate]) => <p key={id}><i style={{ background: resourceById.get(id)?.colour }} />{resourceById.get(id)?.name}<b>{formatRate(rate)}/s</b></p>)}</div><div><span>Outputs</span>{rates.outputs.map(([id, rate]) => <p key={id}><i style={{ background: resourceById.get(id)?.colour }} />{resourceById.get(id)?.name}<b>{formatRate(rate)}/s</b></p>)}</div></div>{contract !== undefined && <small>Footprint {contract.footprint.width} × {contract.footprint.height} m · {contract.blueprintHash.slice(0, 10)}</small>}</section>
         <section className="inspector-card runtime-card"><h3>World runtime {instance !== undefined && <span className={`badge ${stateTone[instance.state]}`}>{instance.state.replace('_', ' ')}</span>}</h3>
           <div className="runtime-actions"><button onClick={supplyInputs}>Supply +12</button><button onClick={() => advance(5)}>Run 5 s</button><button onClick={collectOutputs}>Collect</button></div>

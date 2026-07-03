@@ -1,5 +1,5 @@
 import type { GridPoint } from '../domain'
-import type { BlueprintEdge, FactoryBlueprint, LooseConnection, PortReference, RouteConnector } from './blueprint'
+import type { BlueprintEdge, FactoryBlueprint, LooseConnection, PortReference, RouteHandle } from './blueprint'
 import { absolutePortPosition, findPort } from './blueprint'
 
 export type RouteAxis = 'horizontal' | 'vertical'
@@ -26,13 +26,13 @@ const overlapLength = (a: GridPoint, b: GridPoint, c: GridPoint, d: GridPoint): 
 const overlapWithRoute = (span: readonly GridPoint[], route: readonly GridPoint[]): number => span.slice(1).reduce((total, end, index) => total + route.slice(1).reduce((segmentTotal, routeEnd, routeIndex) => segmentTotal + overlapLength(span[index]!, end, route[routeIndex]!, routeEnd), 0), 0)
 const lSpan = (start: GridPoint, end: GridPoint, firstAxis: RouteAxis): readonly GridPoint[] => [start, firstAxis === 'horizontal' ? { x: end.x, y: start.y } : { x: start.x, y: end.y }, end]
 
-export const materializeConnectorRoute = (
+export const materializeHandleRoute = (
   start: GridPoint,
-  connectors: readonly RouteConnector[],
+  handles: readonly RouteHandle[],
   startAxis: RouteAxis,
   end?: { readonly position: GridPoint; readonly axis: RouteAxis },
 ): MaterializedRoute => {
-  const destinations = connectors.map((connector) => connector.position).concat(end === undefined ? [] : [end.position])
+  const destinations = handles.map((handle) => handle.position).concat(end === undefined ? [] : [end.position])
   const points: GridPoint[] = [start]; const spans: GridPoint[][] = []; let axis = startAxis; let current = start
   destinations.forEach((destination, index) => {
     const final = end !== undefined && index === destinations.length - 1
@@ -52,14 +52,14 @@ export const materializeConnectorRoute = (
 export const edgeRoute = (blueprint: FactoryBlueprint, edge: BlueprintEdge): MaterializedRoute => {
   const source = { nodeId: edge.sourceNodeId, portId: edge.sourcePortId }; const target = { nodeId: edge.targetNodeId, portId: edge.targetPortId }
   const start = absolutePortPosition(blueprint, source); const end = absolutePortPosition(blueprint, target)
-  if (start === undefined || end === undefined) return { points: edge.points, spans: [edge.points] }
-  const routeConnectors = edge.routeConnectors ?? edge.points.slice(1, -1).map((position, index) => ({ id: `${edge.id}:connector:${index}` as RouteConnector['id'], position }))
-  return materializeConnectorRoute(start, routeConnectors, portRouteAxis(blueprint, source), { position: end, axis: portRouteAxis(blueprint, target) })
+  if (start === undefined || end === undefined) return { points: [], spans: [] }
+  return materializeHandleRoute(start, edge.routeHandles, portRouteAxis(blueprint, source), { position: end, axis: portRouteAxis(blueprint, target) })
 }
+export const routePoints = (blueprint: FactoryBlueprint, edge: BlueprintEdge): readonly GridPoint[] => edgeRoute(blueprint, edge).points
 
 export const looseConnectionRoute = (blueprint: FactoryBlueprint, loose: LooseConnection): MaterializedRoute => {
   const start = absolutePortPosition(blueprint, loose.origin)
-  return start === undefined ? { points: [], spans: [] } : materializeConnectorRoute(start, loose.routeConnectors, portRouteAxis(blueprint, loose.origin))
+  return start === undefined ? { points: [], spans: [] } : materializeHandleRoute(start, loose.routeHandles, portRouteAxis(blueprint, loose.origin))
 }
 
 const distanceToSegment = (point: GridPoint, a: GridPoint, b: GridPoint): number => {

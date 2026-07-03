@@ -12,7 +12,7 @@ export const saveGame = async (blueprints: readonly FactoryBlueprint[], contract
   const metadata: MetadataRecord = { key: 'main', schemaVersion: 1, savedAt: new Date().toISOString(), logicalTime: logicalTime.toString() }
   await database.transaction('rw', database.metadata, database.blueprints, database.contracts, database.instances, async () => {
     await database.metadata.put(metadata)
-    await database.blueprints.bulkPut(blueprints.map((blueprint) => ({ id: blueprint.id, schemaVersion: 3, revision: blueprint.revision, payload: canonicalBlueprint(blueprint) })))
+    await database.blueprints.bulkPut(blueprints.map((blueprint) => ({ id: blueprint.id, schemaVersion: 4, revision: blueprint.revision, payload: canonicalBlueprint(blueprint) })))
     await database.contracts.bulkPut(contracts.map((contract) => ({ hash: contract.blueprintHash, schemaVersion: 1, payload: stringifyExact(serializeContract(contract)) })))
     await database.instances.bulkPut(instances.map((instance) => ({ id: instance.id, schemaVersion: 1, contractHash: instance.contract.blueprintHash, payload: stringifyExact(instance.getSnapshot()) })))
   })
@@ -25,7 +25,7 @@ export const loadRecords = async (): Promise<SaveBundle> => ({
 })
 export const importGame = async (raw: string): Promise<void> => {
   const bundle = JSON.parse(raw) as Partial<SaveBundle>
-  if (bundle.format !== 'factory-game' || bundle.schemaVersion !== 1 || !Array.isArray(bundle.blueprints) || !Array.isArray(bundle.metadata)) throw new Error('Unsupported or corrupt save')
+  if (bundle.format !== 'factory-game' || bundle.schemaVersion !== 1 || !Array.isArray(bundle.blueprints) || !bundle.blueprints.every((record) => record.schemaVersion === 4) || !Array.isArray(bundle.metadata)) throw new Error('Unsupported or corrupt save')
   const backup = await exportGame()
   try {
     await database.transaction('rw', database.metadata, database.blueprints, database.contracts, database.instances, async () => {
@@ -33,11 +33,4 @@ export const importGame = async (raw: string): Promise<void> => {
       await database.metadata.bulkPut(bundle.metadata!); await database.blueprints.bulkPut(bundle.blueprints!); await database.contracts.bulkPut(bundle.contracts ?? []); await database.instances.bulkPut(bundle.instances ?? [])
     })
   } catch (error) { localStorage.setItem('factory-game-recovery', backup); throw error }
-}
-
-export interface LegacyMigrationResult { readonly found: boolean; readonly warning?: string; readonly raw?: unknown }
-export const inspectLegacySave = (): LegacyMigrationResult => {
-  const raw = localStorage.getItem('game'); if (raw === null || raw === '') return { found: false }
-  try { return { found: true, raw: JSON.parse(raw), warning: 'Legacy machines are imported as disconnected blueprint nodes. Fractional legacy stock requires manual review.' } }
-  catch { return { found: true, warning: 'The legacy save is corrupt. It was preserved for recovery.' } }
 }

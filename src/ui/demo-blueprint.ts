@@ -3,7 +3,7 @@ import type { EdgeId, FactoryId, NodeId, PortId, RecipeId, ResourceId } from '..
 import type { BlueprintEdge, BlueprintNode, BlueprintPort, FactoryBlueprint } from '../editor'
 
 const port = (id: string, direction: 'input' | 'output', resourceId: string, capacity: string, x: number, y: number): BlueprintPort => ({
-  id: asId<PortId>(id), direction, resourceId: asId<ResourceId>(resourceId), capacity: parseRate(capacity), anchor: gridPoint(x, y), maxConnections: direction === 'output' ? 8 : 1,
+  id: asId<PortId>(id), direction, resourceId: asId<ResourceId>(resourceId), capacity: parseRate(capacity), anchor: gridPoint(x, y),
 })
 const rect = (width: number, height: number) => ({ x: 0, y: 0, width, height })
 
@@ -20,11 +20,9 @@ export const createDemoBlueprint = (): FactoryBlueprint => {
   const input = createBoundaryNode(asId<NodeId>('node-iron-input'), asId<PortId>('port-iron-source'), 'external-input', asId<ResourceId>('ironOre'), 0, 4)
   const furnace = createMachineNode(asId<NodeId>('node-furnace'), asId<RecipeId>('ironIngot'), 7, 3)
   const output = createBoundaryNode(asId<NodeId>('node-iron-output'), asId<PortId>('port-ingot-target'), 'external-output', asId<ResourceId>('ironIngot'), 16, 4, '4')
-  const oreCapacity = input.ports[0]!.capacity < furnace.ports[0]!.capacity ? input.ports[0]!.capacity : furnace.ports[0]!.capacity
-  const ingotCapacity = furnace.ports[1]!.capacity < output.ports[0]!.capacity ? furnace.ports[1]!.capacity : output.ports[0]!.capacity
-  const oreEdge: BlueprintEdge = { id: asId<EdgeId>('edge-ore'), sourceNodeId: input.id, sourcePortId: input.ports[0]!.id, targetNodeId: furnace.id, targetPortId: furnace.ports[0]!.id, resourceId: asId<ResourceId>('ironOre'), capacity: oreCapacity, points: [gridPoint(2, 5), gridPoint(5, 5), gridPoint(5, 4), gridPoint(7, 4)] }
-  const ingotEdge: BlueprintEdge = { id: asId<EdgeId>('edge-ingot'), sourceNodeId: furnace.id, sourcePortId: furnace.ports[1]!.id, targetNodeId: output.id, targetPortId: output.ports[0]!.id, resourceId: asId<ResourceId>('ironIngot'), capacity: ingotCapacity, points: [gridPoint(11, 4), gridPoint(13, 4), gridPoint(13, 5), gridPoint(16, 5)] }
-  return { id: asId<FactoryId>('factory-main'), revision: 0, name: 'Starter iron line', nodes: new Map<NodeId, BlueprintNode>([[input.id, input], [furnace.id, furnace], [output.id, output]]), edges: new Map([[oreEdge.id, oreEdge], [ingotEdge.id, ingotEdge]]), externalPorts: [{ nodeId: input.id, portId: input.ports[0]!.id, side: 'left', offset: 1 }, { nodeId: output.id, portId: output.ports[0]!.id, side: 'right', offset: 1 }] }
+  const oreEdge: BlueprintEdge = { id: asId<EdgeId>('edge-ore'), sourceNodeId: input.id, sourcePortId: input.ports[0]!.id, targetNodeId: furnace.id, targetPortId: furnace.ports[0]!.id, routeHandles: [{ id: asId('edge-ore-handle-1'), position: gridPoint(6, 5) }], bridges: [] }
+  const ingotEdge: BlueprintEdge = { id: asId<EdgeId>('edge-ingot'), sourceNodeId: furnace.id, sourcePortId: furnace.ports[1]!.id, targetNodeId: output.id, targetPortId: output.ports[0]!.id, routeHandles: [{ id: asId('edge-ingot-handle-1'), position: gridPoint(13, 4) }], bridges: [] }
+  return { id: asId<FactoryId>('factory-main'), revision: 0, name: 'Starter iron line', nodes: new Map<NodeId, BlueprintNode>([[input.id, input], [furnace.id, furnace], [output.id, output]]), edges: new Map([[oreEdge.id, oreEdge], [ingotEdge.id, ingotEdge]]), looseConnections: new Map(), externalPorts: [{ nodeId: input.id, portId: input.ports[0]!.id, side: 'left', offset: 1 }, { nodeId: output.id, portId: output.ports[0]!.id, side: 'right', offset: 1 }] }
 }
 
 export const createMachineNode = (id: NodeId, recipeId: RecipeId, x: number, y: number): BlueprintNode => {

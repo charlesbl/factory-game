@@ -9,7 +9,6 @@ export interface PortDefinition {
   readonly resourceId: ResourceId
   readonly capacity: RateRaw
   readonly anchor: GridPoint
-  readonly maxConnections: number
 }
 export interface ResourceDefinition { readonly id: ResourceId; readonly name: string; readonly colour: string }
 export interface RecipeQuantity { readonly resourceId: ResourceId; readonly rate: RateRaw }
