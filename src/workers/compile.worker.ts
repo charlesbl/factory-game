@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 import { compileBlueprint, deserializeContract, ExactDagFlowSolver, isContract, serializeContract } from '../compiler'
-import { canonicalBlueprint, deserializeBlueprint } from '../editor'
+import { canonicalCompilationInput, deserializeBlueprint } from '../editor'
 import type { CompileRequest, CompileResponse } from './protocol'
 
 const hash = async (value: string): Promise<string> => {
@@ -12,7 +12,7 @@ self.addEventListener('message', (event: MessageEvent<CompileRequest>) => {
   void (async () => {
     const request = event.data
     try {
-      const blueprint = deserializeBlueprint(request.blueprint); const blueprintHash = await hash(canonicalBlueprint(blueprint)); const cached = contracts.get(blueprintHash)
+      const blueprint = deserializeBlueprint(request.blueprint); const blueprintHash = await hash(canonicalCompilationInput(blueprint)); const cached = contracts.get(blueprintHash)
       if (cached !== undefined) { self.postMessage({ protocolVersion: 1, requestId: request.requestId, revision: request.revision, ok: true, contract: cached } satisfies CompileResponse); return }
       const childContracts = new Map(request.childContracts.map((contract) => [contract.blueprintHash, deserializeContract(contract)]))
       const compiled = compileBlueprint(blueprint, new ExactDagFlowSolver(childContracts))

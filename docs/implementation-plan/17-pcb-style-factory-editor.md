@@ -5,6 +5,19 @@
 > This document refines the graph-editor work in stage 5. It does not change the
 > accepted conservation, compilation, or runtime rules by itself. Schema and
 > gameplay changes require an ADR before implementation.
+>
+> **Implemented interaction update (2026-07-02):** ADR 0003 now defines a
+> non-modal, connector-driven editor. References below to ordinary autorouting,
+> Select/Route/Bridge/Measure modes, track locking, and click-to-pin drawing are
+> historical design material and are superseded by the following rules:
+> - drag from any machine port to place a saved loose endpoint or finish on a
+>   compatible opposite-direction port;
+> - drag the loose endpoint to extend; drag intermediate connectors to edit;
+> - double-click a route to add a connector and use Delete to remove it;
+> - derive at most one passive orthogonal bend between adjacent connectors;
+> - keep collisions editable and report them through DRC;
+> - insert bridges from a contextual route action; measuring is always available
+>   through selection and the inspector.
 
 ## 1. Vision
 
@@ -30,7 +43,7 @@ The analogy is:
 | Keepout | Machine footprint and required clearance |
 | Design-rule check (DRC) | Routing and factory diagnostics |
 | Ratsnest | Unrouted transport intent |
-| Autorouter | Deterministic conveyor router |
+| Route handle | Player-owned intermediate connector |
 
 This metaphor must remain understandable to players who have never designed a
 PCB. PCB terminology describes the interaction model, not required knowledge.
@@ -43,13 +56,12 @@ The editor should:
 
 1. make factory layout feel like engineering a physical transport circuit;
 2. make the visible conveyor geometry authoritative for compilation;
-3. support fast manual routing and useful automatic routing;
+3. support fast connector-driven routing without persistent editor modes;
 4. create merges and splits naturally when compatible tracks meet;
 5. preserve resource conservation and shared capacity on common trunks;
 6. explain incomplete, invalid, saturated, and inactive routes directly on the
    canvas;
-7. remain responsive while routing and compilation run outside the interaction
-   path;
+7. keep pointer previews local and compile only committed completed routes;
 8. produce deterministic results from identical blueprints;
 9. keep undo, redo, save, load, and duplication predictable;
 10. leave room for advanced tools without requiring micro-configuration on every

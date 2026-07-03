@@ -1,4 +1,4 @@
-import type { EdgeId, NodeId, PortId, ResourceId } from '../domain'
+import type { EdgeId, NetId, NodeId, PortId, ResourceId, TrackId, TransitionId } from '../domain'
 
 export type DiagnosticSeverity = 'error' | 'warning' | 'info'
 export type DiagnosticCode =
@@ -6,7 +6,10 @@ export type DiagnosticCode =
   | 'CONNECTION_LIMIT' | 'ZERO_LENGTH' | 'CYCLE' | 'UNREACHABLE_INPUT' | 'UNROUTED_OUTPUT'
   | 'INDEPENDENT_COMPONENT' | 'MISSING_CHILD_CONTRACT' | 'LIMITED_INPUT' | 'LIMITED_OUTPUT'
   | 'LONGER_PATH' | 'INTERNAL_VERIFICATION'
-export interface DiagnosticEntity { readonly nodeId?: NodeId; readonly edgeId?: EdgeId; readonly portId?: PortId; readonly resourceId?: ResourceId }
+  | 'UNROUTED_INTENT' | 'MACHINE_KEEPOUT' | 'ILLEGAL_CROSSING' | 'INVALID_TRANSITION'
+  | 'TRANSITION_CAPACITY' | 'INSUFFICIENT_CLEARANCE' | 'ORPHANED_TRACK' | 'ENDPOINT_DETACHED'
+  | 'DUPLICATE_SEGMENT' | 'NON_ORTHOGONAL_TRACK' | 'SHARED_CAPACITY'
+export interface DiagnosticEntity { readonly nodeId?: NodeId; readonly edgeId?: EdgeId; readonly netId?: NetId; readonly trackId?: TrackId; readonly transitionId?: TransitionId; readonly portId?: PortId; readonly resourceId?: ResourceId }
 export interface CompileDiagnostic {
   readonly code: DiagnosticCode
   readonly severity: DiagnosticSeverity
@@ -27,6 +30,12 @@ export const diagnosticText = (diagnostic: CompileDiagnostic): string => {
     MISSING_CHILD_CONTRACT: 'The sub-factory contract is unavailable.', LIMITED_INPUT: `Machine activity is limited by ${value ?? 'an input'}.`,
     LIMITED_OUTPUT: `Production is limited by ${value ?? 'an output path'}.`, LONGER_PATH: 'This branch is inactive because a shorter path has priority.',
     INTERNAL_VERIFICATION: 'Exact conservation verification failed.',
+    UNROUTED_INTENT: 'This transport intent has not been routed and carries no flow.', MACHINE_KEEPOUT: 'A conveyor passes through a machine keepout.',
+    ILLEGAL_CROSSING: 'Incompatible conveyors cross on the same routing layer.', INVALID_TRANSITION: 'The bridge transition has invalid layer or capacity settings.',
+    TRANSITION_CAPACITY: 'The bridge is saturated by the routes that use it.', INSUFFICIENT_CLEARANCE: 'A conveyor is too close to a machine or incompatible route.',
+    ORPHANED_TRACK: 'This conveyor is not owned by a valid transport intent.', ENDPOINT_DETACHED: 'A conveyor endpoint is detached from its expected port.',
+    DUPLICATE_SEGMENT: 'This conveyor contains a duplicate zero-length segment.', NON_ORTHOGONAL_TRACK: 'Conveyors must use orthogonal grid segments.',
+    SHARED_CAPACITY: 'The logical routes on this shared trunk request more than its capacity.',
   }
   return messages[diagnostic.code]
 }

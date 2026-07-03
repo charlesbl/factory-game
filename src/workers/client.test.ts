@@ -9,8 +9,8 @@ describe('CompilationClient scheduling', () => {
   it('finishes the active preview, skips superseded work, and compiles the latest blueprint', async () => {
     const client = new CompilationClient()
     const initial = createDemoBlueprint()
-    const firstMove = moveNode(asId<NodeId>('node-furnace'), gridPoint(8, 3)).apply(initial).blueprint
-    const latestMove = moveNode(asId<NodeId>('node-furnace'), gridPoint(9, 3)).apply(firstMove).blueprint
+    const firstMove = moveNode(asId<NodeId>('node-furnace'), gridPoint(7, 7)).apply(initial).blueprint
+    const latestMove = moveNode(asId<NodeId>('node-furnace'), gridPoint(7, 8)).apply(firstMove).blueprint
 
     const active = client.compile(initial)
     const superseded = client.compile(firstMove)

@@ -1,7 +1,7 @@
 import { polylineLength } from '../domain'
 import type { NodeId, PortId } from '../domain'
 import type { FactoryBlueprint } from '../editor'
-import { effectiveEdgePoints, effectivePortResource, findPort, junctionResources } from '../editor'
+import { effectiveEdgePoints, effectivePortResource, findPort, junctionResources, validatePhysicalRouting } from '../editor'
 import type { CompileDiagnostic } from './diagnostics'
 import { topologicalSort } from './topological-sort'
 
@@ -9,7 +9,7 @@ export interface ValidatedGraph { readonly blueprint: FactoryBlueprint; readonly
 export type ValidationResult = { readonly ok: true; readonly graph: ValidatedGraph } | { readonly ok: false; readonly diagnostics: readonly CompileDiagnostic[]; readonly partialOrder: readonly NodeId[] }
 
 export const validateBlueprint = (blueprint: FactoryBlueprint): ValidationResult => {
-  const diagnostics: CompileDiagnostic[] = []
+  const diagnostics: CompileDiagnostic[] = [...validatePhysicalRouting(blueprint)]
   const usage = new Map<PortId, number>()
   for (const edge of [...blueprint.edges.values()].sort((a, b) => a.id.localeCompare(b.id))) {
     const sourceNode = blueprint.nodes.get(edge.sourceNodeId); const targetNode = blueprint.nodes.get(edge.targetNodeId)

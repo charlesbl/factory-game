@@ -1,6 +1,6 @@
 import type { CompileDiagnostic, FactoryContract } from '../compiler'
 import { compileBlueprint, deserializeContract, isContract } from '../compiler'
-import { canonicalBlueprint, serializeBlueprint, type FactoryBlueprint } from '../editor'
+import { canonicalCompilationInput, serializeBlueprint, type FactoryBlueprint } from '../editor'
 import { ContractCache } from './cache'
 import type { CompileRequest, CompileResponse } from './protocol'
 
@@ -43,7 +43,7 @@ export class CompilationClient {
 
   async #compile(blueprint: FactoryBlueprint, generation: number): Promise<Omit<CompilationResult, 'generation' | 'stale'>> {
     const requestId = `compile-${generation}`; const revision = blueprint.revision
-    const hash = await sha256(canonicalBlueprint(blueprint)); const cached = this.cache.get(hash)
+    const hash = await sha256(canonicalCompilationInput(blueprint)); const cached = this.cache.get(hash)
     if (cached !== undefined) return { revision, contract: cached, diagnostics: cached.diagnostics }
     if (this.#worker === undefined) {
       await new Promise<void>((resolve) => setTimeout(resolve, 0)); const compiled = compileBlueprint(blueprint)

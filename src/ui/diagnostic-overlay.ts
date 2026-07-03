@@ -1,6 +1,7 @@
 import type { CompileDiagnostic, DiagnosticSeverity } from '../compiler'
 import type { EdgeId, NodeId } from '../domain'
 import type { FactoryBlueprint } from '../editor'
+import { blueprintNets, blueprintTracks, blueprintTransitions, legacyNetForEdge } from '../editor'
 
 export interface DiagnosticOverlay {
   readonly edgeDiagnostics: ReadonlyMap<EdgeId, CompileDiagnostic>
@@ -19,11 +20,15 @@ export const buildDiagnosticOverlay = (blueprint: FactoryBlueprint, diagnostics:
   const nodeDiagnostics = new Map<NodeId, CompileDiagnostic>()
 
   for (const diagnostic of diagnostics) {
-    const { edgeId, nodeId, portId, resourceId } = diagnostic.entity
+    const { edgeId, netId, trackId, transitionId, nodeId, portId, resourceId } = diagnostic.entity
     if (edgeId !== undefined) keepMostSevere(edgeDiagnostics, edgeId, diagnostic)
     if (nodeId !== undefined) keepMostSevere(nodeDiagnostics, nodeId, diagnostic)
 
     for (const edge of blueprint.edges.values()) {
+      const edgeNet = blueprintNets(blueprint).get(legacyNetForEdge(edge).id) ?? [...blueprintNets(blueprint).values()].find((net) => net.source.portId === edge.sourcePortId && net.targets.some((target) => target.portId === edge.targetPortId))
+      const belongsToPhysicalRoute = (netId !== undefined && edgeNet?.id === netId)
+        || (trackId !== undefined && blueprintTracks(blueprint).get(trackId)?.netIds.includes(edgeNet?.id ?? legacyNetForEdge(edge).id) === true)
+        || (transitionId !== undefined && blueprintTransitions(blueprint).get(transitionId)?.netIds.includes(edgeNet?.id ?? legacyNetForEdge(edge).id) === true)
       const belongsToNode = nodeId === undefined || edge.sourceNodeId === nodeId || edge.targetNodeId === nodeId
       const touchesPort = portId !== undefined && (edge.sourcePortId === portId || edge.targetPortId === portId)
       const entersLimitedNode = diagnostic.code === 'LIMITED_INPUT' && edge.targetNodeId === nodeId && (resourceId === undefined || edge.resourceId === resourceId)
@@ -31,7 +36,7 @@ export const buildDiagnosticOverlay = (blueprint: FactoryBlueprint, diagnostics:
       const touchesBrokenNode = (diagnostic.code === 'CYCLE' || diagnostic.code === 'INTERNAL_VERIFICATION')
         && nodeId !== undefined && (edge.sourceNodeId === nodeId || edge.targetNodeId === nodeId)
 
-      if (belongsToNode && (touchesPort || entersLimitedNode || leavesLimitedNode || touchesBrokenNode)) {
+      if (belongsToPhysicalRoute || (belongsToNode && (touchesPort || entersLimitedNode || leavesLimitedNode || touchesBrokenNode))) {
         keepMostSevere(edgeDiagnostics, edge.id, diagnostic)
       }
     }

@@ -12,7 +12,7 @@ export const saveGame = async (blueprints: readonly FactoryBlueprint[], contract
   const metadata: MetadataRecord = { key: 'main', schemaVersion: 1, savedAt: new Date().toISOString(), logicalTime: logicalTime.toString() }
   await database.transaction('rw', database.metadata, database.blueprints, database.contracts, database.instances, async () => {
     await database.metadata.put(metadata)
-    await database.blueprints.bulkPut(blueprints.map((blueprint) => ({ id: blueprint.id, schemaVersion: 1, revision: blueprint.revision, payload: canonicalBlueprint(blueprint) })))
+    await database.blueprints.bulkPut(blueprints.map((blueprint) => ({ id: blueprint.id, schemaVersion: 3, revision: blueprint.revision, payload: canonicalBlueprint(blueprint) })))
     await database.contracts.bulkPut(contracts.map((contract) => ({ hash: contract.blueprintHash, schemaVersion: 1, payload: stringifyExact(serializeContract(contract)) })))
     await database.instances.bulkPut(instances.map((instance) => ({ id: instance.id, schemaVersion: 1, contractHash: instance.contract.blueprintHash, payload: stringifyExact(instance.getSnapshot()) })))
   })

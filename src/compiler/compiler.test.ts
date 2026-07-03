@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { asId, gridPoint, parseRate } from '../domain'
 import type { EdgeId, NodeId, PortId, ResourceId } from '../domain'
-import { createDemoBlueprint } from '../ui/demo-blueprint'
+import { createBoundaryNode, createDemoBlueprint, createMachineNode } from '../ui/demo-blueprint'
 import type { BlueprintNode, FactoryBlueprint } from '../editor'
+import { legacyNetForEdge, legacyTrackForEdge } from '../editor'
 import { compileBlueprint, isContract } from './compile'
 import { topologicalSort } from './topological-sort'
 
 const withJunctionOnOreLine = (outputCapacity = '6'): FactoryBlueprint => {
   const blueprint = createDemoBlueprint()
+  const intake = blueprint.nodes.get(asId<NodeId>('node-iron-input'))!
   const oreEdge = blueprint.edges.get(asId<EdgeId>('edge-ore'))!
   const junction: BlueprintNode = {
     id: asId<NodeId>('node-junction'), kind: 'junction', name: 'Junction', position: gridPoint(4, 4), footprint: { x: 0, y: 0, width: 2, height: 2 },
@@ -19,7 +21,7 @@ const withJunctionOnOreLine = (outputCapacity = '6'): FactoryBlueprint => {
   const intoJunction = { ...oreEdge, targetNodeId: junction.id, targetPortId: junction.ports[0]!.id, points: [gridPoint(2, 5), gridPoint(4, 5)] }
   const outOfJunction = { ...oreEdge, id: asId<EdgeId>('edge-junction-ore'), sourceNodeId: junction.id, sourcePortId: junction.ports[1]!.id, capacity: parseRate(outputCapacity), points: [gridPoint(6, 5), gridPoint(7, 5)] }
   const edges = new Map(blueprint.edges); edges.set(intoJunction.id, intoJunction); edges.set(outOfJunction.id, outOfJunction)
-  return { ...blueprint, nodes: new Map(blueprint.nodes).set(junction.id, junction), edges }
+  return { ...blueprint, nodes: new Map(blueprint.nodes).set(intake.id, { ...intake, position: gridPoint(-2, 4) }).set(junction.id, junction), edges }
 }
 
 const withThreeFurnaces = (): FactoryBlueprint => {
@@ -59,6 +61,34 @@ const withThreeFurnaces = (): FactoryBlueprint => {
     [junctionDispatch.id, junctionDispatch],
   ])
   return { ...blueprint, nodes, edges }
+}
+
+const withTwoFurnacesOnSharedOreTrunk = (): FactoryBlueprint => {
+  const blueprint = createDemoBlueprint()
+  const intake = blueprint.nodes.get(asId<NodeId>('node-iron-input'))!
+  const first = createMachineNode(asId<NodeId>('node-furnace'), asId('ironIngot'), 7, 1)
+  const second = createMachineNode(asId<NodeId>('node-furnace-2'), asId('ironIngot'), 7, 7)
+  const firstDispatch = createBoundaryNode(asId<NodeId>('node-iron-output'), asId<PortId>('port-ingot-target'), 'external-output', asId<ResourceId>('ironIngot'), 16, 1, '4')
+  const secondDispatch = createBoundaryNode(asId<NodeId>('node-iron-output-2'), asId<PortId>('port-ingot-target-2'), 'external-output', asId<ResourceId>('ironIngot'), 16, 7, '4')
+  const edge = (id: string, source: BlueprintNode, sourcePort: number, target: BlueprintNode, targetPort: number, points: readonly ReturnType<typeof gridPoint>[]) => ({
+    id: asId<EdgeId>(id), sourceNodeId: source.id, sourcePortId: source.ports[sourcePort]!.id, targetNodeId: target.id, targetPortId: target.ports[targetPort]!.id,
+    resourceId: source.ports[sourcePort]!.resourceId!, capacity: source.ports[sourcePort]!.capacity < target.ports[targetPort]!.capacity ? source.ports[sourcePort]!.capacity : target.ports[targetPort]!.capacity, points,
+  })
+  const edges = [
+    edge('edge-ore-1', intake, 0, first, 0, [gridPoint(4, 5), gridPoint(5, 5), gridPoint(5, 2), gridPoint(7, 2)]),
+    edge('edge-ore-2', intake, 0, second, 0, [gridPoint(4, 5), gridPoint(5, 5), gridPoint(5, 8), gridPoint(7, 8)]),
+    edge('edge-ingot-1', first, 1, firstDispatch, 0, [gridPoint(11, 2), gridPoint(16, 2)]),
+    edge('edge-ingot-2', second, 1, secondDispatch, 0, [gridPoint(11, 8), gridPoint(16, 8)]),
+  ]
+  return {
+    ...blueprint,
+    nodes: new Map([intake, first, second, firstDispatch, secondDispatch].map((node) => [node.id, node])),
+    edges: new Map(edges.map((item) => [item.id, item])),
+    nets: new Map(edges.map((item) => { const net = legacyNetForEdge(item); return [net.id, net] })),
+    tracks: new Map(edges.map((item) => { const track = legacyTrackForEdge(item); return [track.id, track] })),
+    transitions: new Map(),
+    externalPorts: [],
+  }
 }
 
 describe('deterministic compilation', () => {
@@ -132,6 +162,16 @@ describe('deterministic compilation', () => {
     expect(compiled.outputRates.get(asId<ResourceId>('ironIngot'))).toBe(parseRate('3'))
     expect([...compiled.machineActivity.values()]).toEqual([1_000_000n, 1_000_000n, 1_000_000n])
     expect(['edge-ore', 'edge-ore-2', 'edge-ore-3'].map((id) => compiled.edgeFlows.get(asId<EdgeId>(id)))).toEqual([parseRate('2'), parseRate('2'), parseRate('2')])
+  })
+  it('adapts a shared intake trunk to the actual recipe demand of every branch', () => {
+    const compiled = compileBlueprint(withTwoFurnacesOnSharedOreTrunk())
+    expect(isContract(compiled)).toBe(true)
+    if (!isContract(compiled)) return
+    expect(compiled.inputRates.get(asId<ResourceId>('ironOre'))).toBe(parseRate('4'))
+    expect(compiled.machineActivity.get(asId<NodeId>('node-furnace'))).toBe(1_000_000n)
+    expect(compiled.machineActivity.get(asId<NodeId>('node-furnace-2'))).toBe(1_000_000n)
+    expect(compiled.edgeFlows.get(asId<EdgeId>('edge-ore-1'))).toBe(parseRate('2'))
+    expect(compiled.edgeFlows.get(asId<EdgeId>('edge-ore-2'))).toBe(parseRate('2'))
   })
   it('explains when two routes exceed a shared destination port limit', () => {
     const blueprint = createDemoBlueprint()
