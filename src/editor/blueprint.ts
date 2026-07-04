@@ -1,6 +1,8 @@
 import type { GridPoint, GridRect, RateRaw } from '../domain'
 import type { ContractId, EdgeId, FactoryId, LooseConnectionId, NodeId, PortId, RecipeId, ResourceId, RouteBridgeId, RouteHandleId } from '../domain'
 
+export interface FactoryVersionRef { readonly factoryId: FactoryId; readonly version: number }
+
 export type BlueprintNodeKind = 'machine' | 'junction' | 'external-input' | 'external-output' | 'sub-factory'
 interface PortBase {
   readonly id: PortId
@@ -9,6 +11,7 @@ interface PortBase {
   readonly anchor: GridPoint
 }
 export interface BlueprintPort extends PortBase { readonly resourceId: ResourceId }
+export interface SubFactoryPort extends BlueprintPort { readonly contractPortId: PortId }
 export interface JunctionPort extends PortBase { readonly resourceId?: never }
 export type AnyBlueprintPort = BlueprintPort | JunctionPort
 
@@ -23,7 +26,7 @@ interface BaseNode<Port extends AnyBlueprintPort> {
 export interface MachineNode extends BaseNode<BlueprintPort> { readonly kind: 'machine'; readonly recipeId: RecipeId }
 export interface JunctionNode extends BaseNode<JunctionPort> { readonly kind: 'junction' }
 export interface BoundaryNode extends BaseNode<BlueprintPort> { readonly kind: 'external-input' | 'external-output' }
-export interface SubFactoryNode extends BaseNode<BlueprintPort> { readonly kind: 'sub-factory'; readonly contractId: ContractId }
+export interface SubFactoryNode extends BaseNode<SubFactoryPort> { readonly kind: 'sub-factory'; readonly factoryId: FactoryId; readonly version: number; readonly contractId: ContractId }
 export type BlueprintNode = MachineNode | JunctionNode | BoundaryNode | SubFactoryNode
 
 export interface RouteHandle { readonly id: RouteHandleId; readonly position: GridPoint }
@@ -49,15 +52,14 @@ export interface ExternalPort { readonly portId: PortId; readonly nodeId: NodeId
 export interface FactoryBlueprint {
   readonly id: FactoryId
   readonly revision: number
-  readonly name: string
   readonly nodes: ReadonlyMap<NodeId, BlueprintNode>
   readonly edges: ReadonlyMap<EdgeId, BlueprintEdge>
   readonly looseConnections: ReadonlyMap<LooseConnectionId, LooseConnection>
   readonly externalPorts: readonly ExternalPort[]
 }
 
-export const createBlueprint = (id: FactoryId, name = 'New factory'): FactoryBlueprint => ({
-  id, revision: 0, name, nodes: new Map(), edges: new Map(), looseConnections: new Map(), externalPorts: [],
+export const createBlueprint = (id: FactoryId): FactoryBlueprint => ({
+  id, revision: 0, nodes: new Map(), edges: new Map(), looseConnections: new Map(), externalPorts: [],
 })
 
 export const updateBlueprint = (blueprint: FactoryBlueprint, update: Partial<Omit<FactoryBlueprint, 'id' | 'revision'>>, affectsCompilation = true): FactoryBlueprint => ({

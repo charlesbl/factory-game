@@ -92,7 +92,7 @@ export class ExactDagFlowSolver implements FlowSolver {
     const inputRates = new Map<ResourceId, RateRaw>(); const outputRates = new Map<ResourceId, RateRaw>()
     for (const edge of blueprint.edges.values()) { const flow = edgeFlows.get(edge.id) ?? 0n; const resource = resourceFor(blueprint, edge); const source = blueprint.nodes.get(edge.sourceNodeId); const target = blueprint.nodes.get(edge.targetNodeId); if (source?.kind === 'external-input') addRate(inputRates, resource, flow); if (target?.kind === 'external-output') addRate(outputRates, resource, flow) }
     const points = [...blueprint.nodes.values()].flatMap((node) => [node.position, { x: node.position.x + node.footprint.width, y: node.position.y + node.footprint.height }]).concat([...blueprint.edges.values()].flatMap((edge) => [...edgeRoute(blueprint, edge).points]))
-    const footprint = boundingRect(points, 2); const boundaryPorts = projectExternalPorts(blueprint, footprint)
+    const footprint = boundingRect(points, 2); const boundaryPorts = projectExternalPorts(blueprint, footprint, edgeFlows)
     return { schemaVersion: 1, blueprintHash: hash, inputRates, outputRates, inputPorts: boundaryPorts.filter((port) => port.direction === 'input'), outputPorts: boundaryPorts.filter((port) => port.direction === 'output'), footprint, machineActivity: activity, edgeFlows, diagnostics }
   }
 }

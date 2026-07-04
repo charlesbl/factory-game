@@ -34,7 +34,7 @@ export const validateBlueprint = (blueprint: FactoryBlueprint): ValidationResult
       if (junctionResources(blueprint, node.id).size > 1) diagnostics.push({ code: 'RESOURCE_MISMATCH', severity: 'error', entity: { nodeId: node.id } })
       if (node.ports.filter((port) => port.direction === 'input').length > 3 || node.ports.filter((port) => port.direction === 'output').length > 3) diagnostics.push({ code: 'JUNCTION_PORT_LIMIT', severity: 'error', entity: { nodeId: node.id } })
     }
-    if (node.kind === 'sub-factory' && node.contractId.length === 0) diagnostics.push({ code: 'MISSING_CHILD_CONTRACT', severity: 'error', entity: { nodeId: node.id } })
+    if (node.kind === 'sub-factory' && (node.contractId.length === 0 || node.factoryId.length === 0 || !Number.isSafeInteger(node.version) || node.version < 1)) diagnostics.push({ code: 'MISSING_CHILD_CONTRACT', severity: 'error', entity: { nodeId: node.id } })
   }
   const topological = topologicalSort(blueprint); for (const nodeId of topological.cyclic) diagnostics.push({ code: 'CYCLE', severity: 'error', entity: { nodeId } })
   const errors = diagnostics.filter((item) => item.severity === 'error')

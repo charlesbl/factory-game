@@ -1,4 +1,5 @@
 import { formatRate, resourceById } from '../domain'
+import type { FactoryId } from '../domain'
 import type { FactoryContract } from '../compiler'
 import type { FactoryBlueprint } from '../editor'
 import type { InstanceSnapshot } from '../simulation'
@@ -14,19 +15,23 @@ const stateTone: Record<string, string> = {
 
 interface Props {
   readonly blueprint: FactoryBlueprint
+  readonly factories: readonly { readonly id: FactoryId; readonly name: string }[]
+  readonly activeFactoryId: FactoryId
+  readonly factoryName: string
   readonly contract: FactoryContract | undefined
   readonly compileState: 'compiling' | 'ready' | 'invalid'
   readonly snapshot: InstanceSnapshot | undefined
   readonly logicalTime: bigint
   readonly scheduledEvents: number
   readonly sleepingActors: number
+  readonly onSelectFactory: (factoryId: FactoryId) => void
   readonly onOpenFactory: () => void
   readonly onSupply: () => void
   readonly onAdvance: () => void
   readonly onCollect: () => void
 }
 
-export const WorldView = ({ blueprint, contract, compileState, snapshot, logicalTime, scheduledEvents, sleepingActors, onOpenFactory, onSupply, onAdvance, onCollect }: Props) => {
+export const WorldView = ({ blueprint, factories, activeFactoryId, factoryName, contract, compileState, snapshot, logicalTime, scheduledEvents, sleepingActors, onSelectFactory, onOpenFactory, onSupply, onAdvance, onCollect }: Props) => {
   const state = snapshot?.state ?? (compileState === 'invalid' ? 'INVALID' : 'PAUSED')
   const buffers = [...(snapshot?.inputs ?? []), ...(snapshot?.outputs ?? [])]
   const storedItems = buffers.reduce((total, buffer) => total + buffer.quantity, 0)
@@ -52,15 +57,20 @@ export const WorldView = ({ blueprint, contract, compileState, snapshot, logical
 
   return <div className="world-workspace">
     <aside className="world-sites panel">
-      <div className="panel-heading"><div><span className="eyebrow">World</span><h2>Production sites</h2></div><span>1</span></div>
-      <button className="world-site is-active" onClick={onOpenFactory}>
-        <span className="world-site-mark">F1</span>
-        <span><strong>{blueprint.name}</strong><small>{contract === undefined ? 'Contract unavailable' : `${contract.footprint.width} × ${contract.footprint.height} m footprint`}</small></span>
-        <i className={`status-dot ${compileState}`} />
-      </button>
+      <div className="panel-heading"><div><span className="eyebrow">World</span><h2>Production sites</h2></div><span>{factories.length}</span></div>
+      <div className="world-site-list">
+        {factories.map((factory, index) => {
+          const isActive = factory.id === activeFactoryId
+          return <button key={factory.id} className={`world-site ${isActive ? 'is-active' : ''}`} aria-label={`View ${factory.name} in world`} aria-pressed={isActive} onClick={() => onSelectFactory(factory.id)}>
+            <span className="world-site-mark">F{index + 1}</span>
+            <span><strong>{factory.name}</strong><small>{isActive ? contract === undefined ? 'Contract unavailable' : `${contract.footprint.width} × ${contract.footprint.height} m footprint` : 'Select production site'}</small></span>
+            <i className={`status-dot ${isActive ? compileState : 'muted'}`} />
+          </button>
+        })}
+      </div>
       <section className="world-summary">
         <span className="eyebrow">Network summary</span>
-        <dl><div><dt>Factories</dt><dd>1</dd></div><div><dt>Stored items</dt><dd>{storedItems}/{totalCapacity}</dd></div><div><dt>Active deliveries</dt><dd>0</dd></div></dl>
+        <dl><div><dt>Factories</dt><dd>{factories.length}</dd></div><div><dt>Stored items</dt><dd>{storedItems}/{totalCapacity}</dd></div><div><dt>Active deliveries</dt><dd>0</dd></div></dl>
       </section>
     </aside>
 
@@ -70,10 +80,10 @@ export const WorldView = ({ blueprint, contract, compileState, snapshot, logical
         <span className="world-flow-label">Inputs</span>
         {snapshot?.inputs.map((buffer) => renderBuffer(buffer, 'input'))}
       </div>
-      <button className="world-factory" onClick={onOpenFactory} aria-label={`Open ${blueprint.name} factory`}>
+      <button className="world-factory" onClick={onOpenFactory} aria-label={`Open ${factoryName} factory`}>
         <span className="world-factory-icon">F</span>
         <span className={`badge ${stateTone[state]}`}>{state.replace('_', ' ')}</span>
-        <strong>{blueprint.name}</strong>
+        <strong>{factoryName}</strong>
         <small>Compiled factory actor</small>
         <span className="world-factory-stats"><b>{blueprint.nodes.size}</b> nodes <b>{blueprint.edges.size}</b> routes</span>
         <em>Open factory →</em>

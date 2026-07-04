@@ -11,12 +11,14 @@ const apply = (blueprint: FactoryBlueprint, command: ReturnType<typeof addNode>)
 const edge = (id: string, sourceNodeId: NodeId, sourcePortId: PortId, targetNodeId: NodeId, targetPortId: PortId): BlueprintEdge => ({ id: asId<EdgeId>(id), sourceNodeId, sourcePortId, targetNodeId, targetPortId, routeHandles: [], bridges: [] })
 const freePort = (blueprint: FactoryBlueprint, nodeId: NodeId, direction: 'input' | 'output') => blueprint.nodes.get(nodeId)!.ports.find((port) => port.direction === direction && !isPortOccupied(blueprint, port.id))!
 
-describe('route schema V4', () => {
+describe('route schema V5', () => {
   it('round-trips deterministically and rejects old schemas', () => {
     const blueprint = createDemoBlueprint(); const serialized = canonicalBlueprint(blueprint)
-    expect(JSON.parse(serialized).schemaVersion).toBe(4)
+    expect(JSON.parse(serialized).schemaVersion).toBe(5)
     expect(canonicalBlueprint(deserializeBlueprint(JSON.parse(serialized)))).toBe(serialized)
-    expect(() => deserializeBlueprint({ schemaVersion: 3 })).toThrow(/expected V4/)
+    const legacy = { ...JSON.parse(serialized), schemaVersion: 4, name: 'Legacy name' }
+    expect(JSON.parse(canonicalBlueprint(deserializeBlueprint(legacy)))).not.toHaveProperty('name')
+    expect(() => deserializeBlueprint({ schemaVersion: 3 })).toThrow(/expected V4 or V5/)
   })
 
   it('lets Any junction chains inherit and release one shared resource', () => {

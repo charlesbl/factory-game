@@ -21,6 +21,8 @@ describe('exact point-to-point flow compiler', () => {
     expect(routeCapacity(blueprint, ore)).toBe(4_000_000n)
     expect(compiled.inputRates.get(asId<ResourceId>('ironOre'))).toBe(2_000_000n)
     expect(compiled.outputRates.get(asId<ResourceId>('ironIngot'))).toBe(1_000_000n)
+    expect(compiled.inputPorts[0]?.rate).toBe(2_000_000n)
+    expect(compiled.outputPorts[0]?.rate).toBe(1_000_000n)
   })
 
   it('splits through independent junction connectors without a global junction cap', () => {

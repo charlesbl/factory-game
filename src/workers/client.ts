@@ -1,5 +1,5 @@
 import type { CompileDiagnostic, FactoryContract } from '../compiler'
-import { compileBlueprint, deserializeContract, isContract } from '../compiler'
+import { compileBlueprint, deserializeContract, ExactDagFlowSolver, isContract, serializeContract } from '../compiler'
 import { canonicalCompilationInput, serializeBlueprint, type FactoryBlueprint } from '../editor'
 import { ContractCache } from './cache'
 import type { CompileRequest, CompileResponse } from './protocol'
@@ -13,6 +13,7 @@ export interface CompilationResult { readonly generation: number; readonly revis
 interface QueuedCompilation {
   readonly generation: number
   readonly blueprint: FactoryBlueprint
+  readonly childContracts: ReadonlyMap<string, FactoryContract>
   readonly resolve: (result: CompilationResult) => void
   readonly reject: (reason?: unknown) => void
 }
@@ -28,10 +29,10 @@ export class CompilationClient {
     this.#worker = typeof Worker === 'undefined' ? undefined : new Worker(new URL('./compile.worker.ts', import.meta.url), { type: 'module', name: 'factory-compiler' })
     this.#worker?.addEventListener('message', (event: MessageEvent<CompileResponse>) => { const resolve = this.#pending.get(event.data.requestId); if (resolve !== undefined) { this.#pending.delete(event.data.requestId); resolve(event.data) } })
   }
-  compile(blueprint: FactoryBlueprint): Promise<CompilationResult> {
+  compile(blueprint: FactoryBlueprint, childContracts: ReadonlyMap<string, FactoryContract> = new Map()): Promise<CompilationResult> {
     const generation = ++this.#request
     return new Promise<CompilationResult>((resolve, reject) => {
-      const compilation = { generation, blueprint, resolve, reject }
+      const compilation = { generation, blueprint, childContracts, resolve, reject }
       if (this.#active === undefined) {
         void this.#run(compilation)
         return
@@ -41,16 +42,16 @@ export class CompilationClient {
     })
   }
 
-  async #compile(blueprint: FactoryBlueprint, generation: number): Promise<Omit<CompilationResult, 'generation' | 'stale'>> {
+  async #compile(blueprint: FactoryBlueprint, childContracts: ReadonlyMap<string, FactoryContract>, generation: number): Promise<Omit<CompilationResult, 'generation' | 'stale'>> {
     const requestId = `compile-${generation}`; const revision = blueprint.revision
     const hash = await sha256(canonicalCompilationInput(blueprint)); const cached = this.cache.get(hash)
     if (cached !== undefined) return { revision, contract: cached, diagnostics: cached.diagnostics }
     if (this.#worker === undefined) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 0)); const compiled = compileBlueprint(blueprint)
+      await new Promise<void>((resolve) => setTimeout(resolve, 0)); const compiled = compileBlueprint(blueprint, new ExactDagFlowSolver(childContracts))
       if (!isContract(compiled)) return { revision, diagnostics: compiled }
       const contract = this.cache.set({ ...compiled, blueprintHash: hash }); return { revision, contract, diagnostics: contract.diagnostics }
     }
-    const request: CompileRequest = { protocolVersion: 1, requestId, revision, blueprint: serializeBlueprint(blueprint), childContracts: [] }
+    const request: CompileRequest = { protocolVersion: 1, requestId, revision, blueprint: serializeBlueprint(blueprint), childContracts: [...new Map([...childContracts.values()].map((contract) => [contract.blueprintHash, contract])).values()].map(serializeContract) }
     const response = await new Promise<CompileResponse>((resolve) => { this.#pending.set(requestId, resolve); this.#worker!.postMessage(request) })
     if (!response.ok) return { revision, diagnostics: response.diagnostics }
     const contract = this.cache.set(deserializeContract(response.contract)); return { revision, contract, diagnostics: contract.diagnostics }
@@ -59,7 +60,7 @@ export class CompilationClient {
   async #run(compilation: QueuedCompilation): Promise<void> {
     this.#active = compilation
     try {
-      const result = await this.#compile(compilation.blueprint, compilation.generation)
+      const result = await this.#compile(compilation.blueprint, compilation.childContracts, compilation.generation)
       compilation.resolve({ ...result, generation: compilation.generation, stale: compilation.generation !== this.#request })
     } catch (error) {
       compilation.reject(error)

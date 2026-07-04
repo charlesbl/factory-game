@@ -21,11 +21,11 @@ interface LooseDrag { readonly kind: 'extend'; readonly looseId: LooseConnection
 type ConnectionDrag = PortDrag | LooseDrag
 interface HandleDrag extends HandleSelection { readonly start: GridPoint }
 interface BridgeMenu { readonly edgeId: EdgeId; readonly position: GridPoint }
-interface Props { readonly blueprint: FactoryBlueprint; readonly contract: FactoryContract | undefined; readonly diagnostics: readonly CompileDiagnostic[]; readonly diagnosticsVisible: boolean; readonly onCommand: (command: EditCommand) => void; readonly onSelection: (selection: GraphSelection) => void }
+interface Props { readonly blueprint: FactoryBlueprint; readonly contract: FactoryContract | undefined; readonly childContracts: ReadonlyMap<string, FactoryContract>; readonly diagnostics: readonly CompileDiagnostic[]; readonly diagnosticsVisible: boolean; readonly onCommand: (command: EditCommand) => void; readonly onSelection: (selection: GraphSelection) => void }
 const samePoint = (a: GridPoint, b: GridPoint): boolean => a.x === b.x && a.y === b.y
 const axisOfLastSegment = (points: readonly GridPoint[], fallback: RouteAxis): RouteAxis => { const end = points.at(-1); const before = points.at(-2); return end === undefined || before === undefined ? fallback : end.y === before.y ? 'horizontal' : 'vertical' }
 
-export const FactoryGraphEditor = ({ blueprint, contract, diagnostics, diagnosticsVisible, onCommand, onSelection }: Props) => {
+export const FactoryGraphEditor = ({ blueprint, contract, childContracts, diagnostics, diagnosticsVisible, onCommand, onSelection }: Props) => {
   const flow = useRef<ReactFlowInstance<FactoryFlowNode, ConveyorFlowEdge> | null>(null)
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 }); const [connectionDrag, setConnectionDrag] = useState<ConnectionDrag>(); const [handleDrag, setHandleDrag] = useState<HandleDrag>(); const [pointer, setPointer] = useState<GridPoint>(); const [selectedHandle, setSelectedHandle] = useState<HandleSelection>(); const [bridgeMenu, setBridgeMenu] = useState<BridgeMenu>(); const [connectionError, setConnectionError] = useState<string>()
   const diagnosticOverlay = useMemo(() => buildDiagnosticOverlay(blueprint, diagnosticsVisible ? diagnostics : []), [blueprint, diagnostics, diagnosticsVisible])
@@ -63,8 +63,9 @@ export const FactoryGraphEditor = ({ blueprint, contract, diagnostics, diagnosti
   }, [blueprint, handleDrag, handlePosition])
   const projectedNodes = useMemo<FactoryFlowNode[]>(() => [...blueprint.nodes.values()].map((node) => {
     const diagnostic = diagnosticOverlay.nodeDiagnostics.get(node.id); const portResources = new Map(node.ports.flatMap((port) => { const resource = effectivePortResource(blueprint, node.id, port.id); return resource === undefined ? [] : [[port.id, resource] as const] }))
-    return { id: node.id, type: 'factory', position: { x: gridToPixel(node.position.x), y: gridToPixel(node.position.y) }, data: { node, portResources, onPortPointerDown: beginPortDrag, ...(portFlows !== undefined ? { portFlows } : {}), activity: Number(contract?.machineActivity.get(node.id) ?? 0n) / 10_000, ...(diagnostic !== undefined ? { diagnostic: diagnosticText(diagnostic), issueSeverity: diagnostic.severity } : {}) }, draggable: true }
-  }), [beginPortDrag, blueprint, contract, diagnosticOverlay, portFlows])
+    const childContract = node.kind === 'sub-factory' ? childContracts.get(node.contractId) : undefined
+    return { id: node.id, type: 'factory', position: { x: gridToPixel(node.position.x), y: gridToPixel(node.position.y) }, data: { node, portResources, onPortPointerDown: beginPortDrag, ...(childContract === undefined ? {} : { childContract }), ...(portFlows !== undefined ? { portFlows } : {}), activity: Number(contract?.machineActivity.get(node.id) ?? 0n) / 10_000, ...(diagnostic !== undefined ? { diagnostic: diagnosticText(diagnostic), issueSeverity: diagnostic.severity } : {}) }, draggable: true }
+  }), [beginPortDrag, blueprint, childContracts, contract, diagnosticOverlay, portFlows])
   const projectedEdges = useMemo<ConveyorFlowEdge[]>(() => [...displayBlueprint.edges.values()].map((edge) => {
     const flowRate = contract?.edgeFlows.get(edge.id) ?? 0n; const capacity = routeCapacity(displayBlueprint, edge); const ratio = capacity === 0n ? 0 : Number((flowRate * 100n) / capacity); const resource = routeResource(displayBlueprint, edge)
     const diagnostic = diagnosticOverlay.edgeDiagnostics.get(edge.id); const blocked = diagnosticOverlay.blockedEdges.has(edge.id); const resourceColour = resource === undefined ? '#8ba39a' : resourceById.get(resource)?.colour ?? '#8ba39a'; const colour = diagnostic?.severity === 'error' ? '#ff746d' : diagnostic?.severity === 'warning' ? '#efb15f' : blocked ? '#927052' : resourceColour

@@ -1,7 +1,7 @@
 import { asId, parseRate } from '../domain'
 import type { EdgeId, GridPoint, IdFactory, LooseConnectionId, NodeId, PortId, RecipeId, RouteBridgeId, RouteHandleId } from '../domain'
-import type { BlueprintEdge, BlueprintNode, ExternalPort, FactoryBlueprint, JunctionNode, LooseConnection, RouteHandle, SubFactoryNode } from './blueprint'
-import { effectivePortResource, findPort, isPortOccupied, junctionResources, occupiedPortIds, routeResource, updateBlueprint } from './blueprint'
+import type { BlueprintEdge, BlueprintNode, ExternalPort, FactoryBlueprint, JunctionNode, LooseConnection, RouteHandle, SubFactoryNode, SubFactoryPort } from './blueprint'
+import { absolutePortPosition, effectivePortResource, findPort, isPortOccupied, junctionResources, occupiedPortIds, routeResource, updateBlueprint } from './blueprint'
 import { edgeRoute } from './connector-route'
 import { cellsOnRoute } from './routing'
 
@@ -174,10 +174,55 @@ export const addBridgeAt = (edgeId: EdgeId, position: GridPoint): EditCommand =>
 })
 
 export const changeRecipe = (nodeId: NodeId, recipeId: RecipeId): EditCommand => ({ label: 'Change recipe', affectsCompilation: true, apply(blueprint) { const node = blueprint.nodes.get(nodeId); if (node?.kind !== 'machine') throw new Error('Only machines have recipes'); return result(blueprint, this, { nodes: new Map(blueprint.nodes).set(nodeId, { ...node, recipeId }) }) } })
-export const renameFactory = (name: string): EditCommand => ({ label: 'Rename factory', affectsCompilation: false, apply(blueprint) { return result(blueprint, this, { name }, changes(false)) } })
 export const addExternalPort = (port: ExternalPort): EditCommand => ({ label: 'Add external port', affectsCompilation: true, apply(blueprint) { return result(blueprint, this, { externalPorts: [...blueprint.externalPorts, port] }) } })
 export const moveExternalPort = (portId: PortId, side: ExternalPort['side'], offset: number): EditCommand => ({ label: 'Move external port', affectsCompilation: true, apply(blueprint) { return result(blueprint, this, { externalPorts: blueprint.externalPorts.map((port) => port.portId === portId ? { ...port, side, offset } : port) }) } })
 export const removeExternalPort = (portId: PortId): EditCommand => ({ label: 'Remove external port', affectsCompilation: true, apply(blueprint) { return result(blueprint, this, { externalPorts: blueprint.externalPorts.filter((port) => port.portId !== portId) }) } })
+const sameSubFactoryInterface = (a: SubFactoryPort, b: SubFactoryPort): boolean => a.direction === b.direction && a.resourceId === b.resourceId
+
+export const replaceSubFactoryVersion = (nodeId: NodeId, replacement: SubFactoryNode): EditCommand => ({
+  label: `Change sub-factory to v${replacement.version}`, affectsCompilation: true,
+  apply(blueprint) {
+    const current = blueprint.nodes.get(nodeId)
+    if (current?.kind !== 'sub-factory') throw new Error('Node is not a sub-factory')
+    if (current.factoryId !== replacement.factoryId) throw new Error('A version change must keep the same factory identity')
+    const unmatched = new Set(replacement.ports.map((port) => port.id)); const mapping = new Map<PortId, SubFactoryPort>()
+    for (const oldPort of current.ports) {
+      const exact = replacement.ports.find((port) => unmatched.has(port.id) && port.contractPortId === oldPort.contractPortId && sameSubFactoryInterface(oldPort, port))
+      if (exact !== undefined) { mapping.set(oldPort.id, exact); unmatched.delete(exact.id) }
+    }
+    for (const oldPort of current.ports.filter((port) => !mapping.has(port.id))) {
+      const candidates = replacement.ports.filter((port) => unmatched.has(port.id) && sameSubFactoryInterface(oldPort, port))
+      if (candidates.length === 1) { mapping.set(oldPort.id, candidates[0]!); unmatched.delete(candidates[0]!.id) }
+    }
+    const ports = replacement.ports.map((port) => {
+      const old = [...mapping].find(([, target]) => target.id === port.id)?.[0]
+      return old === undefined ? port : { ...port, id: old }
+    })
+    const replacementByGeneratedId = new Map(replacement.ports.map((port, index) => [port.id, ports[index]!]))
+    const edges = new Map(blueprint.edges); const looseConnections = new Map(blueprint.looseConnections)
+    for (const edge of blueprint.edges.values()) {
+      const touchesSource = edge.sourceNodeId === nodeId; const touchesTarget = edge.targetNodeId === nodeId
+      if (!touchesSource && !touchesTarget) continue
+      const oldPortId = touchesSource ? edge.sourcePortId : edge.targetPortId
+      const generated = mapping.get(oldPortId)
+      if (generated !== undefined) {
+        const mapped = replacementByGeneratedId.get(generated.id)!
+        edges.set(edge.id, touchesSource ? { ...edge, sourcePortId: mapped.id } : { ...edge, targetPortId: mapped.id })
+        continue
+      }
+      const free = absolutePortPosition(blueprint, { nodeId, portId: oldPortId }) ?? current.position
+      const origin = touchesSource ? { nodeId: edge.targetNodeId, portId: edge.targetPortId } : { nodeId: edge.sourceNodeId, portId: edge.sourcePortId }
+      const handles = touchesSource ? [...edge.routeHandles].reverse() : [...edge.routeHandles]
+      const looseId = asId<LooseConnectionId>(`${edge.id}:version-loose`)
+      looseConnections.set(looseId, { id: looseId, origin, routeHandles: [...handles, { id: asId<RouteHandleId>(`${edge.id}:version-free`), position: free }] })
+      edges.delete(edge.id)
+    }
+    const node = { ...replacement, id: current.id, position: current.position, ports }
+    return result(blueprint, this, { nodes: new Map(blueprint.nodes).set(nodeId, node), edges, looseConnections }, changes(true, [], [replacement.contractId]))
+  },
+})
+
+/** Legacy helper retained for callers that only replace an immutable hash. */
 export const replaceSubFactoryContract = (nodeId: NodeId, contractId: SubFactoryNode['contractId']): EditCommand => ({ label: 'Update sub-factory', affectsCompilation: true, apply(blueprint) { const node = blueprint.nodes.get(nodeId); if (node?.kind !== 'sub-factory') throw new Error('Node is not a sub-factory'); return result(blueprint, this, { nodes: new Map(blueprint.nodes).set(nodeId, { ...node, contractId }) }, changes(true, [], [contractId])) } })
 export const transaction = (label: string, commands: readonly EditCommand[]): EditCommand => ({
   label, affectsCompilation: commands.some((command) => command.affectsCompilation),
