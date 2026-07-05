@@ -1,17 +1,19 @@
-import type { EdgeId, GridPoint, IdFactory, NodeId, PortId } from '../domain'
-import type { BlueprintEdge, BlueprintNode, ExternalPort, FactoryBlueprint } from './blueprint'
+import type { EdgeId, GridPoint, IdFactory, LooseConnectionId, NodeId, PortId } from '../domain'
+import type { BlueprintEdge, BlueprintNode, ExternalPort, FactoryBlueprint, LooseConnection } from './blueprint'
 import { effectivePortResource, findPort, routeResource, updateBlueprint } from './blueprint'
 import { normalizeJunctionPorts, type EditCommand } from './commands'
 
 export interface GraphClipboardPayload {
   readonly nodes: readonly BlueprintNode[]
   readonly edges: readonly BlueprintEdge[]
+  readonly looseConnections: readonly LooseConnection[]
   readonly externalPorts: readonly ExternalPort[]
 }
 
 export interface MaterializedSubgraph extends GraphClipboardPayload {
   readonly nodeIds: readonly NodeId[]
   readonly edgeIds: readonly EdgeId[]
+  readonly looseConnectionIds: readonly LooseConnectionId[]
 }
 
 const translatePoint = (point: GridPoint, offset: GridPoint): GridPoint => ({ x: point.x + offset.x, y: point.y + offset.y })
@@ -20,6 +22,7 @@ export const createClipboardPayload = (
   nodes: readonly BlueprintNode[],
   edges: readonly BlueprintEdge[] = [],
   externalPorts: readonly ExternalPort[] = [],
+  looseConnections: readonly LooseConnection[] = [],
 ): GraphClipboardPayload | undefined => {
   if (nodes.length === 0) return undefined
   const origin = {
@@ -34,19 +37,27 @@ export const createClipboardPayload = (
       routeHandles: edge.routeHandles.map((handle) => ({ ...handle, position: translatePoint(handle.position, relative) })),
       bridges: edge.bridges.map((bridge) => ({ ...bridge, position: translatePoint(bridge.position, relative) })),
     })),
+    looseConnections: looseConnections.map((loose) => ({
+      ...loose,
+      origin: { ...loose.origin },
+      routeHandles: loose.routeHandles.map((handle) => ({ ...handle, position: translatePoint(handle.position, relative) })),
+    })),
     externalPorts: externalPorts.map((port) => ({ ...port })),
   }
 }
 
-export const captureSubgraph = (blueprint: FactoryBlueprint, nodeIds: readonly NodeId[]): GraphClipboardPayload | undefined => {
-  const selected = new Set(nodeIds)
-  const nodes = nodeIds.flatMap((id) => {
+export const captureSubgraph = (blueprint: FactoryBlueprint, nodeIds: readonly NodeId[], looseConnectionIds: readonly LooseConnectionId[] = []): GraphClipboardPayload | undefined => {
+  const explicitlySelectedNodes = new Set(nodeIds)
+  const explicitlySelectedLoose = new Set(looseConnectionIds)
+  const selectedLoose = [...blueprint.looseConnections.values()].filter((loose) => explicitlySelectedNodes.has(loose.origin.nodeId) || explicitlySelectedLoose.has(loose.id))
+  const selected = new Set([...nodeIds, ...selectedLoose.filter((loose) => explicitlySelectedLoose.has(loose.id)).map((loose) => loose.origin.nodeId)])
+  const nodes = [...selected].flatMap((id) => {
     const node = blueprint.nodes.get(id)
     return node === undefined ? [] : [node]
   })
   const edges = [...blueprint.edges.values()].filter((edge) => selected.has(edge.sourceNodeId) && selected.has(edge.targetNodeId))
   const externalPorts = blueprint.externalPorts.filter((port) => selected.has(port.nodeId))
-  return createClipboardPayload(nodes, edges, externalPorts)
+  return createClipboardPayload(nodes, edges, externalPorts, selectedLoose)
 }
 
 export const materializeSubgraph = (payload: GraphClipboardPayload, anchor: GridPoint, idFactory: IdFactory): MaterializedSubgraph => {
@@ -72,8 +83,13 @@ export const materializeSubgraph = (payload: GraphClipboardPayload, anchor: Grid
     routeHandles: edge.routeHandles.map((handle) => ({ id: idFactory.next('RouteHandleId'), position: translatePoint(handle.position, anchor) })),
     bridges: edge.bridges.map((bridge) => ({ id: idFactory.next('RouteBridgeId'), position: translatePoint(bridge.position, anchor) })),
   }))
+  const looseConnections = payload.looseConnections.map((loose): LooseConnection => ({
+    id: idFactory.next('LooseConnectionId'),
+    origin: { nodeId: nodeIds.get(loose.origin.nodeId)!, portId: portIds.get(loose.origin.portId)! },
+    routeHandles: loose.routeHandles.map((handle) => ({ id: idFactory.next('RouteHandleId'), position: translatePoint(handle.position, anchor) })),
+  }))
   const externalPorts = payload.externalPorts.map((port) => ({ ...port, nodeId: nodeIds.get(port.nodeId)!, portId: portIds.get(port.portId)! }))
-  return { nodes, edges, externalPorts, nodeIds: nodes.map((node) => node.id), edgeIds: edges.map((edge) => edge.id) }
+  return { nodes, edges, looseConnections, externalPorts, nodeIds: nodes.map((node) => node.id), edgeIds: edges.map((edge) => edge.id), looseConnectionIds: looseConnections.map((loose) => loose.id) }
 }
 
 export const translateSubgraph = (subgraph: MaterializedSubgraph, anchor: GridPoint): MaterializedSubgraph => ({
@@ -83,6 +99,10 @@ export const translateSubgraph = (subgraph: MaterializedSubgraph, anchor: GridPo
     ...edge,
     routeHandles: edge.routeHandles.map((handle) => ({ ...handle, position: translatePoint(handle.position, anchor) })),
     bridges: edge.bridges.map((bridge) => ({ ...bridge, position: translatePoint(bridge.position, anchor) })),
+  })),
+  looseConnections: subgraph.looseConnections.map((loose) => ({
+    ...loose,
+    routeHandles: loose.routeHandles.map((handle) => ({ ...handle, position: translatePoint(handle.position, anchor) })),
   })),
 })
 
@@ -100,11 +120,14 @@ export const insertSubgraph = (subgraph: MaterializedSubgraph, label = 'Paste se
   apply(blueprint) {
     assertUnique(blueprint.nodes, subgraph.nodeIds, 'Node')
     assertUnique(blueprint.edges, subgraph.edgeIds, 'Edge')
+    assertUnique(blueprint.looseConnections, subgraph.looseConnectionIds, 'Loose connection')
     const nodes = new Map(blueprint.nodes)
     for (const node of subgraph.nodes) nodes.set(node.id, node)
     const edges = new Map(blueprint.edges)
     for (const edge of subgraph.edges) edges.set(edge.id, edge)
-    let candidate: FactoryBlueprint = { ...blueprint, nodes, edges, externalPorts: [...blueprint.externalPorts, ...subgraph.externalPorts] }
+    const looseConnections = new Map(blueprint.looseConnections)
+    for (const loose of subgraph.looseConnections) looseConnections.set(loose.id, loose)
+    let candidate: FactoryBlueprint = { ...blueprint, nodes, edges, looseConnections, externalPorts: [...blueprint.externalPorts, ...subgraph.externalPorts] }
     candidate = normalizeJunctionPorts(candidate)
 
     const occupied = new Set<PortId>()
@@ -119,6 +142,7 @@ export const insertSubgraph = (subgraph: MaterializedSubgraph, label = 'Paste se
       if (sourceResource !== undefined && targetResource !== undefined && sourceResource !== targetResource) throw new Error('Connected ports must transport the same resource')
     }
     for (const loose of candidate.looseConnections.values()) {
+      if (findPort(candidate, loose.origin.nodeId, loose.origin.portId) === undefined) throw new Error('An incomplete route must reference a pasted component port')
       if (occupied.has(loose.origin.portId)) throw new Error('A port can carry only one route')
       occupied.add(loose.origin.portId)
     }
@@ -133,12 +157,13 @@ export const insertSubgraph = (subgraph: MaterializedSubgraph, label = 'Paste se
       if (resource !== undefined) resources.add(resource)
     }
     const childContracts = new Set(subgraph.nodes.flatMap((node) => node.kind === 'sub-factory' ? [node.contractId] : []))
-    const next = updateBlueprint(blueprint, { nodes: candidate.nodes, edges: candidate.edges, externalPorts: candidate.externalPorts })
+    const next = updateBlueprint(blueprint, { nodes: candidate.nodes, edges: candidate.edges, looseConnections: candidate.looseConnections, externalPorts: candidate.externalPorts })
     return { blueprint: next, changes: { resources, childContracts, structureChanged: true } }
   },
 })
 
-export const subgraphSelection = (subgraph: MaterializedSubgraph): { readonly nodeIds: readonly NodeId[]; readonly edgeIds: readonly EdgeId[] } => ({
+export const subgraphSelection = (subgraph: MaterializedSubgraph): { readonly nodeIds: readonly NodeId[]; readonly edgeIds: readonly EdgeId[]; readonly looseConnectionIds: readonly LooseConnectionId[] } => ({
   nodeIds: subgraph.nodeIds,
   edgeIds: subgraph.edgeIds,
+  looseConnectionIds: subgraph.looseConnectionIds,
 })

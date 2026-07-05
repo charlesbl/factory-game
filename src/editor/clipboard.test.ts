@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { asId, createIdFactory, gridPoint } from '../domain'
-import type { ContractId, FactoryId, NodeId, PortId } from '../domain'
-import { createDemoBlueprint } from '../ui/demo-blueprint'
+import type { ContractId, FactoryId, LooseConnectionId, NodeId, PortId, RouteHandleId } from '../domain'
+import { createBoundaryNode, createDemoBlueprint } from '../ui/demo-blueprint'
 import { createBlueprint } from './blueprint'
 import type { SubFactoryNode } from './blueprint'
 import { BlueprintHistory } from './history'
@@ -56,6 +56,29 @@ describe('graph clipboard', () => {
     expect(copy.contractId).toBe(node.contractId)
     expect(copy.factoryId).toBe(node.factoryId)
     expect(copy.version).toBe(3)
+  })
+
+  it('copies an incomplete route with its origin and remaps its identities', () => {
+    const nodeId = asId<NodeId>('loose-origin')
+    const portId = asId<PortId>('loose-port')
+    const looseId = asId<LooseConnectionId>('loose-route')
+    const node = createBoundaryNode(nodeId, portId, 'external-input', asId('ironOre'), 4, 6)
+    const loose = { id: looseId, origin: { nodeId, portId }, routeHandles: [{ id: asId<RouteHandleId>('loose-end'), position: gridPoint(12, 10) }] }
+    const source = { ...createBlueprint(asId<FactoryId>('factory-source')), nodes: new Map([[node.id, node]]), looseConnections: new Map([[loose.id, loose]]) }
+
+    const payload = captureSubgraph(source, [], [looseId])!
+    expect(payload.nodes).toHaveLength(1)
+    expect(payload.looseConnections).toHaveLength(1)
+
+    const placed = materializeSubgraph(payload, gridPoint(20, 30), createIdFactory())
+    expect(placed.looseConnections[0]!.id).not.toBe(looseId)
+    expect(placed.looseConnections[0]!.origin.nodeId).toBe(placed.nodes[0]!.id)
+    expect(placed.looseConnections[0]!.origin.portId).toBe(placed.nodes[0]!.ports[0]!.id)
+    expect(placed.looseConnections[0]!.routeHandles[0]!.position).toEqual(gridPoint(28, 34))
+
+    const inserted = new BlueprintHistory(createBlueprint(asId<FactoryId>('factory-target'))).execute(insertSubgraph(placed))
+    expect(inserted.nodes.size).toBe(1)
+    expect(inserted.looseConnections.size).toBe(1)
   })
 
   it('inserts a complete subgraph as one undoable history entry', () => {
