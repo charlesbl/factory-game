@@ -1,32 +1,69 @@
-import { useState } from 'react'
 import { Background, Controls, ReactFlow, type Edge, type Node } from '@xyflow/react'
-import type { FactoryId } from '../domain'
-import type { FactoryVersionRef } from '../editor'
-import { buildDependencyDag, latestVersion, versionKey, versionsByKey, type FactoryDefinition, type FactoryVersion } from '../factories'
+import { buildDependencyDag, draftKey, versionDependencies, versionKey, versionsByKey, type FactoryDefinition, type FactoryDraft, type FactoryVersion } from '../factories'
 
-interface Props { readonly definitions: readonly FactoryDefinition[]; readonly versions: readonly FactoryVersion[] }
+interface Props {
+  readonly definitions: readonly FactoryDefinition[]
+  readonly versions: readonly FactoryVersion[]
+  readonly root: FactoryVersion | FactoryDraft
+}
 
-export const FactoryDependencyView = ({ definitions, versions }: Props) => {
-  const publishedDefinitions = definitions.filter((definition) => latestVersion(definition.id, versions) !== undefined)
-  const [factoryId, setFactoryId] = useState<FactoryId | undefined>(() => publishedDefinitions[0]?.id)
-  const available = versions.filter((version) => version.factoryId === factoryId).sort((a, b) => b.version - a.version)
-  const [requestedVersion, setRequestedVersion] = useState<number | undefined>()
-  const root = available.find((version) => version.version === requestedVersion) ?? available[0]
+export const FactoryDependencyGraph = ({ definitions, versions, root }: Props) => {
   const definitionById = new Map(definitions.map((definition) => [definition.id, definition]))
-  const graph = root === undefined ? undefined : buildDependencyDag(root, versionsByKey(versions))
-  const depth = new Map<string, number>()
-  if (graph !== undefined) {
-    depth.set(versionKey(root!), 0); const pending: FactoryVersionRef[] = [root!]
-    while (pending.length > 0) { const parent = pending.shift()!; const parentDepth = depth.get(versionKey(parent)) ?? 0; for (const edge of graph.edges.filter((item) => versionKey(item.parent) === versionKey(parent))) { const key = versionKey(edge.child); if (depth.has(key)) continue; depth.set(key, parentDepth + 1); pending.push(edge.child) } }
+  const versionIndex = versionsByKey(versions)
+  const isPublished = 'version' in root
+  const rootId = isPublished ? versionKey(root) : draftKey(root.factoryId)
+  const graphNodes = new Map<string, { readonly label: string }>()
+  const graphEdges = new Map<string, { readonly source: string; readonly target: string }>()
+
+  if (isPublished) {
+    const graph = buildDependencyDag(root, versionIndex)
+    for (const ref of graph.versions) graphNodes.set(versionKey(ref), { label: `${definitionById.get(ref.factoryId)?.name ?? ref.factoryId} · v${ref.version}` })
+    for (const edge of graph.edges) graphEdges.set(`${versionKey(edge.parent)}>${versionKey(edge.child)}`, { source: versionKey(edge.parent), target: versionKey(edge.child) })
+  } else {
+    graphNodes.set(rootId, { label: `${definitionById.get(root.factoryId)?.name ?? root.factoryId} · Draft` })
+    for (const dependency of versionDependencies(root.blueprint)) {
+      const graph = buildDependencyDag(dependency, versionIndex)
+      const dependencyId = versionKey(dependency)
+      graphEdges.set(`${rootId}>${dependencyId}`, { source: rootId, target: dependencyId })
+      for (const ref of graph.versions) graphNodes.set(versionKey(ref), { label: `${definitionById.get(ref.factoryId)?.name ?? ref.factoryId} · v${ref.version}` })
+      for (const edge of graph.edges) graphEdges.set(`${versionKey(edge.parent)}>${versionKey(edge.child)}`, { source: versionKey(edge.parent), target: versionKey(edge.child) })
+    }
   }
-  const nodes: Node[] = (() => {
-    if (graph === undefined) return []
-    const rows = new Map<number, number>()
-    return graph.versions.map((ref) => { const x = (depth.get(versionKey(ref)) ?? 0) * 260; const row = rows.get(x) ?? 0; rows.set(x, row + 1); return { id: versionKey(ref), position: { x, y: row * 130 }, data: { label: `${definitionById.get(ref.factoryId)?.name ?? ref.factoryId} · v${ref.version}` }, className: versionKey(ref) === versionKey(root!) ? 'dependency-root' : 'dependency-node' } })
-  })()
-  const edges: Edge[] = graph?.edges.map((edge) => ({ id: `${versionKey(edge.parent)}>${versionKey(edge.child)}`, source: versionKey(edge.parent), target: versionKey(edge.child), animated: false })) ?? []
-  return <section className="dependency-view" aria-label="Factory dependencies">
-    <header className="dependency-toolbar panel"><div><span className="eyebrow">Published graph</span><h2>Dependencies</h2></div><label>Factory<select aria-label="Dependency factory" value={factoryId ?? ''} onChange={(event) => { setFactoryId(event.target.value as FactoryId); setRequestedVersion(undefined) }}>{publishedDefinitions.map((definition) => <option key={definition.id} value={definition.id}>{definition.name}</option>)}</select></label><label>Version<select aria-label="Dependency version" value={root?.version ?? ''} onChange={(event) => setRequestedVersion(Number(event.target.value))}>{available.map((version) => <option key={version.version} value={version.version}>v{version.version}</option>)}</select></label></header>
-    <div className="dependency-canvas">{root === undefined ? <p>No published version.</p> : <ReactFlow nodes={nodes} edges={edges} fitView nodesDraggable={false} nodesConnectable={false} elementsSelectable><Background /><Controls /></ReactFlow>}</div>
+
+  const depth = new Map<string, number>([[rootId, 0]])
+  const pending: string[] = [rootId]
+
+  while (pending.length > 0) {
+    const parentId = pending.shift()!
+    const parentDepth = depth.get(parentId) ?? 0
+    for (const edge of [...graphEdges.values()].filter((item) => item.source === parentId)) {
+      if (depth.has(edge.target)) continue
+      depth.set(edge.target, parentDepth + 1)
+      pending.push(edge.target)
+    }
+  }
+
+  const rows = new Map<number, number>()
+  const nodes: Node[] = [...graphNodes].map(([id, data]) => {
+    const x = (depth.get(id) ?? 0) * 260
+    const row = rows.get(x) ?? 0
+    rows.set(x, row + 1)
+    return {
+      id,
+      position: { x, y: row * 130 },
+      data,
+      className: id === rootId ? 'dependency-root' : 'dependency-node',
+    }
+  })
+  const edges: Edge[] = [...graphEdges].map(([id, edge]) => ({
+    id,
+    source: edge.source,
+    target: edge.target,
+    animated: false,
+  }))
+
+  return <section className="version-dependency-graph" aria-label="Factory dependencies">
+    <h4>{isPublished ? 'Published dependency graph' : 'Draft dependency graph'}</h4>
+    <div className="dependency-canvas"><ReactFlow nodes={nodes} edges={edges} fitView nodesDraggable={false} nodesConnectable={false} elementsSelectable><Background /><Controls /></ReactFlow></div>
   </section>
 }

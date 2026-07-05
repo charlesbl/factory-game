@@ -1,5 +1,6 @@
 export * from './blueprint'
 export * from './canonicalize'
+export * from './clipboard'
 export * from './commands'
 export * from './connector-route'
 export * from './history'

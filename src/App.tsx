@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { asId, createIdFactory, formatRate, gridPoint, recipes, resourceById, resources } from './domain'
-import type { FactoryId, RecipeId, ResourceId } from './domain'
+import type { FactoryId, NodeId, PortId, RecipeId, ResourceId } from './domain'
 import type { CompileDiagnostic, FactoryContract } from './compiler'
 import { diagnosticText, hydrateBoundaryPortRates } from './compiler'
-import type { FactoryBlueprint } from './editor'
-import { addExternalPort, addNode, BlueprintHistory, createBlueprint, createJunctionNode, disconnectEdge, duplicateNodes, removeNode, replaceSubFactoryVersion, routeCapacity, routePhysicalLength, routeResource, routeSections, transaction, type EditCommand } from './editor'
+import type { FactoryBlueprint, GraphClipboardPayload } from './editor'
+import { BlueprintHistory, captureSubgraph, createBlueprint, createClipboardPayload, createJunctionNode, disconnectEdge, insertSubgraph, materializeSubgraph, removeNode, replaceSubFactoryVersion, routeCapacity, routePhysicalLength, routeResource, routeSections, subgraphSelection, transaction, translateSubgraph, type EditCommand } from './editor'
 import { createFactoryDefinition, deleteFactoryDefinition, deleteFactoryDraft, deleteFactoryVersion, latestVersion, loadFactoryLibrary, materializeSubFactoryNode, publishFactoryVersion, renameFactoryDefinition, restoreFactoryVersionAsDraft, saveFactoryDraft, versionsByKey, versionKey, wouldCreateIdentityCycle, type FactoryDefinition, type FactoryDraft, type FactoryVersion } from './factories'
 import { EventScheduler, FactoryRuntimeInstance } from './simulation'
 import { createBoundaryNode, createDemoBlueprint, createMachineNode } from './ui/demo-blueprint'
-import { FactoryDependencyView } from './ui/FactoryDependencyView'
-import { FactoryGraphEditor, type GraphSelection } from './ui/FactoryGraphEditor'
+import { FactoryGraphEditor, type GraphPlacement, type GraphSelection } from './ui/FactoryGraphEditor'
 import { FactoryLibraryView } from './ui/FactoryLibraryView'
 import { WorldView } from './ui/WorldView'
 import { CompilationClient } from './workers'
@@ -20,6 +19,9 @@ const INITIAL_FACTORY_NAME = 'Starter iron line'
 const LAST_OPENED_FACTORY_KEY = 'factory-game:last-opened-factory'
 const LIBRARY_INITIALIZED_KEY = 'factory-game:library-initialized'
 const stateTone: Record<string, string> = { RUNNING: 'good', WAITING_INPUT: 'waiting', OUTPUT_BLOCKED: 'blocked', PAUSED: 'muted', INVALID: 'bad', MAINTENANCE: 'bad' }
+interface PendingPlacement extends GraphPlacement { readonly payload: GraphClipboardPayload }
+const emptySelection = (): GraphSelection => ({ nodeIds: [], edgeIds: [] })
+const isTextEditing = (target: EventTarget | null): boolean => target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
 const App = () => {
   const initialBlueprint = useMemo(() => createDemoBlueprint(), [])
@@ -30,7 +32,7 @@ const App = () => {
   const [diagnostics, setDiagnostics] = useState<readonly CompileDiagnostic[]>([])
   const [compileState, setCompileState] = useState<'compiling' | 'ready' | 'invalid'>('compiling')
   const [diagnosticsVisible, setDiagnosticsVisible] = useState(true)
-  const [view, setView] = useState<'factory' | 'world' | 'library' | 'dependencies'>('factory')
+  const [view, setView] = useState<'factory' | 'world' | 'library'>('factory')
   const [definitions, setDefinitions] = useState<readonly FactoryDefinition[]>(() => [{ id: initialBlueprint.id, name: INITIAL_FACTORY_NAME, nextVersion: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }])
   const [drafts, setDrafts] = useState<readonly FactoryDraft[]>([])
   const [versions, setVersions] = useState<readonly FactoryVersion[]>([])
@@ -39,6 +41,8 @@ const App = () => {
   const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error'>('saved')
   const [libraryError, setLibraryError] = useState<string>()
   const [selection, setSelection] = useState<GraphSelection>({ nodeIds: [], edgeIds: [] })
+  const [clipboard, setClipboard] = useState<GraphClipboardPayload>()
+  const [placement, setPlacement] = useState<PendingPlacement>()
   const [catalogueQuery, setCatalogueQuery] = useState('')
   const [boundaryResource, setBoundaryResource] = useState<ResourceId>(() => resources[0]!.id)
   const [logicalTime, setLogicalTime] = useState(0n)
@@ -59,8 +63,8 @@ const App = () => {
   const scheduler = runtime?.scheduler
 
   const execute = useCallback((command: EditCommand) => { const next = history.execute(command); if (command.affectsCompilation) { setDiagnostics([]); setCompileState('compiling'); setCompilationBlueprint(next) } setSaveStatus('saving'); setBlueprint(next) }, [history])
-  const undo = useCallback(() => { const next = history.undo(); if (next.revision !== blueprint.revision) { setDiagnostics([]); setCompileState('compiling'); setCompilationBlueprint(next) } setSaveStatus('saving'); setBlueprint(next) }, [blueprint.revision, history])
-  const redo = useCallback(() => { const next = history.redo(); if (next.revision !== blueprint.revision) { setDiagnostics([]); setCompileState('compiling'); setCompilationBlueprint(next) } setSaveStatus('saving'); setBlueprint(next) }, [blueprint.revision, history])
+  const undo = useCallback(() => { setPlacement(undefined); const next = history.undo(); if (next.revision !== blueprint.revision) { setDiagnostics([]); setCompileState('compiling'); setCompilationBlueprint(next) } setSaveStatus('saving'); setBlueprint(next) }, [blueprint.revision, history])
+  const redo = useCallback(() => { setPlacement(undefined); const next = history.redo(); if (next.revision !== blueprint.revision) { setDiagnostics([]); setCompileState('compiling'); setCompilationBlueprint(next) } setSaveStatus('saving'); setBlueprint(next) }, [blueprint.revision, history])
 
   useEffect(() => {
     mounted.current = true
@@ -125,16 +129,8 @@ const App = () => {
     if (instance === undefined) return undefined
     return instance.subscribe(() => renderRuntime((value) => value + 1))
   }, [instance])
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey)) return
-      if (event.key.toLowerCase() === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo() }
-      if (event.key.toLowerCase() === 'd' && selection.nodeIds.length > 0) { event.preventDefault(); execute(duplicateNodes(blueprint, selection.nodeIds, idFactory)) }
-    }
-    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey)
-  }, [blueprint, execute, redo, selection.nodeIds, undo])
-
   const openFactory = async (factoryId: FactoryId, nextView: 'factory' | 'world' = 'factory') => {
+    setPlacement(undefined)
     try {
       const definition = definitions.find((item) => item.id === factoryId)
       if (definition === undefined) return
@@ -155,6 +151,7 @@ const App = () => {
     } catch (error) { setLibraryError(error instanceof Error ? error.message : 'Could not open factory') }
   }
   const createFactory = async (name: string) => {
+    setPlacement(undefined)
     try {
       const id = asId<FactoryId>(`factory-${crypto.randomUUID()}`); const empty = createBlueprint(id); const definition = await createFactoryDefinition(empty, name)
       const draft: FactoryDraft = { factoryId: id, blueprint: empty, autosavedAt: definition.updatedAt }
@@ -184,6 +181,7 @@ const App = () => {
     } catch (error) { setLibraryError(error instanceof Error ? error.message : 'Publication failed') }
   }
   const forkVersion = async (version: FactoryVersion, name: string) => {
+    setPlacement(undefined)
     try {
       const id = asId<FactoryId>(`factory-${crypto.randomUUID()}`)
       const forkedBlueprint: FactoryBlueprint = { ...version.blueprint, id, revision: version.blueprint.revision + 1 }
@@ -200,6 +198,7 @@ const App = () => {
     finally { inspector.dispose() }
   }
   const revertDraft = async (factoryId: FactoryId) => {
+    setPlacement(undefined)
     try {
       await deleteFactoryDraft(factoryId); setDrafts((current) => current.filter((item) => item.factoryId !== factoryId))
       if (factoryId === activeFactoryId) {
@@ -212,6 +211,7 @@ const App = () => {
     catch (error) { setLibraryError(error instanceof Error ? error.message : 'Could not revert draft') }
   }
   const removeFactory = async (factoryId: FactoryId) => {
+    setPlacement(undefined)
     try {
       await deleteFactoryDefinition(factoryId)
       const remaining = definitions.filter((item) => item.id !== factoryId)
@@ -234,17 +234,30 @@ const App = () => {
     catch (error) { setLibraryError(error instanceof Error ? error.message : 'Version cannot be deleted') }
   }
 
+  const validatePlacement = (payload: GraphClipboardPayload): boolean => {
+    for (const node of payload.nodes) if (node.kind === 'sub-factory') {
+      const ref = { factoryId: node.factoryId, version: node.version }
+      if (!versionIndex.has(versionKey(ref))) { setLibraryError(`Placement blocked: ${node.name} v${node.version} is no longer available.`); return false }
+      const path = wouldCreateIdentityCycle(activeFactoryId, ref, versionIndex)
+      if (path !== undefined) { setLibraryError(`Placement blocked: ${node.name} v${node.version} would create a factory cycle through ${cycleText(path)}.`); return false }
+    }
+    return true
+  }
+  const startPlacement = (payload: GraphClipboardPayload | undefined, label: string) => {
+    if (payload === undefined || !validatePlacement(payload)) return
+    setSelection(emptySelection()); setPlacement({ label, payload, subgraph: materializeSubgraph(payload, gridPoint(0, 0), idFactory) }); setLibraryError(undefined)
+  }
   const addMachine = (recipeId: RecipeId) => {
-    const id = idFactory.next('NodeId')
-    execute(addNode(createMachineNode(id, recipeId, 7 + blueprint.nodes.size, 9 + (blueprint.nodes.size % 3) * 4)))
+    const node = createMachineNode(asId<NodeId>('placement-machine'), recipeId, 0, 0)
+    startPlacement(createClipboardPayload([node]), node.name)
   }
   const addBoundary = (kind: 'external-input' | 'external-output') => {
-    const id = idFactory.next('NodeId'); const portId = idFactory.next('PortId'); const isInput = kind === 'external-input'
-    const node = createBoundaryNode(id, portId, kind, boundaryResource, isInput ? 1 : 18, 8 + blueprint.nodes.size * 2)
-    execute(transaction(isInput ? 'Add resource intake' : 'Add resource dispatch', [addNode(node), addExternalPort({ nodeId: id, portId, side: isInput ? 'left' : 'right', offset: 1 })]))
+    const id = asId<NodeId>('placement-boundary'); const portId = asId<PortId>('placement-boundary-port'); const isInput = kind === 'external-input'
+    const node = createBoundaryNode(id, portId, kind, boundaryResource, 0, 0)
+    startPlacement(createClipboardPayload([node], [], [{ nodeId: id, portId, side: isInput ? 'left' : 'right', offset: 1 }]), node.name)
   }
   const addJunction = () => {
-    const id = idFactory.next('NodeId'); execute(addNode(createJunctionNode(id, gridPoint(10, 10))))
+    const node = createJunctionNode(asId<NodeId>('placement-junction'), gridPoint(0, 0)); startPlacement(createClipboardPayload([node]), node.name)
   }
   const factoryCycleReason = (version: FactoryVersion): string | undefined => {
     const path = wouldCreateIdentityCycle(activeFactoryId, version, versionIndex)
@@ -253,7 +266,7 @@ const App = () => {
   const addPublishedFactory = (version: FactoryVersion) => {
     if (factoryCycleReason(version) !== undefined) return
     const definition = definitions.find((item) => item.id === version.factoryId); if (definition === undefined) return
-    const id = idFactory.next('NodeId'); execute(addNode(materializeSubFactoryNode(id, definition, version.version, version.contract, gridPoint(7 + blueprint.nodes.size, 9 + (blueprint.nodes.size % 3) * 5))))
+    const node = materializeSubFactoryNode(asId<NodeId>('placement-sub-factory'), definition, version.version, version.contract, gridPoint(0, 0)); startPlacement(createClipboardPayload([node]), node.name)
   }
   const supplyInputs = () => {
     if (instance === undefined) return
@@ -280,8 +293,42 @@ const App = () => {
       ...selection.nodeIds.map(removeNode),
       ...independentEdges.map(disconnectEdge),
     ]))
-    setSelection({ nodeIds: [], edgeIds: [] })
+    setSelection(emptySelection())
   }
+  const copySelection = () => {
+    const payload = captureSubgraph(blueprint, selection.nodeIds)
+    if (payload !== undefined) { setClipboard(payload); setLibraryError(undefined) }
+  }
+  const cutSelection = () => {
+    const payload = captureSubgraph(blueprint, selection.nodeIds)
+    if (payload === undefined) return
+    setClipboard(payload); execute(transaction('Cut selection', selection.nodeIds.map(removeNode))); setSelection(emptySelection()); setPlacement(undefined); setLibraryError(undefined)
+  }
+  const pasteSelection = () => { if (clipboard !== undefined) startPlacement(clipboard, clipboard.nodes.length === 1 ? clipboard.nodes[0]!.name : `${clipboard.nodes.length.toLocaleString()} components`) }
+  const duplicateSelection = () => {
+    const payload = captureSubgraph(blueprint, selection.nodeIds)
+    if (payload !== undefined) startPlacement(payload, payload.nodes.length === 1 ? payload.nodes[0]!.name : `${payload.nodes.length.toLocaleString()} components`)
+  }
+  const commitPlacement = (position: ReturnType<typeof gridPoint>, repeat: boolean) => {
+    if (placement === undefined) return
+    const placed = translateSubgraph(placement.subgraph, position)
+    execute(insertSubgraph(placed, placement.payload.nodes.length === 1 ? `Place ${placement.label}` : 'Paste selection'))
+    if (repeat) { setSelection(emptySelection()); setPlacement({ ...placement, subgraph: materializeSubgraph(placement.payload, gridPoint(0, 0), idFactory) }) }
+    else { setSelection(subgraphSelection(placed)); setPlacement(undefined) }
+  }
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (view !== 'factory' || activeDefinition === undefined || isTextEditing(event.target)) return
+      const key = event.key.toLowerCase(); const modified = event.ctrlKey || event.metaKey
+      if (modified && key === 'z') { event.preventDefault(); if (event.shiftKey) redo(); else undo(); return }
+      if (modified && key === 'c' && selection.nodeIds.length > 0) { event.preventDefault(); copySelection(); return }
+      if (modified && key === 'x' && selection.nodeIds.length > 0) { event.preventDefault(); cutSelection(); return }
+      if (modified && key === 'v' && clipboard !== undefined) { event.preventDefault(); pasteSelection(); return }
+      if (modified && key === 'd' && selection.nodeIds.length > 0) { event.preventDefault(); duplicateSelection(); return }
+      if (!modified && (event.key === 'Delete' || event.key === 'Backspace') && (selection.nodeIds.length > 0 || selection.edgeIds.length > 0)) { event.preventDefault(); deleteSelection() }
+    }
+    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey)
+  })
   const selectedNode = selection.nodeIds.length === 1 ? blueprint.nodes.get(selection.nodeIds[0]!) : undefined
   const selectedSubFactoryVersions = selectedNode?.kind === 'sub-factory' ? versions.filter((version) => version.factoryId === selectedNode.factoryId).sort((a, b) => b.version - a.version) : []
   const selectedEdge = selection.edgeIds.length === 1 && selection.nodeIds.length === 0 ? blueprint.edges.get(selection.edgeIds[0]!) : undefined
@@ -311,7 +358,8 @@ const App = () => {
     if (!window.confirm(`Switch from v${selectedNode.version} to v${target.version}?\nAdded ports: ${added}\nRemoved ports: ${removed}\nConnections to review: ${affected}\nIncompatible connections will become loose routes.`)) return
     const selectedId = selectedNode.id; execute(replaceSubFactoryVersion(selectedId, replacement)); window.setTimeout(() => setSelection({ nodeIds: [selectedId], edgeIds: [] }), 0); setLibraryError(undefined)
   }
-  const changeView = async (next: 'factory' | 'world' | 'library' | 'dependencies') => {
+  const changeView = async (next: 'factory' | 'world' | 'library') => {
+    setPlacement(undefined)
     if (libraryReady && view === 'factory' && next !== 'factory') {
       try {
         const draft = await saveFactoryDraft(activeFactoryId, blueprint, activeBaseVersion)
@@ -324,13 +372,13 @@ const App = () => {
   return <main className="app-shell">
     <header className="topbar">
       <div className="brand"><span className="brand-mark">F</span><div><strong>Factory Game</strong><small>Graph engineering console</small></div></div>
-      <div className="factory-title"><span>{view === 'factory' ? 'Blueprint /' : view === 'world' ? 'World /' : view === 'library' ? 'Library /' : 'Dependencies /'}</span><strong>{view === 'factory' ? activeDefinition?.name ?? 'No factory' : view === 'world' ? 'Production network' : view === 'library' ? 'My factories' : 'Published graph'}</strong><em>{view === 'factory' ? `rev ${blueprint.revision}` : view === 'world' ? '1 active site' : `${versions.length} versions`}</em></div>
+      <div className="factory-title"><span>{view === 'factory' ? 'Blueprint /' : view === 'world' ? 'World /' : 'Library /'}</span><strong>{view === 'factory' ? activeDefinition?.name ?? 'No factory' : view === 'world' ? 'Production network' : 'My factories'}</strong><em>{view === 'factory' ? `rev ${blueprint.revision}` : view === 'world' ? '1 active site' : `${versions.length} versions`}</em></div>
       <div className="top-status">{view === 'factory' && activeDefinition !== undefined && <><span className={`status-dot ${compileState}`} />{compileState === 'ready' ? 'Contract ready' : compileState === 'compiling' ? 'Compiling…' : 'Invalid graph'}<span className={`save-state ${saveStatus}`}>{saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Draft saved' : 'Save failed'}</span><button className="button button--primary button--compact publish-button" disabled={compileState !== 'ready'} onClick={() => void publishFactory(activeFactoryId)}>Publish</button></>}</div>
     </header>
     <section className="toolbar" aria-label="Editor tools">
-      <div className="view-switch" aria-label="View"><button aria-label="World" aria-pressed={view === 'world'} className={view === 'world' ? 'active' : ''} disabled={activeDefinition === undefined} onClick={() => changeView('world')}>◎ <span>World</span></button><button aria-label="Factory" title={activeDefinition === undefined ? 'Create a factory first' : `Return to ${activeDefinition.name}`} aria-pressed={view === 'factory'} className={view === 'factory' ? 'active' : ''} disabled={activeDefinition === undefined} onClick={() => changeView('factory')}>◇ <span>Factory</span></button><button aria-label="Library" aria-pressed={view === 'library'} className={view === 'library' ? 'active' : ''} onClick={() => changeView('library')}>▤ <span>Library</span></button><button aria-label="Dependencies" aria-pressed={view === 'dependencies'} className={view === 'dependencies' ? 'active' : ''} onClick={() => changeView('dependencies')}>⌘ <span>Dependencies</span></button></div>
+      <div className="view-switch" aria-label="View"><button aria-label="World" aria-pressed={view === 'world'} className={view === 'world' ? 'active' : ''} disabled={activeDefinition === undefined} onClick={() => changeView('world')}>◎ <span>World</span></button><button aria-label="Factory" title={activeDefinition === undefined ? 'Create a factory first' : `Return to ${activeDefinition.name}`} aria-pressed={view === 'factory'} className={view === 'factory' ? 'active' : ''} disabled={activeDefinition === undefined} onClick={() => changeView('factory')}>◇ <span>Factory</span></button><button aria-label="Library" aria-pressed={view === 'library'} className={view === 'library' ? 'active' : ''} onClick={() => changeView('library')}>▤ <span>Library</span></button></div>
       {view === 'factory' && activeDefinition !== undefined && <><div className="tool-group"><button onClick={undo} disabled={!history.canUndo} aria-label="Undo" title="Ctrl+Z">↶ <span>Undo</span></button><button onClick={redo} disabled={!history.canRedo} aria-label="Redo" title="Ctrl+Shift+Z">↷ <span>Redo</span></button></div>
-      <div className="tool-group"><button onClick={addJunction}>◆ <span>Junction</span></button><button onClick={() => selection.nodeIds.length > 0 && execute(duplicateNodes(blueprint, selection.nodeIds, idFactory))} disabled={selection.nodeIds.length === 0} title="Ctrl+D">⧉ <span>Duplicate</span></button><button className="delete-tool" onClick={deleteSelection} disabled={selectionCount === 0} title="Delete / Backspace">⌫ <span>Delete{selectionCount > 0 ? ` (${selectionCount})` : ''}</span></button></div></>}
+      <div className="tool-group"><button onClick={addJunction} aria-label="Place junction">◆ <span>Junction</span></button></div><div className="tool-group clipboard-tools"><button onClick={copySelection} disabled={selection.nodeIds.length === 0} aria-label="Copy selection" title="Ctrl+C">⧉ <span>Copy</span></button><button onClick={cutSelection} disabled={selection.nodeIds.length === 0} aria-label="Cut selection" title="Ctrl+X">✂ <span>Cut</span></button><button onClick={pasteSelection} disabled={clipboard === undefined} aria-label="Paste selection" title="Ctrl+V">▣ <span>Paste</span></button><button onClick={duplicateSelection} disabled={selection.nodeIds.length === 0} aria-label="Duplicate selection" title="Ctrl+D">⧉ <span>Duplicate</span></button><button className="delete-tool" onClick={deleteSelection} disabled={selectionCount === 0} aria-label={selectionCount === 0 ? 'Delete selection' : `Delete (${selectionCount.toLocaleString()})`} title="Delete / Backspace">⌫ <span>Delete{selectionCount > 0 ? ` (${selectionCount.toLocaleString()})` : ''}</span></button></div></>}
       <div className="tool-spacer" />
       {libraryError !== undefined && <div className="library-error" role="alert">{libraryError}<button aria-label="Dismiss library error" onClick={() => setLibraryError(undefined)}>×</button></div>}
       {view === 'factory' && activeDefinition !== undefined && <><button className={diagnosticsVisible ? 'active' : ''} onClick={() => setDiagnosticsVisible((value) => !value)}>◉ <span>Flow diagnostics</span></button>
@@ -353,12 +401,12 @@ const App = () => {
       </aside>
       <section className="canvas-stack">
         <div className="canvas-caption"><span>Factory interior</span><small>Grid unit: 1 m · shortest path has priority</small></div>
-        <FactoryGraphEditor blueprint={displayBlueprint} contract={contract} childContracts={childContracts} diagnostics={diagnostics} diagnosticsVisible={diagnosticsVisible} onCommand={execute} onSelection={setSelection} />
+        <FactoryGraphEditor blueprint={displayBlueprint} contract={contract} childContracts={childContracts} diagnostics={diagnostics} diagnosticsVisible={diagnosticsVisible} selection={selection} {...(placement === undefined ? {} : { placement })} onCommand={execute} onSelection={setSelection} onPlacementCommit={commitPlacement} onPlacementCancel={() => setPlacement(undefined)} />
         <div className="canvas-legend">{diagnostics.some((item) => item.severity === 'error') ? <><span><i className="line problem" /> Problem route</span><span><i className="line blocked" /> Blocked by graph error</span></> : <><span><i className="line active" /> Active flow</span><span><i className="line saturated" /> Saturated</span><span><i className="line idle" /> Available route</span></>}</div>
       </section>
       <aside className="inspector panel">
         <div className="panel-heading"><div><span className="eyebrow">Inspect</span><h2>{selectedNode?.kind === 'sub-factory' ? definitions.find((item) => item.id === selectedNode.factoryId)?.name ?? selectedNode.name : selectedNode?.name ?? (selectedEdge === undefined ? 'Factory contract' : 'Selected route')}</h2></div><span>⌘</span></div>
-        {selectedNode !== undefined && <section className="inspector-card"><h3>Selected node</h3><dl><div><dt>Type</dt><dd>{selectedNode.kind}</dd></div><div><dt>Grid position</dt><dd>{selectedNode.position.x}, {selectedNode.position.y}</dd></div><div><dt>Ports</dt><dd>{selectedNode.ports.length}</dd></div>{selectedNode.kind === 'sub-factory' && <><div><dt>Factory</dt><dd>{definitions.find((item) => item.id === selectedNode.factoryId)?.name ?? selectedNode.factoryId}</dd></div><div><dt>Pinned version</dt><dd>v{selectedNode.version}</dd></div></>}</dl>{selectedNode.kind === 'sub-factory' && <div className="version-switcher"><label>Change version<select aria-label="Sub-factory version" value={selectedNode.version} onChange={(event) => { const target = selectedSubFactoryVersions.find((version) => version.version === Number(event.target.value)); if (target !== undefined) changeSubFactoryVersion(target) }}>{selectedSubFactoryVersions.map((version) => <option key={version.version} value={version.version}>v{version.version}{version.version === selectedSubFactoryVersions[0]?.version ? ' · latest' : ''}</option>)}</select></label>{selectedSubFactoryVersions[0] !== undefined && selectedSubFactoryVersions[0].version > selectedNode.version && <button className="button button--primary button--block" onClick={() => changeSubFactoryVersion(selectedSubFactoryVersions[0]!)}>Upgrade to v{selectedSubFactoryVersions[0].version}</button>}</div>}<button className="danger-button" onClick={deleteSelection}>Delete node</button></section>}
+        {selectedNode !== undefined && <section className="inspector-card"><h3>Selected node</h3><dl><div><dt>Type</dt><dd>{selectedNode.kind}</dd></div><div><dt>Grid position</dt><dd>{selectedNode.position.x}, {selectedNode.position.y}</dd></div><div><dt>Ports</dt><dd>{selectedNode.ports.length}</dd></div>{selectedNode.kind === 'sub-factory' && <><div><dt>Factory</dt><dd>{definitions.find((item) => item.id === selectedNode.factoryId)?.name ?? selectedNode.factoryId}</dd></div><div><dt>Pinned version</dt><dd>v{selectedNode.version}</dd></div></>}</dl>{selectedNode.kind === 'sub-factory' && <div className="version-switcher"><button className="button button--primary button--block" onClick={() => void openFactory(selectedNode.factoryId)}>Edit factory</button><label>Change version<select aria-label="Sub-factory version" value={selectedNode.version} onChange={(event) => { const target = selectedSubFactoryVersions.find((version) => version.version === Number(event.target.value)); if (target !== undefined) changeSubFactoryVersion(target) }}>{selectedSubFactoryVersions.map((version) => <option key={version.version} value={version.version}>v{version.version}{version.version === selectedSubFactoryVersions[0]?.version ? ' · latest' : ''}</option>)}</select></label>{selectedSubFactoryVersions[0] !== undefined && selectedSubFactoryVersions[0].version > selectedNode.version && <button className="button button--primary button--block" onClick={() => changeSubFactoryVersion(selectedSubFactoryVersions[0]!)}>Upgrade to v{selectedSubFactoryVersions[0].version}</button>}</div>}<button className="danger-button" onClick={deleteSelection}>Delete node</button></section>}
         {selectedEdge !== undefined && <section className="inspector-card"><h3>Selected route</h3><dl><div><dt>Resource</dt><dd>{resourceById.get(routeResource(blueprint, selectedEdge)!)?.name ?? 'Any'}</dd></div><div><dt>Current / capacity</dt><dd>{formatRate(contract?.edgeFlows.get(selectedEdge.id) ?? 0n)} / {formatRate(routeCapacity(blueprint, selectedEdge))}/s</dd></div><div><dt>Physical length</dt><dd>{selectedEdgeLengthText} m</dd></div><div><dt>Handles</dt><dd>{selectedEdge.routeHandles.length}</dd></div><div><dt>Layers</dt><dd>{[...new Set(selectedSections.map((section) => section.layerId))].join(' + ') || 'primary'}</dd></div><div><dt>Bridges</dt><dd>{selectedEdge.bridges.length}</dd></div><div><dt>Priority</dt><dd>length → grid → ID</dd></div></dl><button className="danger-button" onClick={deleteSelection}>Delete route</button></section>}
         <section className="inspector-card contract-card"><h3>Net program <span className="badge">Coupled</span></h3><div className="rates"><div><span>Inputs</span>{rates.inputs.map(([id, rate]) => <p key={id}><i style={{ background: resourceById.get(id)?.colour }} />{resourceById.get(id)?.name}<b>{formatRate(rate)}/s</b></p>)}</div><div><span>Outputs</span>{rates.outputs.map(([id, rate]) => <p key={id}><i style={{ background: resourceById.get(id)?.colour }} />{resourceById.get(id)?.name}<b>{formatRate(rate)}/s</b></p>)}</div></div>{contract !== undefined && <small>Footprint {contract.footprint.width} × {contract.footprint.height} m · {contract.blueprintHash.slice(0, 10)}</small>}</section>
         <section className="inspector-card runtime-card"><h3>World runtime {instance !== undefined && <span className={`badge ${stateTone[instance.state]}`}>{instance.state.replace('_', ' ')}</span>}</h3>
@@ -369,7 +417,7 @@ const App = () => {
         </section>
         <section className="inspector-card diagnostics"><h3>Diagnostics</h3>{compileState === 'ready' && diagnostics.length === 0 && <p className="diagnostic-ok">✓ Exact conservation verified</p>}{diagnostics.map((item, index) => <p key={`${item.code}-${index}`}><span>!</span>{diagnosticText(item)}</p>)}{compileState === 'invalid' && <p><span>!</span>The highlighted routes must be repaired before the graph can compile.</p>}</section>
       </aside>
-    </div> : view === 'world' && activeDefinition !== undefined ? <WorldView blueprint={blueprint} factories={definitions} activeFactoryId={activeFactoryId} factoryName={activeDefinition.name} contract={contract} compileState={compileState} snapshot={snapshot} logicalTime={logicalTime} scheduledEvents={scheduler?.scheduledEvents ?? 0} sleepingActors={scheduler?.sleepingActors ?? 0} onSelectFactory={(id) => void openFactory(id, 'world')} onOpenFactory={() => changeView('factory')} onSupply={supplyInputs} onAdvance={() => advance(5)} onCollect={collectOutputs} /> : view === 'library' || activeDefinition === undefined ? <FactoryLibraryView definitions={definitions} drafts={drafts} versions={versions} activeFactoryId={activeFactoryId} onOpen={(id) => void openFactory(id)} onCreate={(name) => void createFactory(name)} onRename={(id, name) => void renameFactory(id, name)} onPublish={(id) => void publishFactory(id)} onInspectDraft={inspectFactoryDraft} onForkVersion={(version, name) => void forkVersion(version, name)} onRevertDraft={(id) => void revertDraft(id)} onDeleteFactory={(id) => void removeFactory(id)} onDeleteVersion={(version) => void removeVersion(version)} /> : <FactoryDependencyView definitions={definitions} versions={versions} />}
+    </div> : view === 'world' && activeDefinition !== undefined ? <WorldView blueprint={blueprint} factories={definitions} activeFactoryId={activeFactoryId} factoryName={activeDefinition.name} contract={contract} compileState={compileState} snapshot={snapshot} logicalTime={logicalTime} scheduledEvents={scheduler?.scheduledEvents ?? 0} sleepingActors={scheduler?.sleepingActors ?? 0} onSelectFactory={(id) => void openFactory(id, 'world')} onOpenFactory={() => changeView('factory')} onSupply={supplyInputs} onAdvance={() => advance(5)} onCollect={collectOutputs} /> : <FactoryLibraryView definitions={definitions} drafts={drafts} versions={versions} activeFactoryId={activeFactoryId} onOpen={(id) => void openFactory(id)} onCreate={(name) => void createFactory(name)} onRename={(id, name) => void renameFactory(id, name)} onPublish={(id) => void publishFactory(id)} onInspectDraft={inspectFactoryDraft} onForkVersion={(version, name) => void forkVersion(version, name)} onRevertDraft={(id) => void revertDraft(id)} onDeleteFactory={(id) => void removeFactory(id)} onDeleteVersion={(version) => void removeVersion(version)} />}
   </main>
 }
 
