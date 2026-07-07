@@ -26,6 +26,13 @@ interface Props { readonly blueprint: FactoryBlueprint; readonly contract: Facto
 const samePoint = (a: GridPoint, b: GridPoint): boolean => a.x === b.x && a.y === b.y
 const sameIds = <Id extends string>(a: readonly Id[], b: readonly Id[]): boolean => a.length === b.length && a.every((id) => b.includes(id))
 const axisOfLastSegment = (points: readonly GridPoint[], fallback: RouteAxis): RouteAxis => { const end = points.at(-1); const before = points.at(-2); return end === undefined || before === undefined ? fallback : end.y === before.y ? 'horizontal' : 'vertical' }
+const snapToDominantAxis = (from: GridPoint, to: GridPoint): GridPoint => {
+  if (from.x !== to.x && from.y !== to.y) {
+    const dx = Math.abs(to.x - from.x); const dy = Math.abs(to.y - from.y)
+    return dx >= dy ? { x: to.x, y: from.y } : { x: from.x, y: to.y }
+  }
+  return to
+}
 
 export const FactoryGraphEditor = ({ blueprint, contract, childContracts, diagnostics, diagnosticsVisible, selection: controlledSelection, placement, onCommand, onSelection, onPlacementCommit, onPlacementCancel }: Props) => {
   const flow = useRef<ReactFlowInstance<FactoryFlowNode, ConveyorFlowEdge> | null>(null)
@@ -138,7 +145,8 @@ export const FactoryGraphEditor = ({ blueprint, contract, childContracts, diagno
         }
       }
     } else if (drop !== undefined && !samePoint(drop, connectionDrag.start)) {
-      const handle: RouteHandle = { id: asId<RouteHandleId>(`handle-${crypto.randomUUID()}`), position: drop }
+      const snapped = snapToDominantAxis(connectionDrag.start, drop)
+      const handle: RouteHandle = { id: asId<RouteHandleId>(`handle-${crypto.randomUUID()}`), position: snapped }
       if (connectionDrag.kind === 'new') onCommand(addLooseConnection({ id: asId<LooseConnectionId>(`loose-${crypto.randomUUID()}`), origin: connectionDrag.origin, routeHandles: [handle] })); else onCommand(extendLooseConnection(connectionDrag.looseId, handle))
     }
     setConnectionDrag(undefined); setPointer(undefined)
@@ -152,7 +160,7 @@ export const FactoryGraphEditor = ({ blueprint, contract, childContracts, diagno
     window.addEventListener('keydown', onKeyDown, true); return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [connectionDrag, onCommand, onPlacementCancel, onSelection, placement, selectedHandle])
   const screenPoint = (point: GridPoint) => ({ x: gridToPixel(point.x) * viewport.zoom + viewport.x, y: gridToPixel(point.y) * viewport.zoom + viewport.y })
-  const preview = connectionDrag === undefined || pointer === undefined ? undefined : materializeHandleRoute(connectionDrag.start, [{ id: asId<RouteHandleId>('preview'), position: pointer }], connectionDrag.axis)
+  const preview = connectionDrag === undefined || pointer === undefined ? undefined : materializeHandleRoute(connectionDrag.start, [{ id: asId<RouteHandleId>('preview'), position: snapToDominantAxis(connectionDrag.start, pointer) }], connectionDrag.axis)
   const looseRoutes = [...blueprint.looseConnections.values()].map((loose) => {
     if (handleDrag?.looseId !== loose.id || handlePosition === undefined) return { loose, route: looseConnectionRoute(blueprint, loose) }
     const routeHandles = loose.routeHandles.map((handle) => handle.id === handleDrag.handleId ? { ...handle, position: handlePosition } : handle); const projected = { ...loose, routeHandles }; return { loose: projected, route: looseConnectionRoute(blueprint, projected) }
