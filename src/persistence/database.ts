@@ -9,6 +9,7 @@ export interface DependencyRecord { readonly key: string; readonly parentId: str
 export interface FactoryRecord { readonly id: string; readonly name: string; readonly nextVersion: number; readonly createdAt: string; readonly updatedAt: string }
 export interface DraftRecord { readonly factoryId: string; readonly schemaVersion: number; readonly baseVersion?: number; readonly revision: number; readonly autosavedAt: string; readonly payload: string }
 export interface FactoryVersionRecord { readonly key: string; readonly factoryId: string; readonly version: number; readonly schemaVersion: number; readonly revision: number; readonly contractHash: string; readonly publishedAt: string; readonly recovered?: boolean; readonly payload: string }
+export interface WorldRecord { readonly id: 'main'; readonly schemaVersion: 2; readonly revision: number; readonly savedAt: string; readonly payload: string }
 
 export class FactoryDatabase extends Dexie {
   metadata!: EntityTable<MetadataRecord, 'key'>
@@ -20,12 +21,12 @@ export class FactoryDatabase extends Dexie {
   factories!: EntityTable<FactoryRecord, 'id'>
   drafts!: EntityTable<DraftRecord, 'factoryId'>
   factoryVersions!: EntityTable<FactoryVersionRecord, 'key'>
-  constructor(name = 'factory-game') {
+  worlds!: EntityTable<WorldRecord, 'id'>
+  constructor(name = 'factory-game-world-v1') {
     super(name)
-    this.version(1).stores({ metadata: '&key', blueprints: '&id,revision', contracts: '&hash', instances: '&id,contractHash', inventories: '&id,resourceId', dependencies: '&key,parentId,childId' })
-    this.version(2).stores({
+    this.version(1).stores({
       metadata: '&key', blueprints: '&id,revision', contracts: '&hash', instances: '&id,contractHash', inventories: '&id,resourceId',
-      dependencies: '&key,parentId,childId', factories: '&id,&name,nextVersion', drafts: '&factoryId,revision', factoryVersions: '&key,factoryId,version,contractHash',
+      dependencies: '&key,parentId,childId', factories: '&id,&name,nextVersion', drafts: '&factoryId,revision', factoryVersions: '&key,factoryId,version,contractHash', worlds: '&id,revision',
     })
   }
 }

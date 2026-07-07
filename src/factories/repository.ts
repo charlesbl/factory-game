@@ -1,7 +1,7 @@
 import { deserializeContract, serializeContract, type FactoryContract, type SerializedFactoryContract } from '../compiler'
 import { asId, parseExact, stringifyExact } from '../domain'
 import type { FactoryId } from '../domain'
-import { canonicalBlueprint, createBlueprint, deserializeBlueprint, serializeBlueprint, type FactoryBlueprint } from '../editor'
+import { canonicalBlueprint, deserializeBlueprint, serializeBlueprint, type FactoryBlueprint } from '../editor'
 import { database, type ContractRecord, type DependencyRecord, type DraftRecord, type FactoryRecord, type FactoryVersionRecord } from '../persistence/database'
 import type { FactoryDefinition, FactoryDraft, FactoryVersion } from './model'
 import { draftKey, versionDependencies, versionKey } from './model'
@@ -28,31 +28,7 @@ const ensureUniqueName = async (name: string, exceptId?: FactoryId): Promise<str
   return normalized
 }
 
-export const migrateLegacyLibrary = async (): Promise<void> => {
-  if (await database.factories.count() > 0) return
-  const legacy = await database.blueprints.toArray()
-  if (legacy.length === 0) return
-  const now = new Date().toISOString()
-  await database.transaction('rw', [database.factories, database.drafts, database.factoryVersions, database.contracts, database.dependencies], async () => {
-    const recovered = new Map<string, { readonly factoryId: FactoryId; readonly name: string; readonly contractHash: string }>()
-    for (const record of legacy) {
-      const raw = JSON.parse(record.payload) as { readonly name?: unknown }; const blueprint = deserializeBlueprint(raw); const name = typeof raw.name === 'string' && raw.name.trim().length > 0 ? raw.name.trim() : 'Recovered factory'
-      await database.factories.put({ id: blueprint.id, name, nextVersion: 1, createdAt: now, updatedAt: now })
-      await database.drafts.put({ factoryId: blueprint.id, schemaVersion: 5, revision: blueprint.revision, autosavedAt: now, payload: canonicalBlueprint(blueprint) })
-      await database.dependencies.bulkPut(dependencyRecords(draftKey(blueprint.id), blueprint))
-      for (const node of blueprint.nodes.values()) if (node.kind === 'sub-factory' && node.factoryId.startsWith('recovered:')) recovered.set(node.factoryId, { factoryId: node.factoryId, name: `Recovered: ${node.name || 'factory'} (${node.contractId.slice(0, 8)})`, contractHash: node.contractId })
-    }
-    for (const item of recovered.values()) {
-      if (await database.contracts.get(item.contractHash) === undefined) continue
-      const recoveredBlueprint = createBlueprint(item.factoryId); const key = versionKey({ factoryId: item.factoryId, version: 1 })
-      await database.factories.put({ id: item.factoryId, name: item.name, nextVersion: 2, createdAt: now, updatedAt: now })
-      await database.factoryVersions.put({ key, factoryId: item.factoryId, version: 1, schemaVersion: 5, revision: 0, contractHash: item.contractHash, publishedAt: now, recovered: true, payload: canonicalBlueprint(recoveredBlueprint) })
-    }
-  })
-}
-
 export const loadFactoryLibrary = async (): Promise<FactoryLibrarySnapshot> => {
-  await migrateLegacyLibrary()
   const [factoryRecords, draftRecords, versionRecords, contractRecords] = await Promise.all([
     database.factories.toArray(), database.drafts.toArray(), database.factoryVersions.toArray(), database.contracts.toArray(),
   ])

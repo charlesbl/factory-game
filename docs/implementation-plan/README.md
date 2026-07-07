@@ -1,13 +1,16 @@
 # Remaining implementation plan
 
-This plan was audited against the current worktree on 2026-07-02. It contains
+This plan was audited against the current worktree on 2026-07-06. It contains
 only work that is not implemented, or whose current implementation does not yet
 meet the acceptance criteria in [`factory-graph-design.md`](../factory-graph-design.md).
 Completed work has intentionally been removed.
 
 The accepted V1 rules remain defined by
-[`ADR 0001`](../adr/0001-factory-graph-v1-rules.md) and
-[`ADR 0002`](../adr/0002-external-logistics-v1.md). Keep `npm run check` and
+[`ADR 0001`](../adr/0001-factory-graph-v1-rules.md),
+[`ADR 0005`](../adr/0005-procedural-world-and-rendering.md),
+[`ADR 0006`](../adr/0006-directional-pod-traffic.md), and
+[`ADR 0007`](../adr/0007-world-construction-and-recovery.md). ADR 0006
+supersedes the abstract travel rules in ADR 0002. Keep `npm run check` and
 `npm run test:e2e` green after every section.
 
 ## Execution order
@@ -20,10 +23,13 @@ The accepted V1 rules remain defined by
 | 4 | Complete worker hashing, nesting, and invalidation | 3 |
 | 5 | Complete graph-editor interactions and navigation | 1; may run alongside 2-4 |
 | 6 | Close runtime, boundary, diagnostic, and footprint gaps | 3-5 |
-| 7 | Complete persistence, migration, and offline progress | 4 and 6 |
+| 7 | Complete current-schema persistence and offline progress | 4 and 6 |
 | 8 | Prove invariants and performance budgets | 2-7 |
-| 9 | Integrate external logistics | 7-8 |
-| 10 | [Post-V1 extensions](16-post-v1-extensions.md) | V1 complete |
+| 9 | [World domain and procedural generation](16-world-domain-and-generation.md) | 7-8 |
+| 10 | [World renderer and editor](17-world-renderer-and-editor.md) | 9 |
+| 11 | [Pod logistics and traffic](18-pod-logistics-and-traffic.md) | 9-10 |
+| 12 | [Mining, storage, and construction](19-mining-storage-and-construction.md) | 9 and 11 |
+| 13 | [World persistence, integration, and proof](20-world-persistence-integration-and-proof.md) | 9-12 |
 
 ## 1. Domain, editor, and language regression gaps
 
@@ -31,9 +37,8 @@ The accepted V1 rules remain defined by
 
 - Add an automated check for known French UI phrases and prohibited legacy
   spellings under active source and public assets.
-- Add a representative legacy-save fixture proving that translated display names
-  do not change persisted IDs or quantities. Implement it with the save migration
-  work below rather than creating a second migration path.
+- Add a current-save fixture proving that translated display names do not change
+  persisted IDs or quantities.
 
 ### Domain model
 
@@ -52,8 +57,6 @@ The accepted V1 rules remain defined by
 - Produce accurate `ChangeSet` resources and child-contract dependencies for add,
   remove, recipe-change, external-port, and sub-factory commands.
 - Validate duplicate or dangling external ports and invalid perimeter offsets.
-- Add the legacy-factory-to-disconnected-blueprint adapter needed by save
-  migration.
 - Add generative valid command sequences and prove undo/redo plus serialisation
   for every command, including external ports, recipes, sub-factories, and
   transactions.
@@ -178,18 +181,15 @@ schema.
 - Add E2E scenarios for a saturated bus, full output followed by exact resumption,
   keyboard-only diagnosis, and high-contrast essential information.
 
-## 7. Saving, migration, and offline progress
+## 7. Saving and offline progress
 
 - Implement a validated load path that reconstructs blueprints, contracts,
   instances, inventories, dependencies, and logical time. Recompile a missing or
   disposable contract instead of treating it as authoritative.
 - Include inventory and dependency records in atomic saves and remove stale
   records when authoritative objects are deleted.
-- Validate every record and critical field during import and load; preserve a
-  recovery backup before any destructive migration.
-- Convert every supported legacy save into explicit disconnected migration
-  blueprints while preserving integer items and reporting fractional debt.
-  Delete legacy data only after a validated IndexedDB commit.
+- Validate every record and critical field before import or load. Accept only the
+  current schema and reject incompatible data without modifying stored state.
 - Complete versioned export/import and prove logical byte equivalence after a
   round trip.
 - Implement recompilation actions for incompatible WIP: continue under the old
@@ -197,9 +197,9 @@ schema.
   item during recompilation or dismantling.
 - Persist and resume an exhausted offline event budget. Add grouped advancement
   only where equivalence to event-by-event execution is proven.
-- Test database round trips, every legacy version, interrupted transactions,
-  missing contracts, corrupt recovery, compatible and incompatible WIP, exact
-  offline continuation, and material conservation during dismantling.
+- Test database round trips, incompatible-schema rejection, interrupted
+  transactions, missing contracts, compatible and incompatible WIP, exact offline
+  continuation, and material conservation during dismantling.
 
 ## 8. Invariants and performance evidence
 
@@ -219,27 +219,18 @@ schema.
 - Record CPU, memory, build, browser, datasets, and results on the reference
   machine. Optimise only bottlenecks demonstrated by those profiles.
 
-## 9. External logistics integration
+## 9–13. Worldview integration
 
-The rail graph, basic dispatcher, integer cargo, and blocked-destination retention
-exist. The remaining work is integration and proof:
+The abstract logistics milestone is replaced by the ordered worldview plans:
 
-- Represent requests, stock changes, assignment, loading, arrival, unloading,
-  blocked destinations, and depot return as deterministic logical-clock events.
-- Include request creation time in the accepted priority tie-break and make
-  provider stock plus vehicle capacity reservation explicitly atomic.
-- Wake requesters when stock appears and blocked vehicles when space is released;
-  inactive stations and vehicles must not be polled.
-- Implement depot assignment and vehicle location rules from ADR 0002.
-- Persist deliveries and vehicles in transit, restore them exactly, and advance
-  them offline through the same event semantics.
-- Add UI explanations for demand, assignment, selected route, cargo, and blocking
-  reasons.
-- Add tests for competing reservations, equal-cost networks, provider wake-up,
-  blocked-destination wake-up, save during transit, offline equivalence, stable
-  priorities, and many inactive stations.
-- Add logistics scenarios to the performance harness and verify that dispatch
-  never traverses an internal factory blueprint.
+- [world domain and procedural generation](16-world-domain-and-generation.md);
+- [PixiJS world renderer and editor](17-world-renderer-and-editor.md);
+- [directional pod logistics and traffic](18-pod-logistics-and-traffic.md);
+- [mining, storage, and construction](19-mining-storage-and-construction.md); and
+- [persistence, integration, and proof](20-world-persistence-integration-and-proof.md).
+
+These stages are part of V1, not post-V1 extensions. The old abstract rail
+prototype may be reused only where it satisfies ADR 0006.
 
 ## V1 completion gate
 
@@ -250,6 +241,12 @@ V1 is complete only when all sections above pass and:
 - identical logical blueprints always produce identical exact contracts;
 - runtime and logistics use contracts and integer world buffers without traversing
   internal graphs;
+- a seeded finite world can be generated, rendered, built on, exhausted, saved,
+  reloaded, and advanced offline exactly;
+- factories, mines, storage, stations, depots, and directional rail form one
+  material-conserving construction and delivery loop;
+- pods never collide, and blocked destinations or circular gridlocks are visible
+  without polling or hidden recovery;
 - WIP remains bounded and exact across backpressure, recompilation, save/load, and
   offline progress;
 - blocked actors schedule no work; and

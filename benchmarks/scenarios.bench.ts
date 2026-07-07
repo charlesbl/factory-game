@@ -5,12 +5,17 @@ import { WorldBuffer } from '../src/simulation'
 import { RailNetwork } from '../src/logistics'
 import { edgeRoute } from '../src/editor'
 import { createDemoBlueprint } from '../src/ui/demo-blueprint'
+import { WorldRuntime, defaultWorldGenerationConfig, stringifyWorldRuntime } from '../src/world'
 
 describe('world scale', () => {
   for (const count of [10_000, 100_000, 1_000_000]) bench(`allocate ${count.toLocaleString()} compact instance records`, () => {
     const states = new Uint8Array(count); const times = new BigInt64Array(count); states[count - 1] = 1; times[count - 1] = 1n
   }, { iterations: count === 1_000_000 ? 3 : 10 })
   bench('move one integer batch', () => { const buffer = new WorldBuffer(asId<ResourceId>('ironOre'), 100, 50); buffer.remove(10); buffer.add(10) })
+  const world = WorldRuntime.generate(defaultWorldGenerationConfig('benchmark-256')); const depotNode = 'rail-starter-depot'
+  for (let index = 0; index < 198; index += 1) { const id = `benchmark-pod-${index.toString().padStart(3, '0')}`; world.addPod(id, depotNode, 'depot:starter'); const pod = world.traffic.pods.get(id)!; pod.state = 'TO_PROVIDER'; pod.motion = { fromNodeId: depotNode, toNodeId: depotNode, startsAt: 0n, endsAt: 1_000_000n } }
+  bench('snapshot 256² world with 200 moving pods', () => world.snapshot(), { iterations: 20 })
+  bench('serialize complete 256² world', () => stringifyWorldRuntime(world), { iterations: 3 })
 })
 
 describe('path scale', () => {

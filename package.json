@@ -15,7 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:invariants": "vitest run src/**/*.property.test.ts",
+    "test:invariants": "vitest run src/invariants.property.test.ts",
     "build": "tsc --noEmit && vite build",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build",
     "benchmark": "vitest bench --run"
@@ -24,6 +24,7 @@
     "@xyflow/react": "12.11.1",
     "dexie": "4.4.4",
     "glpk.js": "5.0.0",
+    "pixi.js": "^8.19.0",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },

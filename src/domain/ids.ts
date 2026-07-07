@@ -13,6 +13,15 @@ export type RecipeId = BrandedId<'RecipeId'>
 export type MachineId = BrandedId<'MachineId'>
 export type ContractId = BrandedId<'ContractId'>
 export type InstanceId = BrandedId<'InstanceId'>
+export type WorldId = BrandedId<'WorldId'>
+export type WorldEntityId = BrandedId<'WorldEntityId'>
+export type StationId = BrandedId<'StationId'>
+export type RailNodeId = BrandedId<'RailNodeId'>
+export type RailEdgeId = BrandedId<'RailEdgeId'>
+export type RailBlockId = BrandedId<'RailBlockId'>
+export type PodId = BrandedId<'PodId'>
+export type DeliveryId = BrandedId<'DeliveryId'>
+export type ConstructionSiteId = BrandedId<'ConstructionSiteId'>
 
 export interface IdFactory {
   next<Name extends string>(prefix: Name): BrandedId<Name>

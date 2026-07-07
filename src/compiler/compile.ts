@@ -1,4 +1,4 @@
-import { boundingRect, RATE_SCALE, recipeById, ratioFromRate, scaleRate } from '../domain'
+import { boundingRect, RATE_SCALE, recipeById, ratioFromRate, scaleRate, worldContent } from '../domain'
 import type { EdgeId, FixedRatio, NodeId, PortId, RateRaw, ResourceId } from '../domain'
 import type { BlueprintEdge, BlueprintNode, FactoryBlueprint } from '../editor'
 import { canonicalCompilationInput, edgeRoute, findPort, routeCapacity, routePhysicalLength, routeResource } from '../editor'
@@ -92,8 +92,13 @@ export class ExactDagFlowSolver implements FlowSolver {
     const inputRates = new Map<ResourceId, RateRaw>(); const outputRates = new Map<ResourceId, RateRaw>()
     for (const edge of blueprint.edges.values()) { const flow = edgeFlows.get(edge.id) ?? 0n; const resource = resourceFor(blueprint, edge); const source = blueprint.nodes.get(edge.sourceNodeId); const target = blueprint.nodes.get(edge.targetNodeId); if (source?.kind === 'external-input') addRate(inputRates, resource, flow); if (target?.kind === 'external-output') addRate(outputRates, resource, flow) }
     const points = [...blueprint.nodes.values()].flatMap((node) => [node.position, { x: node.position.x + node.footprint.width, y: node.position.y + node.footprint.height }]).concat([...blueprint.edges.values()].flatMap((edge) => [...edgeRoute(blueprint, edge).points]))
-    const footprint = boundingRect(points, 2); const boundaryPorts = projectExternalPorts(blueprint, footprint, edgeFlows)
-    return { schemaVersion: 1, blueprintHash: hash, inputRates, outputRates, inputPorts: boundaryPorts.filter((port) => port.direction === 'input'), outputPorts: boundaryPorts.filter((port) => port.direction === 'output'), footprint, machineActivity: activity, edgeFlows, diagnostics }
+    const footprint = boundingRect(points, 2); const boundaryPorts = projectExternalPorts(blueprint, footprint, edgeFlows); const materialTotals = new Map<ResourceId, number>()
+    for (const node of blueprint.nodes.values()) {
+      const cost = node.kind === 'machine' ? recipeById.get(node.recipeId)?.buildCost ?? [] : node.kind === 'sub-factory' ? this.childContracts.get(node.contractId)?.billOfMaterials ?? [] : worldContent.componentBuildCosts[node.kind]
+      for (const item of cost) materialTotals.set(item.resourceId, (materialTotals.get(item.resourceId) ?? 0) + item.quantity)
+    }
+    const billOfMaterials = [...materialTotals].sort(([a], [b]) => a.localeCompare(b)).map(([resourceId, quantity]) => ({ resourceId, quantity }))
+    return { schemaVersion: 1, blueprintHash: hash, inputRates, outputRates, inputPorts: boundaryPorts.filter((port) => port.direction === 'input'), outputPorts: boundaryPorts.filter((port) => port.direction === 'output'), footprint, machineActivity: activity, edgeFlows, diagnostics, billOfMaterials }
   }
 }
 

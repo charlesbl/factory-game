@@ -1,10 +1,8 @@
 [
-  { "id": "ironDrill", "name": "Iron drill", "input": [], "output": [{ "itemId": "ironOre", "quantity": 1 }] },
-  { "id": "ironIngot", "name": "Iron smelting", "input": [{ "itemId": "ironOre", "quantity": 2 }], "output": [{ "itemId": "ironIngot", "quantity": 1 }] },
-  { "id": "ironPlate", "name": "Iron plating", "input": [{ "itemId": "ironIngot", "quantity": 4 }], "output": [{ "itemId": "ironPlate", "quantity": 2 }] },
-  { "id": "copperDrill", "name": "Copper drill", "input": [], "output": [{ "itemId": "copperOre", "quantity": 1 }] },
-  { "id": "copperIngot", "name": "Copper smelting", "input": [{ "itemId": "copperOre", "quantity": 2 }], "output": [{ "itemId": "copperIngot", "quantity": 1 }] },
-  { "id": "copperPlate", "name": "Copper plating", "input": [{ "itemId": "copperIngot", "quantity": 1 }], "output": [{ "itemId": "copperPlate", "quantity": 2 }] },
-  { "id": "copperWire", "name": "Wire drawing", "input": [{ "itemId": "copperPlate", "quantity": 1 }], "output": [{ "itemId": "copperWire", "quantity": 5 }] },
-  { "id": "circuit", "name": "Circuit assembly", "input": [{ "itemId": "copperWire", "quantity": 5 }, { "itemId": "ironPlate", "quantity": 2 }], "output": [{ "itemId": "circuit", "quantity": 1 }] }
+  { "id": "ironIngot", "name": "Iron smelting", "input": [{ "itemId": "ironOre", "quantity": 2 }], "output": [{ "itemId": "ironIngot", "quantity": 1 }], "buildCost": [{ "itemId": "ironPlate", "quantity": 4 }, { "itemId": "copperWire", "quantity": 2 }] },
+  { "id": "ironPlate", "name": "Iron plating", "input": [{ "itemId": "ironIngot", "quantity": 4 }], "output": [{ "itemId": "ironPlate", "quantity": 2 }], "buildCost": [{ "itemId": "ironPlate", "quantity": 4 }, { "itemId": "copperWire", "quantity": 2 }] },
+  { "id": "copperIngot", "name": "Copper smelting", "input": [{ "itemId": "copperOre", "quantity": 2 }], "output": [{ "itemId": "copperIngot", "quantity": 1 }], "buildCost": [{ "itemId": "ironPlate", "quantity": 4 }, { "itemId": "copperWire", "quantity": 2 }] },
+  { "id": "copperPlate", "name": "Copper plating", "input": [{ "itemId": "copperIngot", "quantity": 1 }], "output": [{ "itemId": "copperPlate", "quantity": 2 }], "buildCost": [{ "itemId": "ironPlate", "quantity": 4 }, { "itemId": "copperWire", "quantity": 2 }] },
+  { "id": "copperWire", "name": "Wire drawing", "input": [{ "itemId": "copperPlate", "quantity": 1 }], "output": [{ "itemId": "copperWire", "quantity": 5 }], "buildCost": [{ "itemId": "ironPlate", "quantity": 4 }, { "itemId": "copperWire", "quantity": 2 }] },
+  { "id": "circuit", "name": "Circuit assembly", "input": [{ "itemId": "copperWire", "quantity": 5 }, { "itemId": "ironPlate", "quantity": 2 }], "output": [{ "itemId": "circuit", "quantity": 1 }], "buildCost": [{ "itemId": "ironPlate", "quantity": 4 }, { "itemId": "copperWire", "quantity": 2 }] }
 ]

@@ -16,9 +16,8 @@ describe('route schema V5', () => {
     const blueprint = createDemoBlueprint(); const serialized = canonicalBlueprint(blueprint)
     expect(JSON.parse(serialized).schemaVersion).toBe(5)
     expect(canonicalBlueprint(deserializeBlueprint(JSON.parse(serialized)))).toBe(serialized)
-    const legacy = { ...JSON.parse(serialized), schemaVersion: 4, name: 'Legacy name' }
-    expect(JSON.parse(canonicalBlueprint(deserializeBlueprint(legacy)))).not.toHaveProperty('name')
-    expect(() => deserializeBlueprint({ schemaVersion: 3 })).toThrow(/expected V4 or V5/)
+    expect(() => deserializeBlueprint({ ...JSON.parse(serialized), schemaVersion: 4 })).toThrow(/expected V5/)
+    expect(() => deserializeBlueprint({ schemaVersion: 3 })).toThrow(/expected V5/)
   })
 
   it('lets Any junction chains inherit and release one shared resource', () => {

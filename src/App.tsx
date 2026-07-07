@@ -6,7 +6,6 @@ import { diagnosticText, hydrateBoundaryPortRates } from './compiler'
 import type { FactoryBlueprint, GraphClipboardPayload } from './editor'
 import { BlueprintHistory, captureSubgraph, createBlueprint, createClipboardPayload, createJunctionNode, disconnectEdge, insertSubgraph, materializeSubgraph, removeLooseConnection, removeNode, replaceSubFactoryVersion, routeCapacity, routePhysicalLength, routeResource, routeSections, subgraphSelection, transaction, translateSubgraph, type EditCommand } from './editor'
 import { createFactoryDefinition, deleteFactoryDefinition, deleteFactoryDraft, deleteFactoryVersion, latestVersion, loadFactoryLibrary, materializeSubFactoryNode, publishFactoryVersion, renameFactoryDefinition, restoreFactoryVersionAsDraft, saveFactoryDraft, versionsByKey, versionKey, wouldCreateIdentityCycle, type FactoryDefinition, type FactoryDraft, type FactoryVersion } from './factories'
-import { EventScheduler, FactoryRuntimeInstance } from './simulation'
 import { createBoundaryNode, createDemoBlueprint, createMachineNode } from './ui/demo-blueprint'
 import { FactoryGraphEditor, type GraphPlacement, type GraphSelection } from './ui/FactoryGraphEditor'
 import { FactoryLibraryView } from './ui/FactoryLibraryView'
@@ -18,7 +17,6 @@ const compiler = new CompilationClient()
 const INITIAL_FACTORY_NAME = 'Starter iron line'
 const LAST_OPENED_FACTORY_KEY = 'factory-game:last-opened-factory'
 const LIBRARY_INITIALIZED_KEY = 'factory-game:library-initialized'
-const stateTone: Record<string, string> = { RUNNING: 'good', WAITING_INPUT: 'waiting', OUTPUT_BLOCKED: 'blocked', PAUSED: 'muted', INVALID: 'bad', MAINTENANCE: 'bad' }
 interface PendingPlacement extends GraphPlacement { readonly payload: GraphClipboardPayload }
 const emptySelection = (): GraphSelection => ({ nodeIds: [], edgeIds: [], looseConnectionIds: [] })
 const isTextEditing = (target: EventTarget | null): boolean => target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
@@ -45,22 +43,12 @@ const App = () => {
   const [placement, setPlacement] = useState<PendingPlacement>()
   const [catalogueQuery, setCatalogueQuery] = useState('')
   const [boundaryResource, setBoundaryResource] = useState<ResourceId>(() => resources[0]!.id)
-  const [logicalTime, setLogicalTime] = useState(0n)
-  const [, renderRuntime] = useState(0)
   const mounted = useRef(true)
   const displayedCompilation = useRef(0)
   const activeDefinition = definitions.find((definition) => definition.id === activeFactoryId) ?? definitions[0]
   const versionIndex = useMemo(() => versionsByKey(versions), [versions])
   const childContracts = useMemo(() => new Map(versions.map((version) => [version.contract.blueprintHash, version.recovered ? version.contract : hydrateBoundaryPortRates(version.blueprint, version.contract)])), [versions])
   const activeBaseVersion = drafts.find((draft) => draft.factoryId === activeFactoryId)?.baseVersion
-  const runtime = useMemo(() => {
-    if (contract === undefined) return undefined
-    const instance = new FactoryRuntimeInstance(asId('instance-main'), contract, 24)
-    const scheduler = new EventScheduler(); scheduler.register(instance)
-    return { instance, scheduler }
-  }, [contract])
-  const instance = runtime?.instance
-  const scheduler = runtime?.scheduler
 
   const execute = useCallback((command: EditCommand) => { const next = history.execute(command); if (command.affectsCompilation) { setDiagnostics([]); setCompileState('compiling'); setCompilationBlueprint(next) } setSaveStatus('saving'); setBlueprint(next) }, [history])
   const undo = useCallback(() => { setPlacement(undefined); const next = history.undo(); if (next.revision !== blueprint.revision) { setDiagnostics([]); setCompileState('compiling'); setCompilationBlueprint(next) } setSaveStatus('saving'); setBlueprint(next) }, [blueprint.revision, history])
@@ -108,7 +96,7 @@ const App = () => {
       displayedCompilation.current = result.generation
       setDiagnostics(result.diagnostics)
       if (result.contract === undefined) { setContract(undefined); setCompileState('invalid'); return }
-      setContract(result.contract); setLogicalTime(0n); setCompileState(result.stale ? 'compiling' : 'ready')
+      setContract(result.contract); setCompileState(result.stale ? 'compiling' : 'ready')
     })
   }, [childContracts, compilationBlueprint])
   useEffect(() => {
@@ -125,10 +113,6 @@ const App = () => {
     const flushWhenHidden = () => { if (document.visibilityState === 'hidden' && libraryReady && view === 'factory') void saveFactoryDraft(activeFactoryId, blueprint, activeBaseVersion) }
     document.addEventListener('visibilitychange', flushWhenHidden); return () => document.removeEventListener('visibilitychange', flushWhenHidden)
   }, [activeBaseVersion, activeFactoryId, blueprint, libraryReady, view])
-  useEffect(() => {
-    if (instance === undefined) return undefined
-    return instance.subscribe(() => renderRuntime((value) => value + 1))
-  }, [instance])
   const openFactory = async (factoryId: FactoryId, nextView: 'factory' | 'world' = 'factory') => {
     setPlacement(undefined)
     try {
@@ -268,20 +252,6 @@ const App = () => {
     const definition = definitions.find((item) => item.id === version.factoryId); if (definition === undefined) return
     const node = materializeSubFactoryNode(asId<NodeId>('placement-sub-factory'), definition, version.version, version.contract, gridPoint(0, 0)); startPlacement(createClipboardPayload([node]), node.name)
   }
-  const supplyInputs = () => {
-    if (instance === undefined) return
-    for (const [resource, buffer] of instance.inputs) if (buffer.freeSpace > 0) instance.addInput(resource, Math.min(12, buffer.freeSpace), logicalTime)
-    scheduler?.schedule(instance)
-  }
-  const advance = (seconds: number) => {
-    if (instance === undefined) return
-    const target = logicalTime + FactoryRuntimeInstance.seconds(seconds); scheduler?.schedule(instance); scheduler?.advanceTo(target); setLogicalTime(target); renderRuntime((value) => value + 1)
-  }
-  const collectOutputs = () => {
-    if (instance === undefined) return
-    for (const [resource, buffer] of instance.outputs) if (buffer.quantity > 0) instance.removeOutput(resource, buffer.quantity, logicalTime)
-    scheduler?.schedule(instance)
-  }
   const deleteSelection = () => {
     if (selection.nodeIds.length === 0 && selection.edgeIds.length === 0 && selection.looseConnectionIds.length === 0) return
     const selectedNodes = new Set(selection.nodeIds)
@@ -345,7 +315,6 @@ const App = () => {
   const selectedEdgeLengthText = selectedEdgeLength?.toLocaleString(undefined, { maximumFractionDigits: 2 })
   const selectionCount = selection.nodeIds.length + selection.edgeIds.length + selection.looseConnectionIds.length
   const issueCount = diagnostics.length
-  const snapshot = instance?.getSnapshot()
   const rates = useMemo(() => ({ inputs: [...(contract?.inputRates ?? [])], outputs: [...(contract?.outputRates ?? [])] }), [contract])
   const filteredRecipes = useMemo(() => {
     const query = catalogueQuery.trim().toLocaleLowerCase()
@@ -418,15 +387,10 @@ const App = () => {
         {selectedEdge !== undefined && <section className="inspector-card"><h3>Selected route</h3><dl><div><dt>Resource</dt><dd>{resourceById.get(routeResource(blueprint, selectedEdge)!)?.name ?? 'Any'}</dd></div><div><dt>Current / capacity</dt><dd>{formatRate(contract?.edgeFlows.get(selectedEdge.id) ?? 0n)} / {formatRate(routeCapacity(blueprint, selectedEdge))}/s</dd></div><div><dt>Physical length</dt><dd>{selectedEdgeLengthText} m</dd></div><div><dt>Handles</dt><dd>{selectedEdge.routeHandles.length}</dd></div><div><dt>Layers</dt><dd>{[...new Set(selectedSections.map((section) => section.layerId))].join(' + ') || 'primary'}</dd></div><div><dt>Bridges</dt><dd>{selectedEdge.bridges.length}</dd></div><div><dt>Priority</dt><dd>length → grid → ID</dd></div></dl><button className="danger-button" onClick={deleteSelection}>Delete route</button></section>}
         {selectedLooseConnection !== undefined && <section className="inspector-card"><h3>Incomplete route</h3><dl><div><dt>Status</dt><dd>Waiting for endpoint</dd></div><div><dt>Handles</dt><dd>{selectedLooseConnection.routeHandles.length}</dd></div></dl><button className="danger-button" onClick={deleteSelection}>Delete route</button></section>}
         <section className="inspector-card contract-card"><h3>Net program <span className="badge">Coupled</span></h3><div className="rates"><div><span>Inputs</span>{rates.inputs.map(([id, rate]) => <p key={id}><i style={{ background: resourceById.get(id)?.colour }} />{resourceById.get(id)?.name}<b>{formatRate(rate)}/s</b></p>)}</div><div><span>Outputs</span>{rates.outputs.map(([id, rate]) => <p key={id}><i style={{ background: resourceById.get(id)?.colour }} />{resourceById.get(id)?.name}<b>{formatRate(rate)}/s</b></p>)}</div></div>{contract !== undefined && <small>Footprint {contract.footprint.width} × {contract.footprint.height} m · {contract.blueprintHash.slice(0, 10)}</small>}</section>
-        <section className="inspector-card runtime-card"><h3>World runtime {instance !== undefined && <span className={`badge ${stateTone[instance.state]}`}>{instance.state.replace('_', ' ')}</span>}</h3>
-          <div className="runtime-actions"><button onClick={supplyInputs}>Supply +12</button><button onClick={() => advance(5)}>Run 5 s</button><button onClick={collectOutputs}>Collect</button></div>
-          <small>Logical time {Number(logicalTime) / 1_000_000}s · {scheduler?.scheduledEvents ?? 0} scheduled · {scheduler?.sleepingActors ?? 0} sleeping</small>
-          {snapshot?.inputs.map((buffer) => <div className="buffer" key={`in-${buffer.resourceId}`}><span>{resourceById.get(buffer.resourceId)?.name} input</span><b>{buffer.quantity}/{buffer.capacity}</b><div><i style={{ width: `${buffer.quantity / buffer.capacity * 100}%` }} /></div></div>)}
-          {snapshot?.outputs.map((buffer) => <div className="buffer output" key={`out-${buffer.resourceId}`}><span>{resourceById.get(buffer.resourceId)?.name} output</span><b>{buffer.quantity}/{buffer.capacity}</b><div><i style={{ width: `${buffer.quantity / buffer.capacity * 100}%` }} /></div></div>)}
-        </section>
+        <section className="inspector-card runtime-card"><h3>World runtime</h3><p>Placed factories are simulated exclusively by the world worker. Use the World view to connect station rules, pods, construction and time controls.</p></section>
         <section className="inspector-card diagnostics"><h3>Diagnostics</h3>{compileState === 'ready' && diagnostics.length === 0 && <p className="diagnostic-ok">✓ Exact conservation verified</p>}{diagnostics.map((item, index) => <p key={`${item.code}-${index}`}><span>!</span>{diagnosticText(item)}</p>)}{compileState === 'invalid' && <p><span>!</span>The highlighted routes must be repaired before the graph can compile.</p>}</section>
       </aside>
-    </div> : view === 'world' && activeDefinition !== undefined ? <WorldView blueprint={blueprint} factories={definitions} activeFactoryId={activeFactoryId} factoryName={activeDefinition.name} contract={contract} compileState={compileState} snapshot={snapshot} logicalTime={logicalTime} scheduledEvents={scheduler?.scheduledEvents ?? 0} sleepingActors={scheduler?.sleepingActors ?? 0} onSelectFactory={(id) => void openFactory(id, 'world')} onOpenFactory={() => changeView('factory')} onSupply={supplyInputs} onAdvance={() => advance(5)} onCollect={collectOutputs} /> : <FactoryLibraryView definitions={definitions} drafts={drafts} versions={versions} activeFactoryId={activeFactoryId} onOpen={(id) => void openFactory(id)} onCreate={(name) => void createFactory(name)} onRename={(id, name) => void renameFactory(id, name)} onPublish={(id) => void publishFactory(id)} onInspectDraft={inspectFactoryDraft} onForkVersion={(version, name) => void forkVersion(version, name)} onRevertDraft={(id) => void revertDraft(id)} onDeleteFactory={(id) => void removeFactory(id)} onDeleteVersion={(version) => void removeVersion(version)} />}
+    </div> : view === 'world' && activeDefinition !== undefined ? <WorldView blueprint={blueprint} factories={definitions} activeFactoryId={activeFactoryId} factoryName={activeDefinition.name} contract={contract} compileState={compileState} onSelectFactory={(id) => void openFactory(id, 'world')} onOpenFactory={() => changeView('factory')} /> : <FactoryLibraryView definitions={definitions} drafts={drafts} versions={versions} activeFactoryId={activeFactoryId} onOpen={(id) => void openFactory(id)} onCreate={(name) => void createFactory(name)} onRename={(id, name) => void renameFactory(id, name)} onPublish={(id) => void publishFactory(id)} onInspectDraft={inspectFactoryDraft} onForkVersion={(version, name) => void forkVersion(version, name)} onRevertDraft={(id) => void revertDraft(id)} onDeleteFactory={(id) => void removeFactory(id)} onDeleteVersion={(version) => void removeVersion(version)} />}
   </main>
 }
 

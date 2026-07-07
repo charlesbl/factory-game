@@ -50,12 +50,13 @@ const deserializeNode = (node: SerializedNode): BlueprintNode => {
   if (node.kind === 'machine') { if (node.recipeId === undefined) throw new Error('Machine recipe is missing'); return { ...base, kind: 'machine', recipeId: asId<RecipeId>(node.recipeId) } }
   if (node.kind === 'sub-factory') {
     if (node.contractId === undefined) throw new Error('Sub-factory contract is missing')
-    const factoryId = node.factoryId ?? `recovered:${node.contractId}`
-    const version = node.version ?? 1
-    if (!Number.isSafeInteger(version) || version < 1) throw new Error('Sub-factory version is invalid')
+    if (node.factoryId === undefined) throw new Error('Sub-factory identity is missing')
+    const version = node.version
+    if (version === undefined || !Number.isSafeInteger(version) || version < 1) throw new Error('Sub-factory version is invalid')
+    if (node.ports.some((port) => port.contractPortId === undefined)) throw new Error('Sub-factory contract port identity is missing')
     return {
-      ...base, kind: 'sub-factory', factoryId: asId<FactoryId>(factoryId), version, contractId: asId<ContractId>(node.contractId),
-      ports: node.ports.map((port) => ({ ...deserializeTypedPort(port), contractPortId: asId<PortId>(port.contractPortId ?? port.id) })),
+      ...base, kind: 'sub-factory', factoryId: asId<FactoryId>(node.factoryId), version, contractId: asId<ContractId>(node.contractId),
+      ports: node.ports.map((port) => ({ ...deserializeTypedPort(port), contractPortId: asId<PortId>(port.contractPortId!) })),
     }
   }
   return { ...base, kind: node.kind }
@@ -67,9 +68,9 @@ const deserializeLoose = (loose: SerializedLooseConnection): LooseConnection => 
 const assertUnique = (values: readonly { readonly id: string }[], label: string): void => { const ids = new Set<string>(); for (const value of values) { if (ids.has(value.id)) throw new Error(`Duplicate ${label} ID: ${value.id}`); ids.add(value.id) } }
 
 export const deserializeBlueprint = (value: unknown): FactoryBlueprint => {
-  if (typeof value !== 'object' || value === null || !('schemaVersion' in value) || (value.schemaVersion !== 4 && value.schemaVersion !== 5)) throw new Error('Unsupported blueprint schema; expected V4 or V5')
+  if (typeof value !== 'object' || value === null || !('schemaVersion' in value) || value.schemaVersion !== 5) throw new Error('Unsupported blueprint schema; expected V5')
   const serialized = value as SerializedBlueprint
-  if (!Array.isArray(serialized.nodes) || !Array.isArray(serialized.edges) || !Array.isArray(serialized.looseConnections)) throw new Error('Invalid V4 blueprint')
+  if (!Array.isArray(serialized.nodes) || !Array.isArray(serialized.edges) || !Array.isArray(serialized.looseConnections)) throw new Error('Invalid V5 blueprint')
   assertUnique(serialized.nodes, 'node'); assertUnique(serialized.edges, 'edge'); assertUnique(serialized.looseConnections, 'loose connection')
   const nodes = serialized.nodes.map(deserializeNode); const edges = serialized.edges.map(deserializeEdge); const loose = serialized.looseConnections.map(deserializeLoose)
   return { id: asId<FactoryId>(serialized.id), revision: serialized.revision, nodes: new Map(nodes.map((node) => [node.id, node])), edges: new Map(edges.map((edge) => [edge.id, edge])), looseConnections: new Map(loose.map((item) => [item.id, item])), externalPorts: serialized.externalPorts.map((port) => ({ ...port, nodeId: asId<NodeId>(port.nodeId), portId: asId<PortId>(port.portId) })) }

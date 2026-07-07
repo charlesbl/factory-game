@@ -1,115 +1,59 @@
-import { formatRate, resourceById } from '../domain'
-import type { FactoryId } from '../domain'
-import type { FactoryContract } from '../compiler'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { asId, formatRate, gridSize, parseExact, resourceById, resources, stringifyExact, worldContent } from '../domain'
+import type { FactoryId, GridPoint, InstanceId, ResourceId } from '../domain'
+import { serializeContract, type FactoryContract } from '../compiler'
 import type { FactoryBlueprint } from '../editor'
-import type { InstanceSnapshot } from '../simulation'
+import { database } from '../persistence'
+import { occupiedCells, OreKind, TerrainKind, WorldClient, defaultWorldGenerationConfig, type QuarterTurn, type SerializedWorldState, type WorldClientResult, type WorldEntity, type WorldSnapshot, type WorldTool, type WorldTransform } from '../world'
+import { railEdgeAt } from './worldRailVisual'
+import { WorldBuildingInspector } from './WorldBuildingInspector'
 
-const stateTone: Record<string, string> = {
-  RUNNING: 'good',
-  WAITING_INPUT: 'waiting',
-  OUTPUT_BLOCKED: 'blocked',
-  PAUSED: 'muted',
-  INVALID: 'bad',
-  MAINTENANCE: 'bad',
-}
+const WorldCanvas = lazy(async () => ({ default: (await import('./WorldCanvas')).WorldCanvas }))
+interface Props { readonly blueprint: FactoryBlueprint; readonly factories: readonly { readonly id: FactoryId; readonly name: string }[]; readonly activeFactoryId: FactoryId; readonly factoryName: string; readonly contract: FactoryContract | undefined; readonly compileState: 'compiling' | 'ready' | 'invalid'; readonly onSelectFactory: (factoryId: FactoryId) => void; readonly onOpenFactory: () => void }
+const tools: readonly { readonly id: WorldTool; readonly label: string; readonly key: string }[] = [{ id: 'select', label: 'Select', key: 'S' }, { id: 'rail', label: 'Rail', key: 'T' }, { id: 'rail-erase', label: 'Erase rail', key: 'X' }, { id: 'junction', label: 'Junction', key: 'J' }, { id: 'station', label: 'Station', key: 'G' }, { id: 'factory', label: 'Factory', key: 'F' }, { id: 'mine', label: 'Mine', key: 'M' }, { id: 'drill', label: 'Drill', key: 'D' }, { id: 'storage', label: 'Storage', key: 'B' }, { id: 'depot', label: 'Depot', key: 'P' }]
+const samePoint = (a: GridPoint, b: GridPoint) => a.x === b.x && a.y === b.y
+const entityAt = (snapshot: WorldSnapshot, point: GridPoint): WorldEntity | undefined => snapshot.entities.find((entity) => occupiedCells(entity.transform).some((cell) => samePoint(cell, point)))
+const adjacent = (a: WorldTransform, b: WorldTransform) => occupiedCells(a).some((one) => occupiedCells(b).some((two) => Math.abs(one.x - two.x) + Math.abs(one.y - two.y) === 1))
 
-interface Props {
-  readonly blueprint: FactoryBlueprint
-  readonly factories: readonly { readonly id: FactoryId; readonly name: string }[]
-  readonly activeFactoryId: FactoryId
-  readonly factoryName: string
-  readonly contract: FactoryContract | undefined
-  readonly compileState: 'compiling' | 'ready' | 'invalid'
-  readonly snapshot: InstanceSnapshot | undefined
-  readonly logicalTime: bigint
-  readonly scheduledEvents: number
-  readonly sleepingActors: number
-  readonly onSelectFactory: (factoryId: FactoryId) => void
-  readonly onOpenFactory: () => void
-  readonly onSupply: () => void
-  readonly onAdvance: () => void
-  readonly onCollect: () => void
-}
+export const WorldView = ({ factories, activeFactoryId, factoryName, contract, compileState, onSelectFactory, onOpenFactory }: Props) => {
+  const clientRef = useRef<WorldClient | undefined>(undefined); const busyRef = useRef(false); const [snapshot, setSnapshot] = useState<WorldSnapshot>(); const [seed, setSeed] = useState('starter-world'); const [selected, setSelected] = useState<GridPoint>(); const [hovered, setHovered] = useState<GridPoint>(); const [tool, setTool] = useState<WorldTool>('select'); const [rotation, setRotation] = useState<QuarterTurn>(0); const [railDraft, setRailDraft] = useState<readonly GridPoint[]>([]); const [mineResource, setMineResource] = useState<ResourceId>(asId('ironOre')); const [ruleResource, setRuleResource] = useState<ResourceId>(asId('ironPlate')); const [ruleMode, setRuleMode] = useState<'request' | 'provide'>('request'); const [ruleTarget, setRuleTarget] = useState(50); const [error, setError] = useState<string>(); const [busy, setBusy] = useState(true)
+  const persist = useCallback(async (result: WorldClientResult) => { setSnapshot(result.snapshot); const client = clientRef.current; if (client === undefined) return; const saved = await client.save(); if (saved.state !== undefined) await database.worlds.put({ id: 'main', schemaVersion: 2, revision: saved.snapshot.revision, savedAt: new Date().toISOString(), payload: stringifyExact(saved.state) }) }, [])
+  const run = useCallback(async (operation: (client: WorldClient) => Promise<WorldClientResult>, save = true) => { const client = clientRef.current; if (client === undefined || busyRef.current) return undefined; busyRef.current = true; setBusy(true); setError(undefined); try { const result = await operation(client); if (save) await persist(result); else setSnapshot(result.snapshot); return result } catch (reason) { setError(reason instanceof Error ? reason.message : 'World command failed'); return undefined } finally { busyRef.current = false; setBusy(false) } }, [persist])
+  useEffect(() => {
+    const client = new WorldClient(); clientRef.current = client; let active = true
+    const start = async () => { try { const stored = await database.worlds.get('main'); let result: WorldClientResult; if (stored?.schemaVersion === 2) { result = await client.load(parseExact<SerializedWorldState>(stored.payload)); if (!result.snapshot.paused) { const elapsed = Math.max(0, Date.now() - Date.parse(stored.savedAt)); result = await client.advance(result.snapshot.logicalTime + BigInt(elapsed * 1000 * result.snapshot.timeScale)) } } else result = await client.generate(defaultWorldGenerationConfig('starter-world')); if (active) await persist(result) } catch (reason) { if (active) setError(reason instanceof Error ? reason.message : 'World initialisation failed') } finally { if (active) { setBusy(false); busyRef.current = false } } }
+    void start(); return () => { active = false; client.dispose(); if (clientRef.current === client) clientRef.current = undefined }
+  }, [persist])
+  useEffect(() => { if (snapshot?.paused !== false) return; const timer = window.setInterval(() => { const current = snapshot; if (current !== undefined) void run((client) => client.advance(current.logicalTime + BigInt(1_000_000 * current.timeScale))) }, 1000); return () => window.clearInterval(timer) }, [run, snapshot])
 
-export const WorldView = ({ blueprint, factories, activeFactoryId, factoryName, contract, compileState, snapshot, logicalTime, scheduledEvents, sleepingActors, onSelectFactory, onOpenFactory, onSupply, onAdvance, onCollect }: Props) => {
-  const state = snapshot?.state ?? (compileState === 'invalid' ? 'INVALID' : 'PAUSED')
-  const buffers = [...(snapshot?.inputs ?? []), ...(snapshot?.outputs ?? [])]
-  const storedItems = buffers.reduce((total, buffer) => total + buffer.quantity, 0)
-  const totalCapacity = buffers.reduce((total, buffer) => total + buffer.capacity, 0)
+  const transformFor = useCallback((activeTool: WorldTool, point: GridPoint): WorldTransform | undefined => { if (activeTool === 'factory') { if (contract === undefined) return undefined; return { position: point, size: gridSize(contract.footprint.width, contract.footprint.height), rotation } } if (activeTool === 'mine' || activeTool === 'storage' || activeTool === 'depot') return { position: point, size: gridSize(4, 4), rotation }; if (activeTool === 'drill' || activeTool === 'junction') return { position: point, size: gridSize(1, 1), rotation: 0 }; if (activeTool === 'station') return { position: point, size: worldContent.stationFootprint, rotation: 0 }; return undefined }, [contract, rotation])
+  const stationFor = useCallback((transform: WorldTransform): Extract<WorldEntity, { kind: 'station' }> | undefined => snapshot?.entities.filter((entity): entity is Extract<WorldEntity, { kind: 'station' }> => entity.kind === 'station' && entity.linkedEntityId === undefined).find((station) => adjacent(transform, station.transform)), [snapshot])
+  const localValidity = useCallback((transform: WorldTransform, activeTool: WorldTool): boolean => { if (snapshot === undefined) return false; for (const cell of occupiedCells(transform)) { if (cell.x < 0 || cell.y < 0 || cell.x >= snapshot.grid.width || cell.y >= snapshot.grid.height) return false; const index = cell.y * snapshot.grid.width + cell.x; if (snapshot.grid.terrain[index] === TerrainKind.OBSTACLE || snapshot.grid.occupancy[index] !== 0) return false } if (['factory', 'mine', 'storage', 'depot'].includes(activeTool) && stationFor(transform) === undefined) return false; if (activeTool === 'mine' && occupiedCells(transform).some((cell) => snapshot.grid.oreKinds[cell.y * snapshot.grid.width + cell.x] !== OreKind.NONE)) return false; return true }, [snapshot, stationFor])
+  const ghostTransform = hovered === undefined ? undefined : transformFor(tool, hovered); const ghost = ghostTransform === undefined ? undefined : { transform: ghostTransform, valid: localValidity(ghostTransform, tool) }; const hoveredRailEdgeId = tool === 'rail-erase' && snapshot !== undefined && hovered !== undefined ? railEdgeAt(snapshot, hovered)?.id : undefined
+  const selectedEntity = snapshot === undefined || selected === undefined ? undefined : entityAt(snapshot, selected)
 
-  const renderBuffer = (buffer: InstanceSnapshot['inputs'][number], role: 'input' | 'output') => {
-    const resource = resourceById.get(buffer.resourceId)
-    const rate = role === 'input' ? contract?.inputRates.get(buffer.resourceId) : contract?.outputRates.get(buffer.resourceId)
-    const ports = role === 'input' ? contract?.inputPorts : contract?.outputPorts
-    const maximumRate = ports?.filter((port) => port.resourceId === buffer.resourceId).reduce((total, port) => total + port.capacity, 0n) ?? 0n
-    const utilisation = maximumRate === 0n || rate === undefined ? 0 : Math.min(100, Number((rate * 100n) / maximumRate))
-    return <article className={`world-port world-port--${role}`} key={`${role}-${buffer.resourceId}`}>
-      <div><i style={{ background: resource?.colour }} /><span>{resource?.name ?? buffer.resourceId}</span><b>{buffer.quantity}/{buffer.capacity}</b></div>
-      <div className="world-buffer-track"><i style={{ width: `${buffer.capacity === 0 ? 0 : buffer.quantity / buffer.capacity * 100}%`, background: resource?.colour }} /></div>
-      <div className="world-port-rate">
-        <span>Contract rate</span>
-        <b>{rate === undefined ? '0' : formatRate(rate)}/s</b>
-        <small>max {formatRate(maximumRate)}/s · {utilisation}%</small>
-      </div>
-      <div className="world-rate-track" title={`${utilisation}% of boundary capacity`}><i style={{ width: `${utilisation}%`, background: resource?.colour }} /></div>
-    </article>
-  }
+  const commitRail = useCallback(async () => { if (railDraft.length < 2) return; const points = railDraft; setRailDraft([]); await run((client) => client.command({ type: 'PLACE_RAIL_PATH', points })) }, [railDraft, run])
+  const handleMapClick = useCallback(async (point: GridPoint) => {
+    setSelected(point)
+    if (tool === 'select') return
+    if (tool === 'rail') { setRailDraft((current) => { if (current.length === 0) return [point]; const last = current.at(-1)!; if (last.x !== point.x && last.y !== point.y) { setError('Rail segments must be horizontal or vertical.'); return current } return samePoint(last, point) ? current : [...current, point] }); return }
+    if (tool === 'rail-erase') { const edge = snapshot === undefined ? undefined : railEdgeAt(snapshot, point); if (edge === undefined) { setError('No rail segment on this tile.'); return } await run((client) => client.command({ type: 'REMOVE_RAIL_EDGE', edgeId: edge.id })); return }
+    if (tool === 'junction' || tool === 'station') { await run((client) => client.command({ type: 'PLACE_CONTROL_NODE', kind: tool, position: point })); return }
+    if (tool === 'drill') { const mineId = selectedEntity?.kind === 'mine' ? selectedEntity.id : selectedEntity?.kind === 'drill' ? selectedEntity.mineId : undefined; if (mineId === undefined) { setError('Select a mine before placing its drill chain.'); return } await run((client) => client.command({ type: 'PLACE_DRILL', mineId, position: point })); return }
+    const transform = transformFor(tool, point); if (transform === undefined) return; const station = stationFor(transform); if (station === undefined) { setError('Place one free adjacent station first.'); return }
+    const targetKind = tool as 'factory' | 'mine' | 'storage' | 'depot'; const validation = await run((client) => client.command({ type: 'VALIDATE_GHOST', targetKind, position: transform.position, size: transform.size, rotation: transform.rotation, stationId: station.stationId, ...(targetKind === 'mine' ? { resourceId: mineResource } : {}) }), false); if (validation?.validation?.valid !== true) { setError(`Invalid ghost: ${validation?.validation?.reason ?? 'worker rejected placement'}`); return }
+    await run((client) => client.command({ type: 'CREATE_SITE', targetKind, position: transform.position, size: transform.size, rotation: transform.rotation, stationId: station.stationId, ...(targetKind === 'factory' && contract !== undefined ? { cost: contract.billOfMaterials ?? [], factoryId: activeFactoryId, instanceId: asId<InstanceId>(`instance-${Date.now()}`), contract: serializeContract(contract) } : {}), ...(targetKind === 'mine' ? { resourceId: mineResource } : {}) }))
+  }, [activeFactoryId, contract, mineResource, run, selectedEntity, snapshot, stationFor, tool, transformFor])
+  useEffect(() => { const onKey = (event: KeyboardEvent) => { if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return; const found = tools.find((item) => item.key.toLowerCase() === event.key.toLowerCase()); if (found !== undefined) { setTool(found.id); setRailDraft([]); return } if (event.key.toLowerCase() === 'r') setRotation((value) => ((value + 1) % 4) as QuarterTurn); else if (event.key === 'Escape') { setRailDraft([]); setTool('select') } else if (event.key === 'Enter' && railDraft.length >= 2) void commitRail() }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey) }, [commitRail, railDraft.length])
 
-  return <div className="world-workspace">
-    <aside className="world-sites panel">
-      <div className="panel-heading"><div><span className="eyebrow">World</span><h2>Production sites</h2></div><span>{factories.length}</span></div>
-      <div className="world-site-list">
-        {factories.map((factory, index) => {
-          const isActive = factory.id === activeFactoryId
-          return <button key={factory.id} className={`world-site ${isActive ? 'is-active' : ''}`} aria-label={`View ${factory.name} in world`} aria-pressed={isActive} onClick={() => onSelectFactory(factory.id)}>
-            <span className="world-site-mark">F{index + 1}</span>
-            <span><strong>{factory.name}</strong><small>{isActive ? contract === undefined ? 'Contract unavailable' : `${contract.footprint.width} × ${contract.footprint.height} m footprint` : 'Select production site'}</small></span>
-            <i className={`status-dot ${isActive ? compileState : 'muted'}`} />
-          </button>
-        })}
-      </div>
-      <section className="world-summary">
-        <span className="eyebrow">Network summary</span>
-        <dl><div><dt>Factories</dt><dd>{factories.length}</dd></div><div><dt>Stored items</dt><dd>{storedItems}/{totalCapacity}</dd></div><div><dt>Active deliveries</dt><dd>0</dd></div></dl>
-      </section>
-    </aside>
-
-    <section className="world-map" aria-label="World overview">
-      <div className="world-map-caption"><span>World overview</span><small>Factory boundaries and discrete buffers</small></div>
-      <div className="world-flow world-flow--inputs">
-        <span className="world-flow-label">Inputs</span>
-        {snapshot?.inputs.map((buffer) => renderBuffer(buffer, 'input'))}
-      </div>
-      <button className="world-factory" onClick={onOpenFactory} aria-label={`Open ${factoryName} factory`}>
-        <span className="world-factory-icon">F</span>
-        <span className={`badge ${stateTone[state]}`}>{state.replace('_', ' ')}</span>
-        <strong>{factoryName}</strong>
-        <small>Compiled factory actor</small>
-        <span className="world-factory-stats"><b>{blueprint.nodes.size}</b> nodes <b>{blueprint.edges.size}</b> routes</span>
-        <em>Open factory →</em>
-      </button>
-      <div className="world-flow world-flow--outputs">
-        <span className="world-flow-label">Outputs</span>
-        {snapshot?.outputs.map((buffer) => renderBuffer(buffer, 'output'))}
-      </div>
-    </section>
-
-    <aside className="world-inspector panel">
-      <div className="panel-heading"><div><span className="eyebrow">Operate</span><h2>World runtime</h2></div><span className={`badge ${stateTone[state]}`}>{state.replace('_', ' ')}</span></div>
-      <section className="inspector-card">
-        <h3>Time controls</h3>
-        <div className="world-runtime-actions"><button onClick={onSupply}>Supply +12</button><button className="primary" onClick={onAdvance}>Run 5 s</button><button onClick={onCollect}>Collect all</button></div>
-        <small className="world-clock">Logical time {Number(logicalTime) / 1_000_000}s</small>
-      </section>
-      <section className="inspector-card">
-        <h3>Scheduler</h3>
-        <dl><div><dt>Scheduled events</dt><dd>{scheduledEvents}</dd></div><div><dt>Sleeping actors</dt><dd>{sleepingActors}</dd></div><div><dt>Work generation</dt><dd>{snapshot?.generation ?? 0}</dd></div></dl>
-      </section>
-      <section className="inspector-card world-layer-note">
-        <h3>World layer</h3>
-        <p>Items in this view are discrete integers. Open the factory to edit its continuous production graph.</p>
-        <button onClick={onOpenFactory}>Edit factory blueprint</button>
-      </section>
-    </aside>
+  const regenerate = async () => { if (snapshot !== undefined && !window.confirm('Generate a new world? The current world will be replaced only after generation succeeds.')) return; const result = await run((client) => client.generate(defaultWorldGenerationConfig(seed.trim() || 'starter-world'))); if (result !== undefined) { setSelected(undefined); setRailDraft([]) } }
+  const setTime = async (paused: boolean, timeScale = snapshot?.timeScale ?? 1) => { await run((client) => client.command({ type: 'SET_TIME_CONTROL', paused, timeScale })) }
+  const selectedIndex = snapshot === undefined || selected === undefined ? -1 : selected.y * snapshot.grid.width + selected.x
+  const selectedDescription = useMemo(() => { if (snapshot === undefined || selectedIndex < 0) return undefined; const ore = snapshot.grid.oreKinds[selectedIndex]; return { terrain: snapshot.grid.terrain[selectedIndex] === TerrainKind.OBSTACLE ? 'Obstacle' : 'Buildable ground', ore: ore === OreKind.IRON ? 'Iron ore' : ore === OreKind.COPPER ? 'Copper ore' : undefined, amount: snapshot.grid.oreRemaining[selectedIndex] ?? 0 } }, [selectedIndex, snapshot])
+  const contractRows = contract === undefined ? [] : [...[...contract.inputRates].map(([resourceId, rate]) => ({ role: 'input' as const, resourceId, rate, maximum: contract.inputPorts.filter((port) => port.resourceId === resourceId).reduce((total, port) => total + port.capacity, 0n) })), ...[...contract.outputRates].map(([resourceId, rate]) => ({ role: 'output' as const, resourceId, rate, maximum: contract.outputPorts.filter((port) => port.resourceId === resourceId).reduce((total, port) => total + port.capacity, 0n) }))]
+  return <div className="world-workspace world-workspace--map">
+    <aside className="world-sites panel"><div className="panel-heading"><div><span className="eyebrow">World editor</span><h2>Build tools</h2></div><span>{snapshot?.revision ?? 0}</span></div><div className="world-tool-grid" role="toolbar" aria-label="World build tools">{tools.map((item) => <button key={item.id} aria-pressed={tool === item.id} className={tool === item.id ? 'is-active' : ''} onClick={() => { setTool(item.id); setRailDraft([]) }}>{item.label}<kbd>{item.key}</kbd></button>)}</div>{tool === 'rail' && <div className="world-tool-options"><p>{railDraft.length === 0 ? 'Start on the round anchor inside a station.' : `${railDraft.length} points · finish on another anchor`}</p><button disabled={railDraft.length < 2 || busy} onClick={() => void commitRail()}>Finish rail</button><button disabled={railDraft.length === 0} onClick={() => setRailDraft([])}>Cancel</button></div>}{tool === 'rail-erase' && <div className="world-tool-options"><p>Hover a segment to highlight it, then click to remove it.</p></div>}{(tool === 'rail' || tool === 'rail-erase') && <div className="world-rail-legend" aria-label="Rail connection legend"><span><i className="connected" />Connected</span><span><i className="disconnected" />Open end</span></div>}<div className="world-tool-options"><button onClick={() => setRotation((value) => ((value + 1) % 4) as QuarterTurn)}>Rotate · {rotation * 90}° <kbd>R</kbd></button>{tool === 'mine' && <select aria-label="Mine resource" value={mineResource} onChange={(event) => setMineResource(asId<ResourceId>(event.target.value))}><option value="ironOre">Iron ore</option><option value="copperOre">Copper ore</option></select>}</div><div className="world-site-list">{factories.map((factory, index) => <button key={factory.id} aria-label={`View ${factory.name} in world`} aria-pressed={factory.id === activeFactoryId} className={`world-site ${factory.id === activeFactoryId ? 'is-active' : ''}`} onClick={() => onSelectFactory(factory.id)}><span className="world-site-mark">F{index + 1}</span><span><strong>{factory.name}</strong><small>{factory.id === activeFactoryId ? 'Placement definition' : 'Choose definition'}</small></span></button>)}</div><section className="world-summary"><dl><div><dt>Entities</dt><dd>{snapshot?.entities.length ?? 0}</dd></div><div><dt>Pods</dt><dd>{snapshot?.pods.length ?? 0}</dd></div><div><dt>Events</dt><dd>{snapshot?.scheduledEvents ?? 0}</dd></div></dl></section></aside>
+    <section className="world-map world-map--pixi" aria-label="World overview">{snapshot === undefined ? <div className="world-loading">{error ?? 'Generating deterministic world…'}</div> : <Suspense fallback={<div className="world-loading">Loading WebGL renderer…</div>}><WorldCanvas snapshot={snapshot} {...(selected === undefined ? {} : { selected })} {...(ghost === undefined ? {} : { ghost })} {...(hoveredRailEdgeId === undefined ? {} : { hoveredRailEdgeId })} railDraft={railDraft} onSelect={(point) => void handleMapClick(point)} onHover={setHovered} /></Suspense>}<div className="world-map-caption"><span>{tool} tool</span><small>Seed {seed} · pan, wheel to zoom, click to edit</small></div></section>
+    <aside className="world-inspector panel"><div className="panel-heading"><div><span className="eyebrow">Operate</span><h2>World runtime</h2></div><span className={`badge ${compileState === 'ready' ? 'good' : 'waiting'}`}>{compileState}</span></div>{error !== undefined && <p className="world-error" role="alert">{error}</p>}<section className="inspector-card"><h3>World seed</h3><label className="world-seed"><span>Seed</span><input value={seed} onChange={(event) => setSeed(event.target.value)} /></label><button className="button button--primary button--block" disabled={busy} onClick={() => void regenerate()}>Generate new world</button></section><section className="inspector-card"><h3>Logical clock</h3><dl><div><dt>Time</dt><dd>{Number(snapshot?.logicalTime ?? 0n) / 1_000_000}s</dd></div><div><dt>State</dt><dd>{snapshot?.paused === false ? `${snapshot.timeScale}×` : 'Paused'}</dd></div></dl><div className="world-time-controls"><button aria-label={snapshot?.paused === false ? 'Pause world' : 'Play world'} onClick={() => void setTime(snapshot?.paused === false)}>{snapshot?.paused === false ? 'Pause' : 'Play'}</button>{([1, 5, 20] as const).map((speed) => <button key={speed} aria-pressed={snapshot?.timeScale === speed} onClick={() => void setTime(false, speed)}>{speed}×</button>)}</div>{snapshot?.pendingAdvanceTarget !== undefined && <button onClick={() => void run((client) => client.continueAdvance())}>Continue catch-up</button>}</section>{selected !== undefined && selectedDescription !== undefined && <section className="inspector-card"><h3>Tile {selected.x}, {selected.y}</h3><dl><div><dt>Terrain</dt><dd>{selectedDescription.terrain}</dd></div>{selectedDescription.ore !== undefined && <><div><dt>Deposit</dt><dd>{selectedDescription.ore}</dd></div><div><dt>Remaining</dt><dd>{selectedDescription.amount}</dd></div></>}</dl></section>}{selectedEntity !== undefined && snapshot !== undefined && <section className="inspector-card world-building-card"><h3>Selected {selectedEntity.kind}</h3><WorldBuildingInspector entity={selectedEntity} snapshot={snapshot} />{selectedEntity.kind === 'construction-site' && <button className="danger-button" onClick={() => void run((client) => client.command({ type: 'CANCEL_CONSTRUCTION', siteId: selectedEntity.id }))}>Cancel and evacuate</button>}{selectedEntity.kind === 'storage' && <div className="world-rule-editor"><h4>New logistics rule</h4><select aria-label="Rule resource" value={ruleResource} onChange={(event) => setRuleResource(asId<ResourceId>(event.target.value))}>{resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.name}</option>)}</select><select aria-label="Rule mode" value={ruleMode} onChange={(event) => setRuleMode(event.target.value as 'request' | 'provide')}><option value="request">Request</option><option value="provide">Provide</option></select><input aria-label="Rule target" type="number" min="0" value={ruleTarget} onChange={(event) => setRuleTarget(Number(event.target.value))} /><button onClick={() => void run((client) => client.command({ type: 'CONFIGURE_STATION', entityId: selectedEntity.id, resourceId: ruleResource, mode: ruleMode, target: ruleTarget, priority: 0 }))}>Apply rule</button></div>}</section>}<section className="inspector-card world-contract"><h3>{factoryName}</h3><p>{contract === undefined ? 'Compile the blueprint before placing it.' : `${contract.footprint.width} × ${contract.footprint.height} tiles · ${contract.billOfMaterials?.reduce((sum, item) => sum + item.quantity, 0) ?? 0} build items.`}</p>{contractRows.map((row) => <div className="world-contract-row" key={`${row.role}-${row.resourceId}`}><span>Contract rate</span><strong>{resourceById.get(row.resourceId)?.name ?? row.resourceId}</strong><b>{formatRate(row.rate)}/s</b><small>max {formatRate(row.maximum)}/s</small></div>)}<button aria-label={`Open ${factoryName} factory`} className="button button--block" onClick={onOpenFactory}>Open factory blueprint</button></section><section className="inspector-card"><h3>Accessible entities</h3><ul className="world-entity-list">{snapshot?.entities.map((entity) => <li key={entity.id}><button onClick={() => setSelected(entity.transform.position)}>{entity.kind} · {entity.id}</button></li>)}</ul></section><section className="inspector-card"><h3>Traffic diagnostics</h3>{snapshot?.diagnostics.length === 0 ? <p>No blocking cycle.</p> : snapshot?.diagnostics.map((diagnostic) => <p key={`${diagnostic.code}-${diagnostic.entityIds.join('-')}`}>{diagnostic.message}</p>)}</section></aside>
   </div>
 }

@@ -153,6 +153,65 @@ button:focus-visible { outline: 2px solid var(--mint); outline-offset: 2px; }
 .world-clock { display: block; margin-top: 10px; color: var(--muted); font: 8px 'DM Mono'; }
 .world-layer-note p { color: #83998f; font-size: 9px; line-height: 1.55; }
 .world-layer-note button { width: 100%; margin-top: 5px; }
+.world-workspace--map { overflow: hidden; }
+.world-map--pixi { display: block; padding: 0; background: #07100d; }
+.world-map--pixi::before,.world-map--pixi::after { display: none; }
+.world-pixi-canvas { position: absolute; inset: 0; overflow: hidden; touch-action: none; }
+.world-pixi-canvas canvas { display: block; width: 100%; height: 100%; outline: none; cursor: grab; }
+.world-pixi-canvas canvas:active { cursor: grabbing; }
+.world-pixi-canvas canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--mint); }
+.world-map--pixi .world-map-caption { z-index: 2; padding: 7px 9px; border: 1px solid #315043; border-radius: 4px; background: rgba(7,16,13,.82); pointer-events: none; }
+.world-loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font: 10px 'DM Mono'; }
+.world-error { margin: 10px; padding: 9px; border: 1px solid #7c4138; background: #2b1512; color: #e6a399; font-size: 9px; }
+.world-seed { display: grid; gap: 5px; margin-bottom: 8px; color: var(--muted); font-size: 9px; }
+.world-seed input { min-width: 0; padding: 7px; border: 1px solid #315043; border-radius: 3px; background: #08140f; color: #c8ded4; font: 9px 'DM Mono'; }
+.world-entity-list { display: grid; gap: 4px; max-height: 180px; margin: 0; padding: 0; overflow: auto; list-style: none; }
+.world-entity-list button { width: 100%; overflow: hidden; padding: 6px; border: 1px solid #29463a; border-radius: 3px; background: #0c1d16; color: #9eb8ac; font: 8px 'DM Mono'; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.world-contract-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin: 9px 0; padding: 8px; border: 1px solid #29463a; background: #0b1913; }
+.world-contract-row span { grid-column: 1/-1; color: var(--muted); font: 7px 'DM Mono'; letter-spacing: .08em; text-transform: uppercase; }
+.world-contract-row strong { font-size: 9px; }
+.world-contract-row b { color: #d0e5db; font: 9px 'DM Mono'; }
+.world-contract-row small { grid-column: 1/-1; color: var(--muted); font: 7px 'DM Mono'; text-align: right; }
+.world-tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 10px; }
+.world-tool-grid button,.world-tool-options button,.world-time-controls button,.world-rule-editor button { display: flex; justify-content: space-between; gap: 6px; padding: 7px; border: 1px solid #29463a; border-radius: 3px; background: #0c1d16; color: #9eb8ac; font: 8px 'DM Mono'; cursor: pointer; }
+.world-tool-grid button.is-active,.world-tool-grid button[aria-pressed="true"],.world-time-controls button[aria-pressed="true"] { border-color: var(--mint); background: #173b2d; color: #d9eee5; }
+.world-tool-grid kbd,.world-tool-options kbd { color: #6f8d80; font: 7px 'DM Mono'; }
+.world-tool-options { display: grid; gap: 5px; padding: 0 10px 10px; }
+.world-tool-options p { margin: 0; color: var(--muted); font: 8px/1.5 'DM Mono'; }
+.world-rail-legend { display: flex; gap: 12px; padding: 0 10px 10px; color: var(--muted); font: 8px 'DM Mono'; }
+.world-rail-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.world-rail-legend i { width: 8px; height: 8px; border: 2px solid currentColor; border-radius: 50%; background: #07100d; }
+.world-rail-legend i.connected { color: #91e0bb; }
+.world-rail-legend i.disconnected { color: #ff817c; }
+.world-tool-options select,.world-rule-editor select,.world-rule-editor input { min-width: 0; padding: 7px; border: 1px solid #315043; border-radius: 3px; background: #08140f; color: #c8ded4; font: 8px 'DM Mono'; }
+.world-time-controls { display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; }
+.world-time-controls button { justify-content: center; }
+.world-rule-editor { display: grid; gap: 6px; margin-top: 8px; }
+.world-building-card>h3 { margin-bottom: 8px; }
+.world-building-identity { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+.world-building-identity p { min-width: 0; margin: 0; overflow: hidden; color: #789087; font: 8px 'DM Mono'; text-overflow: ellipsis; white-space: nowrap; }
+.world-building-identity .badge,.world-building-status .badge { flex: none; text-transform: uppercase; }
+.world-building-counts { margin: 0 0 10px!important; }
+.world-building-status { display: flex; align-items: center; justify-content: space-between; margin: 11px 0 5px; color: var(--muted); font-size: 9px; }
+.world-runtime-note { margin: 3px 0 9px; color: #668177; font: 7px 'DM Mono'; text-align: right; }
+.world-buffer-group,.world-inventory,.world-logistics-state { margin-top: 11px; padding-top: 10px; border-top: 1px solid #21372e; }
+.world-buffer-group h4,.world-inventory-heading strong,.world-logistics-state h4,.world-rule-editor h4 { margin: 0; color: #90aa9f; font: 8px 'DM Mono'; letter-spacing: .08em; text-transform: uppercase; }
+.world-buffer { margin-top: 8px; }
+.world-buffer>div,.world-inventory-heading,.world-logistics-row>div { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 9px; }
+.world-buffer b,.world-inventory-heading span,.world-logistics-row b { color: #c6ded3; font: 8px 'DM Mono'; font-weight: 500; }
+.world-buffer small,.world-logistics-row small { display: flex; justify-content: space-between; margin-top: 5px; color: #6f897e; font: 7px 'DM Mono'; }
+.world-inventory-meter { display: block; height: 4px; margin-top: 5px; overflow: hidden; border-radius: 2px; background: #162a21; }
+.world-inventory-meter i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#4d9e79,var(--mint)); }
+.world-inventory-meter.is-wip { height: 2px; margin-top: 3px; }
+.world-inventory-meter.is-wip i { background: var(--orange); }
+.world-inventory ul { display: grid; gap: 5px; margin: 8px 0 0; padding: 0; list-style: none; }
+.world-inventory li { display: grid; grid-template-columns: 6px 1fr auto; align-items: center; gap: 6px; color: #9db5aa; font-size: 8px; }
+.world-inventory li b { color: #d1e4dc; font: 8px 'DM Mono'; }
+.world-resource-dot { width: 6px; height: 6px; border-radius: 50%; background: #789087; }
+.world-empty-state { margin: 7px 0 0; color: #587066; font: 8px 'DM Mono'; font-style: italic; }
+.world-logistics-row { margin-top: 8px; padding: 7px; border: 1px solid #243d32; border-radius: 3px; background: #091711; }
+.world-logistics-row>div>b { color: #7fb99f; font-size: 7px; text-transform: uppercase; }
+.world-rule-editor h4 { margin-top: 4px; }
 
 @media (max-width: 1050px) {
   .world-workspace { grid-template-columns: 210px minmax(460px,1fr); }

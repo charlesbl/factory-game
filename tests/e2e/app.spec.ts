@@ -21,7 +21,7 @@ test('opens the graph editor and compiles the demo factory', async ({ page }) =>
 test('adds a machine and supports undo', async ({ page }) => {
   await page.goto('/')
   const nodes = page.locator('.graph-node'); await expect(nodes).toHaveCount(3)
-  await page.getByRole('button', { name: /Copper drill/i }).click(); await placePreview(page, 80, 80); await expect(nodes).toHaveCount(4)
+  await page.getByRole('button', { name: /Copper smelting/i }).click(); await placePreview(page, 80, 80); await expect(nodes).toHaveCount(4)
   await page.getByRole('button', { name: 'Undo' }).click(); await expect(nodes).toHaveCount(3)
 })
 
@@ -29,7 +29,7 @@ test('previews repeated placement and cancels without history', async ({ page })
   await page.goto('/')
   const committed = page.locator('.react-flow__node:not(.placement-flow-node) .graph-node')
   await expect(committed).toHaveCount(3)
-  await page.getByRole('button', { name: /Copper drill/i }).click()
+  await page.getByRole('button', { name: /Copper smelting/i }).click()
   const ghost = page.locator('.placement-flow-node'); await expect(ghost).toBeVisible()
   await ghost.evaluate((element) => { element.setAttribute('data-stability-check', 'mounted') })
   const canvas = await page.getByLabel('Factory graph editor').boundingBox(); expect(canvas).not.toBeNull()
@@ -41,7 +41,7 @@ test('previews repeated placement and cancels without history', async ({ page })
   await page.keyboard.press('Escape')
   await expect(page.locator('.placement-flow-node')).toHaveCount(0); await expect(committed).toHaveCount(3)
 
-  await page.getByRole('button', { name: /Copper drill/i }).click(); await placePreview(page, 70, 80, true)
+  await page.getByRole('button', { name: /Copper smelting/i }).click(); await placePreview(page, 70, 80, true)
   await expect(page.locator('.placement-flow-node')).toBeVisible()
   await placePreview(page, 150, 120)
   await expect(page.locator('.placement-flow-node')).toHaveCount(0); await expect(committed).toHaveCount(5)
@@ -90,10 +90,10 @@ test('selects multiple components with a direct marquee', async ({ page }) => {
   await expect(page.locator('.graph-node--external-output.is-selected')).toHaveCount(1)
 })
 
-test('runs the exact world boundary simulation', async ({ page }) => {
-  await page.goto('/'); await expect(page.getByText('Contract ready')).toBeVisible()
-  await page.getByRole('button', { name: 'Supply +12' }).click(); await page.getByRole('button', { name: 'Run 5 s' }).click()
-  await expect(page.getByText('5/24')).toBeVisible()
+test('runs the authoritative world clock without direct supply mutations', async ({ page }) => {
+  await page.goto('/'); await expect(page.getByText('Contract ready')).toBeVisible(); await expect(page.getByRole('button', { name: 'Supply +12' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'World', exact: true }).click(); await expect(page.getByLabel('World build tools')).toBeVisible(); await expect(page.getByRole('button', { name: 'Rail' })).toBeVisible()
+  await page.getByRole('button', { name: 'Play world' }).click(); await expect(page.getByText('1×', { exact: true })).toBeVisible(); await page.getByRole('button', { name: '5×' }).click(); await expect(page.getByText('5×', { exact: true })).toBeVisible()
 })
 
 test('switches between the world overview and factory editor', async ({ page }) => {
@@ -102,9 +102,9 @@ test('switches between the world overview and factory editor', async ({ page }) 
   await expect(page.getByLabel('World overview')).toBeVisible()
   await expect(page.getByText('Contract rate')).toHaveCount(2)
   await expect(page.getByText('2/s')).toBeVisible()
-  await expect(page.getByText('max 6/s · 33%')).toBeVisible()
+  await expect(page.getByText('max 6/s')).toBeVisible()
   await expect(page.getByText('1/s')).toBeVisible()
-  await expect(page.getByText('max 4/s · 25%')).toBeVisible()
+  await expect(page.getByText('max 4/s')).toBeVisible()
   await expect(page.getByRole('button', { name: /Open Starter iron line factory/i })).toBeVisible()
   await page.getByRole('button', { name: /Open Starter iron line factory/i }).click()
   await expect(page.getByLabel('Factory graph editor')).toBeVisible()
