@@ -1,58 +1,562 @@
-import { Application, Container, Graphics } from 'pixi.js'
-import { useEffect, useRef } from 'react'
-import type { GridPoint, RailEdgeId, RailNodeId } from '../domain'
-import { OreKind, TerrainKind, occupiedCells, type WorldSnapshot, type WorldTransform } from '../world'
-import { railEdgeConnectionState, railNodeConnectionState, railNodeDegrees } from './worldRailVisual'
+import { Application, Container, Graphics } from 'pixi.js';
+import { useEffect, useRef } from 'react';
+import type {
+  GridPoint,
+  RailEdgeId,
+  RailNodeId,
+  WorldEntityId,
+} from '../domain';
+import {
+  OreKind,
+  TerrainKind,
+  occupiedCells,
+  type WorldSnapshot,
+  type WorldTransform,
+} from '../world';
+import {
+  railEdgeConnectionState,
+  railNodeConnectionState,
+  railNodeDegrees,
+} from './worldRailVisual';
 
-const CELL = 8
-const CHUNK = 32
-interface Ghost { readonly transform: WorldTransform; readonly valid: boolean }
-interface Props { readonly snapshot: WorldSnapshot; readonly selected?: GridPoint; readonly ghost?: Ghost; readonly railDraft: readonly GridPoint[]; readonly hoveredRailEdgeId?: RailEdgeId; readonly onSelect: (point: GridPoint) => void; readonly onHover: (point?: GridPoint) => void }
-interface Scene { readonly app: Application; readonly camera: Container; readonly terrain: Container; readonly ore: Container; readonly rail: Graphics; readonly entities: Graphics; readonly reservations: Graphics; readonly pods: Graphics; readonly overlay: Graphics; readonly chunks: Container[]; worldId?: string; snapshot?: WorldSnapshot; receivedAt: number }
+const CELL = 8;
+const CHUNK = 32;
+interface Ghost {
+  readonly transform: WorldTransform;
+  readonly valid: boolean;
+}
+interface Props {
+  readonly snapshot: WorldSnapshot;
+  readonly selected?: GridPoint;
+  readonly ghost?: Ghost;
+  readonly railDraft: readonly GridPoint[];
+  readonly hoveredRailEdgeId?: RailEdgeId;
+  readonly hoveredDismantleEntityId?: WorldEntityId;
+  readonly selectedRailEdgeId?: RailEdgeId;
+  readonly onSelect: (point: GridPoint) => void;
+  readonly onHover: (point?: GridPoint) => void;
+}
+interface Scene {
+  readonly app: Application;
+  readonly camera: Container;
+  readonly terrain: Container;
+  readonly ore: Container;
+  readonly rail: Graphics;
+  readonly entities: Graphics;
+  readonly reservations: Graphics;
+  readonly pods: Graphics;
+  readonly overlay: Graphics;
+  readonly chunks: Container[];
+  worldId?: string;
+  snapshot?: WorldSnapshot;
+  receivedAt: number;
+}
 
 const drawScene = (scene: Scene, snapshot: WorldSnapshot): void => {
-  scene.snapshot = snapshot; scene.receivedAt = performance.now()
+  scene.snapshot = snapshot;
+  scene.receivedAt = performance.now();
   if (scene.worldId !== snapshot.worldId) {
-    scene.worldId = snapshot.worldId; scene.terrain.removeChildren().forEach((child) => child.destroy({ children: true })); scene.ore.removeChildren().forEach((child) => child.destroy({ children: true })); scene.chunks.length = 0
-    for (let cy = 0; cy < Math.ceil(snapshot.grid.height / CHUNK); cy += 1) for (let cx = 0; cx < Math.ceil(snapshot.grid.width / CHUNK); cx += 1) {
-      const terrain = new Graphics(); const ores = new Graphics(); const chunk = new Container(); chunk.label = `${cx}:${cy}`
-      for (let y = cy * CHUNK; y < Math.min(snapshot.grid.height, (cy + 1) * CHUNK); y += 1) for (let x = cx * CHUNK; x < Math.min(snapshot.grid.width, (cx + 1) * CHUNK); x += 1) { const index = y * snapshot.grid.width + x; terrain.rect(x * CELL, y * CELL, CELL, CELL).fill(snapshot.grid.terrain[index] === TerrainKind.OBSTACLE ? '#14231e' : (x + y) % 2 === 0 ? '#0b1814' : '#0c1a15'); if (snapshot.grid.oreKinds[index] === OreKind.IRON) ores.rect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2).fill({ color: '#b86e43', alpha: .78 }); else if (snapshot.grid.oreKinds[index] === OreKind.COPPER) ores.rect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2).fill({ color: '#5fb5aa', alpha: .78 }) }
-      chunk.addChild(terrain); scene.terrain.addChild(chunk); scene.ore.addChild(ores); scene.chunks.push(chunk)
+    scene.worldId = snapshot.worldId;
+    scene.terrain
+      .removeChildren()
+      .forEach((child) => child.destroy({ children: true }));
+    scene.ore
+      .removeChildren()
+      .forEach((child) => child.destroy({ children: true }));
+    scene.chunks.length = 0;
+    for (let cy = 0; cy < Math.ceil(snapshot.grid.height / CHUNK); cy += 1)
+      for (let cx = 0; cx < Math.ceil(snapshot.grid.width / CHUNK); cx += 1) {
+        const terrain = new Graphics();
+        const ores = new Graphics();
+        const chunk = new Container();
+        chunk.label = `${cx}:${cy}`;
+        for (
+          let y = cy * CHUNK;
+          y < Math.min(snapshot.grid.height, (cy + 1) * CHUNK);
+          y += 1
+        )
+          for (
+            let x = cx * CHUNK;
+            x < Math.min(snapshot.grid.width, (cx + 1) * CHUNK);
+            x += 1
+          ) {
+            const index = y * snapshot.grid.width + x;
+            terrain
+              .rect(x * CELL, y * CELL, CELL, CELL)
+              .fill(
+                snapshot.grid.terrain[index] === TerrainKind.OBSTACLE
+                  ? '#14231e'
+                  : (x + y) % 2 === 0
+                    ? '#0b1814'
+                    : '#0c1a15',
+              );
+            if (snapshot.grid.oreKinds[index] === OreKind.IRON)
+              ores
+                .rect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2)
+                .fill({ color: '#b86e43', alpha: 0.78 });
+            else if (snapshot.grid.oreKinds[index] === OreKind.COPPER)
+              ores
+                .rect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2)
+                .fill({ color: '#5fb5aa', alpha: 0.78 });
+          }
+        chunk.addChild(terrain);
+        scene.terrain.addChild(chunk);
+        scene.ore.addChild(ores);
+        scene.chunks.push(chunk);
+      }
+  }
+  const degrees = railNodeDegrees(snapshot.railEdges);
+  const nodes = new Map<RailNodeId, WorldSnapshot['railNodes'][number]>(
+    snapshot.railNodes.map((node) => [node.id, node]),
+  );
+  scene.rail.clear();
+  for (const edge of snapshot.railEdges) {
+    const first = edge.points[0];
+    if (first === undefined) continue;
+    const connected =
+      railEdgeConnectionState(edge, nodes, degrees) === 'connected';
+    const colour = connected ? '#63c99c' : '#c97968';
+    scene.rail.moveTo(first.x * CELL + CELL / 2, first.y * CELL + CELL / 2);
+    for (const point of edge.points.slice(1))
+      scene.rail.lineTo(point.x * CELL + CELL / 2, point.y * CELL + CELL / 2);
+    scene.rail.stroke({ color: colour, width: 3 });
+    const end = edge.points.at(-1)!;
+    const prior = edge.points.at(-2) ?? first;
+    const dx = Math.sign(end.x - prior.x);
+    const dy = Math.sign(end.y - prior.y);
+    const ex = end.x * CELL + CELL / 2;
+    const ey = end.y * CELL + CELL / 2;
+    scene.rail
+      .poly([
+        ex,
+        ey,
+        ex - dx * 5 - dy * 3,
+        ey - dy * 5 + dx * 3,
+        ex - dx * 5 + dy * 3,
+        ey - dy * 5 - dx * 3,
+      ])
+      .fill(colour);
+  }
+  scene.entities.clear();
+  const colours: Record<string, string> = {
+    factory: '#5fae88',
+    mine: '#c97946',
+    drill: '#d39a5f',
+    station: '#8eabc2',
+    storage: '#a58ad0',
+    depot: '#e0bd63',
+    'construction-site': '#d48c53',
+  };
+  for (const entity of snapshot.entities) {
+    if (entity.kind === 'construction-site') {
+      const cells = occupiedCells(entity.transform);
+      const totalRequired = entity.required.reduce(
+        (sum, item) => sum + item.quantity,
+        0,
+      );
+      const totalDelivered = entity.delivered.reduce(
+        (sum, item) => sum + item.quantity,
+        0,
+      );
+      const progress =
+        totalRequired === 0 ? 1 : Math.min(totalDelivered / totalRequired, 1);
+      const builtCount = Math.floor(progress * cells.length);
+      const builtColor = colours[entity.targetKind] ?? '#6fd0a6';
+      for (let index = 0; index < cells.length; index += 1) {
+        const cell = cells[index]!;
+        const isBuilt = index < builtCount;
+        scene.entities
+          .rect(cell.x * CELL, cell.y * CELL, CELL, CELL)
+          .fill({
+            color: isBuilt ? builtColor : '#d48c53',
+            alpha: isBuilt ? 0.85 : 0.35,
+          })
+          .stroke({ color: '#d9eee5', width: isBuilt ? 1 : 0.5 });
+      }
+    } else {
+      const width =
+        (entity.transform.rotation % 2 === 0
+          ? entity.transform.size.width
+          : entity.transform.size.height) * CELL;
+      const height =
+        (entity.transform.rotation % 2 === 0
+          ? entity.transform.size.height
+          : entity.transform.size.width) * CELL;
+      const dismantling =
+        entity.kind === 'factory' &&
+        'state' in entity &&
+        entity.state === 'DISMANTLING';
+      scene.entities
+        .rect(
+          entity.transform.position.x * CELL,
+          entity.transform.position.y * CELL,
+          width,
+          height,
+        )
+        .fill({
+          color: dismantling ? '#d46c53' : (colours[entity.kind] ?? '#6fd0a6'),
+          alpha: dismantling
+            ? 0.6
+            : entity.kind === 'drill' && entity.state === 'GHOST'
+              ? 0.45
+              : 0.85,
+        })
+        .stroke({
+          color: dismantling ? '#ff817c' : '#d9eee5',
+          width: dismantling ? 2 : 1,
+        });
     }
   }
-  const degrees = railNodeDegrees(snapshot.railEdges); const nodes = new Map<RailNodeId, WorldSnapshot['railNodes'][number]>(snapshot.railNodes.map((node) => [node.id, node]))
-  scene.rail.clear(); for (const edge of snapshot.railEdges) { const first = edge.points[0]; if (first === undefined) continue; const connected = railEdgeConnectionState(edge, nodes, degrees) === 'connected'; const colour = connected ? '#63c99c' : '#c97968'; scene.rail.moveTo(first.x * CELL + CELL / 2, first.y * CELL + CELL / 2); for (const point of edge.points.slice(1)) scene.rail.lineTo(point.x * CELL + CELL / 2, point.y * CELL + CELL / 2); scene.rail.stroke({ color: colour, width: 3 }); const end = edge.points.at(-1)!; const prior = edge.points.at(-2) ?? first; const dx = Math.sign(end.x - prior.x); const dy = Math.sign(end.y - prior.y); const ex = end.x * CELL + CELL / 2; const ey = end.y * CELL + CELL / 2; scene.rail.poly([ex, ey, ex - dx * 5 - dy * 3, ey - dy * 5 + dx * 3, ex - dx * 5 + dy * 3, ey - dy * 5 - dx * 3]).fill(colour) }
-  scene.entities.clear(); const colours: Record<string, string> = { factory: '#5fae88', mine: '#c97946', drill: '#d39a5f', station: '#8eabc2', storage: '#a58ad0', depot: '#e0bd63', 'construction-site': '#d48c53' }; for (const entity of snapshot.entities) { const width = (entity.transform.rotation % 2 === 0 ? entity.transform.size.width : entity.transform.size.height) * CELL; const height = (entity.transform.rotation % 2 === 0 ? entity.transform.size.height : entity.transform.size.width) * CELL; scene.entities.rect(entity.transform.position.x * CELL, entity.transform.position.y * CELL, width, height).fill({ color: colours[entity.kind] ?? '#6fd0a6', alpha: entity.kind === 'construction-site' || entity.kind === 'drill' && entity.state === 'GHOST' ? .45 : .85 }).stroke({ color: '#d9eee5', width: 1 }) }
-  for (const node of snapshot.railNodes) { const connected = railNodeConnectionState(node, degrees) === 'connected'; if (node.kind === 'endpoint' && connected) continue; const x = node.position.x * CELL + CELL / 2; const y = node.position.y * CELL + CELL / 2; const colour = connected ? '#91e0bb' : '#ff817c'; const radius = node.kind === 'station' || node.kind === 'depot' ? 3.5 : 2.5; scene.entities.circle(x, y, radius).fill('#07100d').stroke({ color: colour, width: 1.5 }); if (node.kind === 'station' || node.kind === 'depot') scene.entities.circle(x, y, 1.25).fill(colour) }
-  scene.reservations.clear(); for (const block of snapshot.railBlocks) if (block.occupantId !== undefined || block.reservedById !== undefined) { const edge = snapshot.railEdges.find((item) => item.id === block.edgeId); const a = edge?.points[0]; const b = edge?.points.at(-1); if (a !== undefined && b !== undefined) scene.reservations.circle((a.x + b.x + 1) * CELL / 2, (a.y + b.y + 1) * CELL / 2, 3).fill(block.occupantId === undefined ? '#f4d35e' : '#ef6f6c') }
-}
-
-export const WorldCanvas = ({ snapshot, selected, ghost, railDraft, hoveredRailEdgeId, onSelect, onHover }: Props) => {
-  const hostRef = useRef<HTMLDivElement>(null); const sceneRef = useRef<Scene | undefined>(undefined); const snapshotRef = useRef(snapshot); const selectRef = useRef(onSelect); const hoverRef = useRef(onHover)
-  useEffect(() => { snapshotRef.current = snapshot }, [snapshot])
-  useEffect(() => { selectRef.current = onSelect; hoverRef.current = onHover }, [onHover, onSelect])
-  useEffect(() => {
-    const host = hostRef.current; if (host === null) return undefined; let disposed = false; let dragging = false; let downX = 0; let downY = 0; let lastX = 0; let lastY = 0
-    const initialise = async () => {
-      const app = new Application(); await app.init({ resizeTo: host, preference: 'webgl', antialias: false, background: '#07100d', autoDensity: true, resolution: Math.min(devicePixelRatio, 2) }); if (disposed) { app.destroy(true); return }
-      host.replaceChildren(app.canvas); app.canvas.setAttribute('aria-label', 'Procedural world map'); app.canvas.setAttribute('role', 'application'); app.canvas.tabIndex = 0
-      const camera = new Container(); const terrain = new Container(); const ore = new Container(); const rail = new Graphics(); const entities = new Graphics(); const reservations = new Graphics(); const pods = new Graphics(); const overlay = new Graphics(); camera.addChild(terrain, ore, rail, entities, reservations, pods, overlay); app.stage.addChild(camera)
-      const initial = snapshotRef.current; const scene: Scene = { app, camera, terrain, ore, rail, entities, reservations, pods, overlay, chunks: [], receivedAt: performance.now() }; sceneRef.current = scene; drawScene(scene, initial)
-      const fit = () => { const scale = Math.min(host.clientWidth / (initial.grid.width * CELL), host.clientHeight / (initial.grid.height * CELL)) * .92; camera.scale.set(scale); camera.position.set((host.clientWidth - initial.grid.width * CELL * scale) / 2, (host.clientHeight - initial.grid.height * CELL * scale) / 2) }; fit()
-      const updateCulling = () => { const scale = camera.scale.x; for (const chunk of scene.chunks) { const [cx, cy] = chunk.label.split(':').map(Number); const left = camera.x + cx! * CHUNK * CELL * scale; const top = camera.y + cy! * CHUNK * CELL * scale; const size = CHUNK * CELL * scale; chunk.visible = left < host.clientWidth && top < host.clientHeight && left + size > 0 && top + size > 0 } }
-      const pointFrom = (clientX: number, clientY: number): GridPoint => ({ x: Math.floor((clientX - host.getBoundingClientRect().left - camera.x) / camera.scale.x / CELL), y: Math.floor((clientY - host.getBoundingClientRect().top - camera.y) / camera.scale.y / CELL) })
-      const inside = (point: GridPoint) => point.x >= 0 && point.y >= 0 && point.x < (scene.snapshot?.grid.width ?? 0) && point.y < (scene.snapshot?.grid.height ?? 0)
-      const down = (event: PointerEvent) => { dragging = true; downX = lastX = event.clientX; downY = lastY = event.clientY; app.canvas.setPointerCapture(event.pointerId) }
-      const move = (event: PointerEvent) => { const point = pointFrom(event.clientX, event.clientY); hoverRef.current(inside(point) ? point : undefined); if (!dragging) return; camera.x += event.clientX - lastX; camera.y += event.clientY - lastY; lastX = event.clientX; lastY = event.clientY; updateCulling() }
-      const up = (event: PointerEvent) => { const moved = Math.abs(event.clientX - downX) + Math.abs(event.clientY - downY); dragging = false; if (moved < 3) { const point = pointFrom(event.clientX, event.clientY); if (inside(point)) selectRef.current(point) } }
-      const wheel = (event: WheelEvent) => { event.preventDefault(); const before = pointFrom(event.clientX, event.clientY); const scale = Math.max(.2, Math.min(5, camera.scale.x * (event.deltaY < 0 ? 1.15 : .87))); camera.scale.set(scale); const rect = host.getBoundingClientRect(); camera.x = event.clientX - rect.left - before.x * CELL * scale; camera.y = event.clientY - rect.top - before.y * CELL * scale; updateCulling() }
-      const key = (event: KeyboardEvent) => { const amount = event.shiftKey ? 80 : 24; if (event.key === 'ArrowLeft') camera.x += amount; else if (event.key === 'ArrowRight') camera.x -= amount; else if (event.key === 'ArrowUp') camera.y += amount; else if (event.key === 'ArrowDown') camera.y -= amount; else if (event.key === '+' || event.key === '=') camera.scale.set(Math.min(5, camera.scale.x * 1.15)); else if (event.key === '-') camera.scale.set(Math.max(.2, camera.scale.x * .87)); else return; event.preventDefault(); updateCulling() }
-      app.canvas.addEventListener('pointerdown', down); app.canvas.addEventListener('pointermove', move); app.canvas.addEventListener('pointerleave', () => hoverRef.current(undefined)); app.canvas.addEventListener('pointerup', up); app.canvas.addEventListener('wheel', wheel, { passive: false }); app.canvas.addEventListener('keydown', key); updateCulling()
-      app.ticker.add(() => { const current = scene.snapshot; if (current === undefined) return; scene.pods.clear(); const logicalNow = current.logicalTime + BigInt(Math.max(0, Math.floor((performance.now() - scene.receivedAt) * 1000))); for (const pod of current.pods) { let point = current.railNodes.find((node) => node.id === pod.nodeId)?.position; if (pod.motion !== undefined) { const duration = pod.motion.endsAt - pod.motion.startsAt; const elapsed = logicalNow <= pod.motion.startsAt ? 0 : logicalNow >= pod.motion.endsAt ? Number(duration) : Number(logicalNow - pod.motion.startsAt); const ratio = duration === 0n ? 1 : elapsed / Number(duration); point = { x: pod.motion.from.x + (pod.motion.to.x - pod.motion.from.x) * ratio, y: pod.motion.from.y + (pod.motion.to.y - pod.motion.from.y) * ratio } } if (point !== undefined) scene.pods.circle(point.x * CELL + CELL / 2, point.y * CELL + CELL / 2, 3).fill(pod.state === 'DESTINATION_BLOCKED' || pod.state === 'GRIDLOCKED' ? '#ef6f6c' : '#f4d35e') } })
+  for (const node of snapshot.railNodes) {
+    const connected = railNodeConnectionState(node, degrees) === 'connected';
+    if (node.kind === 'endpoint' && connected) continue;
+    const x = node.position.x * CELL + CELL / 2;
+    const y = node.position.y * CELL + CELL / 2;
+    const colour = connected ? '#91e0bb' : '#ff817c';
+    const radius = node.kind === 'station' || node.kind === 'depot' ? 3.5 : 2.5;
+    scene.entities
+      .circle(x, y, radius)
+      .fill('#07100d')
+      .stroke({ color: colour, width: 1.5 });
+    if (node.kind === 'station' || node.kind === 'depot')
+      scene.entities.circle(x, y, 1.25).fill(colour);
+  }
+  scene.reservations.clear();
+  for (const block of snapshot.railBlocks)
+    if (block.occupantId !== undefined || block.reservedById !== undefined) {
+      const edge = snapshot.railEdges.find((item) => item.id === block.edgeId);
+      const a = edge?.points[0];
+      const b = edge?.points.at(-1);
+      if (a !== undefined && b !== undefined)
+        scene.reservations
+          .circle(((a.x + b.x + 1) * CELL) / 2, ((a.y + b.y + 1) * CELL) / 2, 3)
+          .fill(block.occupantId === undefined ? '#f4d35e' : '#ef6f6c');
     }
-    void initialise(); return () => { disposed = true; const app = sceneRef.current?.app; sceneRef.current = undefined; app?.destroy(true, { children: true }) }
-  }, [])
-  useEffect(() => { if (sceneRef.current !== undefined) drawScene(sceneRef.current, snapshot) }, [snapshot])
-  useEffect(() => { const overlay = sceneRef.current?.overlay; if (overlay === undefined) return; overlay.clear(); if (selected !== undefined) overlay.rect(selected.x * CELL, selected.y * CELL, CELL, CELL).stroke({ color: '#ffffff', width: 1.5 }); if (railDraft.length > 0) { overlay.moveTo(railDraft[0]!.x * CELL + CELL / 2, railDraft[0]!.y * CELL + CELL / 2); for (const point of railDraft.slice(1)) overlay.lineTo(point.x * CELL + CELL / 2, point.y * CELL + CELL / 2); overlay.stroke({ color: '#f4d35e', width: 2 }) } if (hoveredRailEdgeId !== undefined) { const edge = snapshotRef.current.railEdges.find((candidate) => candidate.id === hoveredRailEdgeId); const first = edge?.points[0]; if (edge !== undefined && first !== undefined) { overlay.moveTo(first.x * CELL + CELL / 2, first.y * CELL + CELL / 2); for (const point of edge.points.slice(1)) overlay.lineTo(point.x * CELL + CELL / 2, point.y * CELL + CELL / 2); overlay.stroke({ color: '#ff625c', width: 5, alpha: .8 }) } } if (ghost !== undefined) for (const cell of occupiedCells(ghost.transform)) overlay.rect(cell.x * CELL, cell.y * CELL, CELL, CELL).fill({ color: ghost.valid ? '#5fae88' : '#ef6f6c', alpha: .28 }).stroke({ color: ghost.valid ? '#91e0bb' : '#ff9693', width: 1 }) }, [ghost, hoveredRailEdgeId, railDraft, selected])
-  return <div className="world-pixi-canvas" ref={hostRef} />
-}
+};
+
+export const WorldCanvas = ({
+  snapshot,
+  selected,
+  ghost,
+  railDraft,
+  hoveredRailEdgeId,
+  hoveredDismantleEntityId,
+  selectedRailEdgeId,
+  onSelect,
+  onHover,
+}: Props) => {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<Scene | undefined>(undefined);
+  const snapshotRef = useRef(snapshot);
+  const selectRef = useRef(onSelect);
+  const hoverRef = useRef(onHover);
+  useEffect(() => {
+    snapshotRef.current = snapshot;
+  }, [snapshot]);
+  useEffect(() => {
+    selectRef.current = onSelect;
+    hoverRef.current = onHover;
+  }, [onHover, onSelect]);
+  useEffect(() => {
+    const host = hostRef.current;
+    if (host === null) return undefined;
+    let disposed = false;
+    let dragging = false;
+    let downX = 0;
+    let downY = 0;
+    let lastX = 0;
+    let lastY = 0;
+    const initialise = async () => {
+      const app = new Application();
+      await app.init({
+        resizeTo: host,
+        preference: 'webgl',
+        antialias: false,
+        background: '#07100d',
+        autoDensity: true,
+        resolution: Math.min(devicePixelRatio, 2),
+      });
+      if (disposed) {
+        app.destroy(true);
+        return;
+      }
+      host.replaceChildren(app.canvas);
+      app.canvas.setAttribute('aria-label', 'Procedural world map');
+      app.canvas.setAttribute('role', 'application');
+      app.canvas.tabIndex = 0;
+      const camera = new Container();
+      const terrain = new Container();
+      const ore = new Container();
+      const rail = new Graphics();
+      const entities = new Graphics();
+      const reservations = new Graphics();
+      const pods = new Graphics();
+      const overlay = new Graphics();
+      camera.addChild(
+        terrain,
+        ore,
+        rail,
+        entities,
+        reservations,
+        pods,
+        overlay,
+      );
+      app.stage.addChild(camera);
+      const initial = snapshotRef.current;
+      const scene: Scene = {
+        app,
+        camera,
+        terrain,
+        ore,
+        rail,
+        entities,
+        reservations,
+        pods,
+        overlay,
+        chunks: [],
+        receivedAt: performance.now(),
+      };
+      sceneRef.current = scene;
+      drawScene(scene, initial);
+      const fit = () => {
+        const scale =
+          Math.min(
+            host.clientWidth / (initial.grid.width * CELL),
+            host.clientHeight / (initial.grid.height * CELL),
+          ) * 0.92;
+        camera.scale.set(scale);
+        camera.position.set(
+          (host.clientWidth - initial.grid.width * CELL * scale) / 2,
+          (host.clientHeight - initial.grid.height * CELL * scale) / 2,
+        );
+      };
+      fit();
+      const updateCulling = () => {
+        const scale = camera.scale.x;
+        for (const chunk of scene.chunks) {
+          const [cx, cy] = chunk.label.split(':').map(Number);
+          const left = camera.x + cx! * CHUNK * CELL * scale;
+          const top = camera.y + cy! * CHUNK * CELL * scale;
+          const size = CHUNK * CELL * scale;
+          chunk.visible =
+            left < host.clientWidth &&
+            top < host.clientHeight &&
+            left + size > 0 &&
+            top + size > 0;
+        }
+      };
+      const pointFrom = (clientX: number, clientY: number): GridPoint => ({
+        x: Math.floor(
+          (clientX - host.getBoundingClientRect().left - camera.x) /
+            camera.scale.x /
+            CELL,
+        ),
+        y: Math.floor(
+          (clientY - host.getBoundingClientRect().top - camera.y) /
+            camera.scale.y /
+            CELL,
+        ),
+      });
+      const inside = (point: GridPoint) =>
+        point.x >= 0 &&
+        point.y >= 0 &&
+        point.x < (scene.snapshot?.grid.width ?? 0) &&
+        point.y < (scene.snapshot?.grid.height ?? 0);
+      const down = (event: PointerEvent) => {
+        dragging = true;
+        downX = lastX = event.clientX;
+        downY = lastY = event.clientY;
+        app.canvas.setPointerCapture(event.pointerId);
+      };
+      const move = (event: PointerEvent) => {
+        const point = pointFrom(event.clientX, event.clientY);
+        hoverRef.current(inside(point) ? point : undefined);
+        if (!dragging) return;
+        camera.x += event.clientX - lastX;
+        camera.y += event.clientY - lastY;
+        lastX = event.clientX;
+        lastY = event.clientY;
+        updateCulling();
+      };
+      const up = (event: PointerEvent) => {
+        const moved =
+          Math.abs(event.clientX - downX) + Math.abs(event.clientY - downY);
+        dragging = false;
+        if (moved < 3) {
+          const point = pointFrom(event.clientX, event.clientY);
+          if (inside(point)) selectRef.current(point);
+        }
+      };
+      const wheel = (event: WheelEvent) => {
+        event.preventDefault();
+        const before = pointFrom(event.clientX, event.clientY);
+        const scale = Math.max(
+          0.2,
+          Math.min(5, camera.scale.x * (event.deltaY < 0 ? 1.15 : 0.87)),
+        );
+        camera.scale.set(scale);
+        const rect = host.getBoundingClientRect();
+        camera.x = event.clientX - rect.left - before.x * CELL * scale;
+        camera.y = event.clientY - rect.top - before.y * CELL * scale;
+        updateCulling();
+      };
+      const key = (event: KeyboardEvent) => {
+        const amount = event.shiftKey ? 80 : 24;
+        if (event.key === 'ArrowLeft') camera.x += amount;
+        else if (event.key === 'ArrowRight') camera.x -= amount;
+        else if (event.key === 'ArrowUp') camera.y += amount;
+        else if (event.key === 'ArrowDown') camera.y -= amount;
+        else if (event.key === '+' || event.key === '=')
+          camera.scale.set(Math.min(5, camera.scale.x * 1.15));
+        else if (event.key === '-')
+          camera.scale.set(Math.max(0.2, camera.scale.x * 0.87));
+        else return;
+        event.preventDefault();
+        updateCulling();
+      };
+      app.canvas.addEventListener('pointerdown', down);
+      app.canvas.addEventListener('pointermove', move);
+      app.canvas.addEventListener('pointerleave', () =>
+        hoverRef.current(undefined),
+      );
+      app.canvas.addEventListener('pointerup', up);
+      app.canvas.addEventListener('wheel', wheel, { passive: false });
+      app.canvas.addEventListener('keydown', key);
+      updateCulling();
+      app.ticker.add(() => {
+        const current = scene.snapshot;
+        if (current === undefined) return;
+        scene.pods.clear();
+        const logicalNow =
+          current.logicalTime +
+          BigInt(
+            Math.max(
+              0,
+              Math.floor((performance.now() - scene.receivedAt) * 1000),
+            ),
+          );
+        for (const pod of current.pods) {
+          let point = current.railNodes.find(
+            (node) => node.id === pod.nodeId,
+          )?.position;
+          if (pod.motion !== undefined) {
+            const duration = pod.motion.endsAt - pod.motion.startsAt;
+            const elapsed =
+              logicalNow <= pod.motion.startsAt
+                ? 0
+                : logicalNow >= pod.motion.endsAt
+                  ? Number(duration)
+                  : Number(logicalNow - pod.motion.startsAt);
+            const ratio = duration === 0n ? 1 : elapsed / Number(duration);
+            point = {
+              x:
+                pod.motion.from.x +
+                (pod.motion.to.x - pod.motion.from.x) * ratio,
+              y:
+                pod.motion.from.y +
+                (pod.motion.to.y - pod.motion.from.y) * ratio,
+            };
+          }
+          if (point !== undefined)
+            scene.pods
+              .circle(point.x * CELL + CELL / 2, point.y * CELL + CELL / 2, 3)
+              .fill(
+                pod.state === 'DESTINATION_BLOCKED' ||
+                  pod.state === 'GRIDLOCKED'
+                  ? '#ef6f6c'
+                  : '#f4d35e',
+              );
+        }
+      });
+    };
+    void initialise();
+    return () => {
+      disposed = true;
+      const app = sceneRef.current?.app;
+      sceneRef.current = undefined;
+      app?.destroy(true, { children: true });
+    };
+  }, []);
+  useEffect(() => {
+    if (sceneRef.current !== undefined) drawScene(sceneRef.current, snapshot);
+  }, [snapshot]);
+  useEffect(() => {
+    const overlay = sceneRef.current?.overlay;
+    if (overlay === undefined) return;
+    overlay.clear();
+    if (selected !== undefined)
+      overlay
+        .rect(selected.x * CELL, selected.y * CELL, CELL, CELL)
+        .stroke({ color: '#ffffff', width: 1.5 });
+    if (railDraft.length > 0) {
+      overlay.moveTo(
+        railDraft[0]!.x * CELL + CELL / 2,
+        railDraft[0]!.y * CELL + CELL / 2,
+      );
+      for (const point of railDraft.slice(1))
+        overlay.lineTo(point.x * CELL + CELL / 2, point.y * CELL + CELL / 2);
+      overlay.stroke({ color: '#f4d35e', width: 2 });
+    }
+    if (hoveredRailEdgeId !== undefined) {
+      const edge = snapshotRef.current.railEdges.find(
+        (candidate) => candidate.id === hoveredRailEdgeId,
+      );
+      const first = edge?.points[0];
+      if (edge !== undefined && first !== undefined) {
+        overlay.moveTo(first.x * CELL + CELL / 2, first.y * CELL + CELL / 2);
+        for (const point of edge.points.slice(1))
+          overlay.lineTo(point.x * CELL + CELL / 2, point.y * CELL + CELL / 2);
+        overlay.stroke({ color: '#ff625c', width: 5, alpha: 0.8 });
+      }
+    }
+    if (selectedRailEdgeId !== undefined) {
+      const edge = snapshotRef.current.railEdges.find(
+        (candidate) => candidate.id === selectedRailEdgeId,
+      );
+      const first = edge?.points[0];
+      if (edge !== undefined && first !== undefined) {
+        overlay.moveTo(first.x * CELL + CELL / 2, first.y * CELL + CELL / 2);
+        for (const point of edge.points.slice(1))
+          overlay.lineTo(point.x * CELL + CELL / 2, point.y * CELL + CELL / 2);
+        overlay.stroke({ color: '#ffffff', width: 3, alpha: 0.9 });
+      }
+    }
+    if (hoveredDismantleEntityId !== undefined) {
+      const entity = snapshotRef.current.entities.find(
+        (e) => e.id === hoveredDismantleEntityId,
+      );
+      if (entity !== undefined) {
+        const width =
+          (entity.transform.rotation % 2 === 0
+            ? entity.transform.size.width
+            : entity.transform.size.height) * CELL;
+        const height =
+          (entity.transform.rotation % 2 === 0
+            ? entity.transform.size.height
+            : entity.transform.size.width) * CELL;
+        overlay
+          .rect(
+            entity.transform.position.x * CELL,
+            entity.transform.position.y * CELL,
+            width,
+            height,
+          )
+          .stroke({ color: '#ff625c', width: 3, alpha: 0.9 });
+      }
+    }
+    if (ghost !== undefined)
+      for (const cell of occupiedCells(ghost.transform))
+        overlay
+          .rect(cell.x * CELL, cell.y * CELL, CELL, CELL)
+          .fill({ color: ghost.valid ? '#5fae88' : '#ef6f6c', alpha: 0.28 })
+          .stroke({ color: ghost.valid ? '#91e0bb' : '#ff9693', width: 1 });
+  }, [
+    ghost,
+    hoveredDismantleEntityId,
+    hoveredRailEdgeId,
+    railDraft,
+    selected,
+    selectedRailEdgeId,
+  ]);
+  return <div className="world-pixi-canvas" ref={hostRef} />;
+};

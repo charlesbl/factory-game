@@ -1,0 +1,9 @@
+dist
+coverage
+node_modules
+playwright-report
+.npm-cache
+test-results
+src/Game
+src/Views
+src/reportWebVitals.ts
