@@ -271,7 +271,14 @@ export class PodTrafficSystem {
       );
     for (const requester of requesters) {
       const target = requester.buffer!;
-      const wanted = requester.target - target.quantity;
+      const inbound = [...this.missions.values()]
+        .filter(
+          (mission) =>
+            mission.requesterId === requester.id &&
+            mission.status !== 'DELIVERED',
+        )
+        .reduce((total, mission) => total + mission.quantity, 0);
+      const wanted = requester.target - target.quantity - inbound;
       const providerCandidates = [...this.stations.values()]
         .filter(
           (station) =>

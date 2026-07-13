@@ -60,6 +60,9 @@ export interface WorldContent {
     readonly extractionIntervalTicks: bigint;
     readonly outputCapacity: number;
   };
+  readonly pod: {
+    readonly buildCost: readonly ItemQuantity[];
+  };
   readonly stationFootprint: GridSize;
   readonly storageCapacity: number;
   readonly depotCapacity: number;

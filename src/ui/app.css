@@ -1844,6 +1844,39 @@ button:focus-visible {
   color: #6f897e;
   font: 7px 'DM Mono';
 }
+.world-pod-production {
+  margin-top: 12px;
+}
+.world-pod-production > p {
+  margin: 7px 0;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.5;
+}
+.world-pod-progress {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+}
+.world-pod-progress > strong {
+  color: #c6ded3;
+  font: 8px 'DM Mono';
+}
+.world-pod-progress > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 9px;
+}
+.world-pod-progress b {
+  color: #c6ded3;
+  font: 8px 'DM Mono';
+}
+.world-pod-actions {
+  display: grid;
+  gap: 6px;
+  margin-top: 9px;
+}
 .world-inventory-meter {
   display: block;
   height: 4px;

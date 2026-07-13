@@ -20,6 +20,56 @@ import {
 } from './index';
 
 describe('world runtime persistence', () => {
+  it('reconnects a restored mine output to its logistics station', () => {
+    const runtime = WorldRuntime.generate({
+      ...defaultWorldGenerationConfig('mine-output-restore'),
+      width: 64,
+      height: 64,
+      spawnClearingSize: 24,
+    });
+    const mineId = asId<WorldEntityId>('mine-restored');
+    const resourceId = asId<ResourceId>('ironOre');
+    runtime.entities.set(mineId, {
+      id: mineId,
+      kind: 'mine',
+      stationId: asId<StationId>('mine-station'),
+      resourceId,
+      constructionBuffer: { capacity: 1_000, items: [] },
+      salvageBuffer: { capacity: 1_000, items: [] },
+      transform: {
+        position: gridPoint(0, 0),
+        size: gridSize(4, 4),
+        rotation: 0,
+      },
+      createdAt: 0n,
+    });
+    runtime.addTrafficStation({
+      id: `mine-output:${mineId}`,
+      railNodeId: asId<RailNodeId>('mine-node'),
+      role: 'provider',
+      buffer: new WorldBuffer(resourceId, 100),
+      priority: 0,
+      target: 0,
+      minBatch: 1,
+      maxBatch: 10,
+    });
+
+    runtime.restoreMines([
+      {
+        entityId: mineId,
+        resourceId,
+        oreKind: OreKind.IRON,
+        drills: [],
+        output: { resourceId, capacity: 100, quantity: 7 },
+      },
+    ]);
+
+    const mine = runtime.mines.get(mineId)!;
+    const station = runtime.traffic.stations.get(`mine-output:${mineId}`)!;
+    expect(station.buffer).toBe(mine.output);
+    expect(station.buffer?.quantity).toBe(7);
+  });
+
   it('boots with one finite construction hub, eight depot slots, and two pods', () => {
     const runtime = WorldRuntime.generate({
       ...defaultWorldGenerationConfig('starter-hub'),
@@ -105,7 +155,10 @@ describe('world runtime persistence', () => {
     expect(restored.logicalTime).toBe(5_000_000n);
     expect(restored.revision).toBe(runtime.revision);
     expect(restored.entities.get(entityId)?.kind).toBe('station');
-    expect(restored.railEdges.get('rail-edge')?.length).toBe(8);
+    expect(restored.railEdges.size).toBe(8);
+    expect(
+      [...restored.railEdges.values()].every((edge) => edge.length === 1),
+    ).toBe(true);
     expect(restored.world.grid.oreRemaining).toEqual(
       runtime.world.grid.oreRemaining,
     );
@@ -307,8 +360,13 @@ describe('world runtime persistence', () => {
     });
     const start = gridPoint(10, 10);
     const end = gridPoint(15, 10);
-    const [edgeId] = runtime.placeRailPath([start, end]);
+    const edgeIds = runtime.placeRailPath([start, end]);
+    const edgeId = edgeIds[0];
     expect(edgeId).toBeDefined();
+    expect(edgeIds).toHaveLength(5);
+    expect(edgeIds.map((id) => runtime.railEdges.get(id)?.length)).toEqual([
+      1, 1, 1, 1, 1,
+    ]);
     expect(runtime.railNodes.size).toBeGreaterThanOrEqual(4);
     runtime.removeRailEdge(edgeId!);
     expect(runtime.railEdges.has(edgeId!)).toBe(false);
@@ -317,10 +375,209 @@ describe('world runtime persistence', () => {
         (node) => node.position.x === start.x && node.position.y === start.y,
       ),
     ).toBe(false);
+    expect(runtime.railEdges.size).toBe(4);
+  });
+
+  it('deduplicates directed cells and connects crossings automatically', () => {
+    const runtime = WorldRuntime.generate({
+      ...defaultWorldGenerationConfig('rail-crossing'),
+      width: 64,
+      height: 64,
+      spawnClearingSize: 24,
+    });
+    const horizontal = runtime.placeRailPath([
+      gridPoint(10, 10),
+      gridPoint(14, 10),
+    ]);
     expect(
-      [...runtime.railNodes.values()].some(
-        (node) => node.position.x === end.x && node.position.y === end.y,
+      runtime.placeRailPath([gridPoint(10, 10), gridPoint(14, 10)]),
+    ).toEqual(horizontal);
+    runtime.placeRailPath([gridPoint(12, 8), gridPoint(12, 12)]);
+    const crossing = [...runtime.railNodes.values()].find(
+      (node) => node.position.x === 12 && node.position.y === 10,
+    );
+    expect(crossing?.kind).toBe('junction');
+    const west = [...runtime.railNodes.values()].find(
+      (node) => node.position.x === 10 && node.position.y === 10,
+    )!;
+    const south = [...runtime.railNodes.values()].find(
+      (node) => node.position.x === 12 && node.position.y === 12,
+    )!;
+    expect(runtime.rails.route(west.id, south.id)?.distance).toBe(4);
+  });
+
+  it('reserves global capacity for queued pod production', () => {
+    const runtime = WorldRuntime.generate({
+      ...defaultWorldGenerationConfig('pod-capacity'),
+      width: 64,
+      height: 64,
+      spawnClearingSize: 24,
+    });
+    const depotId = asId<WorldEntityId>('world-starter-depot');
+    for (let index = 0; index < 6; index += 1)
+      runtime.queuePodProduction(depotId);
+    expect(() => runtime.queuePodProduction(depotId)).toThrow(
+      'Global pod capacity is full',
+    );
+    const depot = runtime
+      .snapshot()
+      .buildings.find((building) => building.kind === 'depot');
+    expect(depot).toMatchObject({
+      podCount: 2,
+      globalPodCapacity: 8,
+      queuedPodCount: 6,
+      productionQueueLength: 6,
+    });
+    for (let index = 0; index < 6; index += 1)
+      runtime.cancelPodProduction(depotId);
+    const depotEntity = runtime.entities.get(depotId);
+    if (depotEntity?.kind !== 'depot')
+      throw new Error('Starter depot is missing');
+    for (let index = 0; index < 6; index += 1)
+      runtime.addPod(
+        `capacity-pod-${index}`,
+        depotEntity.railNodeId,
+        'depot:starter',
+      );
+    expect(() => runtime.dismantleEntity(depotId)).toThrow(
+      'Dismantling would exceed global pod capacity',
+    );
+  });
+
+  it('completes pod production from exact delivered materials and persists its sequence', () => {
+    const runtime = WorldRuntime.generate({
+      ...defaultWorldGenerationConfig('pod-production'),
+      width: 64,
+      height: 64,
+      spawnClearingSize: 24,
+    });
+    const depotId = asId<WorldEntityId>('world-starter-depot');
+    const storage = runtime.storageInventories.get(
+      asId<WorldEntityId>('world-starter-storage'),
+    )!;
+    runtime.queuePodProduction(depotId);
+    for (const [resourceId, quantity] of [
+      [asId<ResourceId>('ironPlate'), 10],
+      [asId<ResourceId>('copperWire'), 5],
+      [asId<ResourceId>('circuit'), 2],
+    ] as const) {
+      storage.remove(resourceId, quantity);
+      runtime.traffic.stations
+        .get(`pod-production:pod-production-1:${resourceId}`)!
+        .buffer!.add(quantity);
+    }
+    const restored = deserializeWorldRuntime(serializeWorldRuntime(runtime));
+    expect(
+      restored
+        .snapshot()
+        .buildings.find((building) => building.kind === 'depot'),
+    ).toMatchObject({
+      queuedPodCount: 1,
+      activeProduction: {
+        state: 'ACTIVE',
+        delivered: [
+          { resourceId: 'circuit', quantity: 2 },
+          { resourceId: 'copperWire', quantity: 5 },
+          { resourceId: 'ironPlate', quantity: 10 },
+        ],
+      },
+    });
+    restored.advanceTo(restored.logicalTime);
+    expect(restored.traffic.pods.has('pod-built-1')).toBe(true);
+    expect(restored.traffic.pods.size).toBe(3);
+    restored.queuePodProduction(depotId);
+    expect(restored.podProductions.has('pod-production-2')).toBe(true);
+
+    const legacyRuntime = WorldRuntime.generate({
+      ...defaultWorldGenerationConfig('pod-production-legacy'),
+      width: 64,
+      height: 64,
+      spawnClearingSize: 24,
+    });
+    const { nextPodSequence, podProductions, ...legacyState } =
+      serializeWorldRuntime(legacyRuntime);
+    void nextPodSequence;
+    void podProductions;
+    const migrated = deserializeWorldRuntime({
+      ...legacyState,
+      schemaVersion: 3,
+    });
+    expect(migrated.podProductions.size).toBe(0);
+    expect(migrated.nextPodSequence).toBe(1);
+  });
+
+  it('cancels the latest queued order before the active order', () => {
+    const runtime = WorldRuntime.generate({
+      ...defaultWorldGenerationConfig('pod-cancel'),
+      width: 64,
+      height: 64,
+      spawnClearingSize: 24,
+    });
+    const depotId = asId<WorldEntityId>('world-starter-depot');
+    runtime.queuePodProduction(depotId);
+    runtime.queuePodProduction(depotId);
+    runtime.cancelPodProduction(depotId);
+    expect([...runtime.podProductions.values()]).toEqual([
+      expect.objectContaining({ id: 'pod-production-1', state: 'ACTIVE' }),
+    ]);
+    runtime.cancelPodProduction(depotId);
+    expect(runtime.podProductions.size).toBe(0);
+    expect(runtime.snapshot().buildings).toContainEqual(
+      expect.objectContaining({
+        kind: 'depot',
+        queuedPodCount: 0,
+        productionQueueLength: 0,
+      }),
+    );
+  });
+
+  it('builds through the rail network and returns in-flight materials when cancelled', () => {
+    const createConnectedRuntime = (seed: string) => {
+      const runtime = WorldRuntime.generate({
+        ...defaultWorldGenerationConfig(seed),
+        width: 64,
+        height: 64,
+        spawnClearingSize: 24,
+      });
+      const storageNode = runtime.railNodes.get('rail-starter-storage')!;
+      const depotNode = runtime.railNodes.get('rail-starter-depot')!;
+      runtime.placeRailPath([depotNode.position, storageNode.position]);
+      runtime.placeRailPath([storageNode.position, depotNode.position]);
+      return runtime;
+    };
+    const depotId = asId<WorldEntityId>('world-starter-depot');
+    const completed = createConnectedRuntime('pod-network-build');
+    completed.queuePodProduction(depotId);
+    completed.advanceTo(200_000_000n);
+    expect(completed.traffic.pods.has('pod-built-1')).toBe(true);
+    expect(
+      completed.storageInventories
+        .get(asId<WorldEntityId>('world-starter-storage'))
+        ?.snapshot(),
+    ).toEqual([
+      { resourceId: 'circuit', quantity: 38 },
+      { resourceId: 'copperWire', quantity: 95 },
+      { resourceId: 'ironPlate', quantity: 190 },
+    ]);
+
+    const cancelled = createConnectedRuntime('pod-network-cancel');
+    const original = cancelled.storageInventories
+      .get(asId<WorldEntityId>('world-starter-storage'))!
+      .snapshot();
+    cancelled.queuePodProduction(depotId);
+    expect(
+      [...cancelled.traffic.missions.values()].some(
+        (mission) => mission.status !== 'DELIVERED',
       ),
-    ).toBe(false);
+    ).toBe(true);
+    cancelled.cancelPodProduction(depotId);
+    cancelled.advanceTo(200_000_000n);
+    expect(cancelled.podProductions.size).toBe(0);
+    expect(
+      cancelled.storageInventories
+        .get(asId<WorldEntityId>('world-starter-storage'))!
+        .snapshot(),
+    ).toEqual(original);
+    expect(cancelled.traffic.pods.size).toBe(2);
   });
 });

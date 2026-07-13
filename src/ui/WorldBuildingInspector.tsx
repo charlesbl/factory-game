@@ -1,4 +1,4 @@
-import { resourceById } from '../domain';
+import { resourceById, worldContent } from '../domain';
 import type { ResourceId } from '../domain';
 import type {
   WorldBuildingSnapshot,
@@ -11,6 +11,9 @@ import type {
 interface Props {
   readonly entity: WorldEntity;
   readonly snapshot: WorldSnapshot;
+  readonly busy?: boolean;
+  readonly onQueuePod: () => void;
+  readonly onCancelPod: () => void;
 }
 
 const resourceName = (id: ResourceId): string =>
@@ -210,7 +213,13 @@ const Logistics = ({
     </div>
   );
 
-export const WorldBuildingInspector = ({ entity, snapshot }: Props) => {
+export const WorldBuildingInspector = ({
+  entity,
+  snapshot,
+  busy = false,
+  onQueuePod,
+  onCancelPod,
+}: Props) => {
   const state = snapshot.buildings.find((item) => item.entityId === entity.id);
   const linkedStation =
     entity.kind === 'station'
@@ -257,15 +266,86 @@ export const WorldBuildingInspector = ({ entity, snapshot }: Props) => {
       {state?.kind === 'mine' && <MineState state={state} />}
       {state?.kind === 'depot' && (
         <div className="world-buffer-group">
-          <h4>Pod slots</h4>
+          <h4>Pod fleet</h4>
           <div className="world-buffer">
             <div>
-              <span>Pods at depot</span>
+              <span>Global capacity</span>
               <b>
-                {state.podCount} / {state.podCapacity}
+                {state.podCount} + {state.queuedPodCount} /{' '}
+                {state.globalPodCapacity}
               </b>
             </div>
-            <Meter value={percent(state.podCount, state.podCapacity)} />
+            <Meter
+              value={percent(
+                state.podCount + state.queuedPodCount,
+                state.globalPodCapacity,
+              )}
+            />
+          </div>
+          <div className="world-buffer">
+            <div>
+              <span>This depot contributes</span>
+              <b>{state.podCapacity} slots</b>
+            </div>
+          </div>
+          <div className="world-pod-production">
+            <h4>Pod production</h4>
+            <p>
+              Cost ·{' '}
+              {worldContent.pod.buildCost
+                .map(
+                  (item) => `${item.quantity} ${resourceName(item.resourceId)}`,
+                )
+                .join(' · ')}
+            </p>
+            {state.activeProduction !== undefined && (
+              <div className="world-pod-progress">
+                <strong>
+                  {state.activeProduction.state === 'EVACUATING'
+                    ? 'Returning materials'
+                    : 'Active order'}
+                </strong>
+                {state.activeProduction.required.map((required) => {
+                  const delivered =
+                    state.activeProduction?.delivered.find(
+                      (item) => item.resourceId === required.resourceId,
+                    )?.quantity ?? 0;
+                  return (
+                    <div key={required.resourceId}>
+                      <span>{resourceName(required.resourceId)}</span>
+                      <b>
+                        {delivered} / {required.quantity}
+                      </b>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <p>{state.productionQueueLength} order(s) queued</p>
+            <div className="world-pod-actions">
+              <button
+                disabled={
+                  busy ||
+                  state.podCount + state.queuedPodCount >=
+                    state.globalPodCapacity
+                }
+                onClick={onQueuePod}
+                title={
+                  state.podCount + state.queuedPodCount >=
+                  state.globalPodCapacity
+                    ? 'Global pod capacity is full'
+                    : 'Queue one pod for production'
+                }
+              >
+                Build pod
+              </button>
+              <button
+                disabled={busy || state.productionQueueLength === 0}
+                onClick={onCancelPod}
+              >
+                Cancel latest order
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1,5 +1,6 @@
 import {
   lazy,
+  startTransition,
   Suspense,
   useCallback,
   useEffect,
@@ -42,6 +43,7 @@ import {
   type WorldTransform,
 } from '../world';
 import { railEdgeAt } from './worldRailVisual';
+import { WORLD_SYNC_INTERVAL_MS } from './worldAnimation';
 import { WorldBuildingInspector } from './WorldBuildingInspector';
 
 const WorldCanvas = lazy(async () => ({
@@ -103,6 +105,7 @@ export const WorldView = ({
 }: Props) => {
   const clientRef = useRef<WorldClient | undefined>(undefined);
   const busyRef = useRef(false);
+  const snapshotRef = useRef<WorldSnapshot | undefined>(undefined);
   const [snapshot, setSnapshot] = useState<WorldSnapshot>();
   const [seed, setSeed] = useState('starter-world');
   const [selected, setSelected] = useState<GridPoint>();
@@ -119,10 +122,11 @@ export const WorldView = ({
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(true);
   const [selectedRailEdgeId, setSelectedRailEdgeId] = useState<RailEdgeId>();
-  const persist = useCallback(async (result: WorldClientResult) => {
-    setSnapshot(result.snapshot);
-    const client = clientRef.current;
-    if (client === undefined) return;
+  const acceptSnapshot = useCallback((next: WorldSnapshot) => {
+    snapshotRef.current = next;
+    startTransition(() => setSnapshot(next));
+  }, []);
+  const saveCurrent = useCallback(async (client: WorldClient) => {
     const saved = await client.save();
     if (saved.state !== undefined)
       await database.worlds.put({
@@ -133,6 +137,14 @@ export const WorldView = ({
         payload: stringifyExact(saved.state),
       });
   }, []);
+  const persist = useCallback(
+    async (result: WorldClientResult) => {
+      acceptSnapshot(result.snapshot);
+      const client = clientRef.current;
+      if (client !== undefined) await saveCurrent(client);
+    },
+    [acceptSnapshot, saveCurrent],
+  );
   const run = useCallback(
     async (
       operation: (client: WorldClient) => Promise<WorldClientResult>,
@@ -146,7 +158,7 @@ export const WorldView = ({
       try {
         const result = await operation(client);
         if (save) await persist(result);
-        else setSnapshot(result.snapshot);
+        else acceptSnapshot(result.snapshot);
         return result;
       } catch (reason) {
         setError(
@@ -158,7 +170,7 @@ export const WorldView = ({
         setBusy(false);
       }
     },
-    [persist],
+    [acceptSnapshot, persist],
   );
   useEffect(() => {
     const client = new WorldClient();
@@ -209,18 +221,68 @@ export const WorldView = ({
     };
   }, [persist]);
   useEffect(() => {
-    if (snapshot?.paused !== false) return;
-    const timer = window.setInterval(() => {
-      const current = snapshot;
-      if (current !== undefined)
-        void run((client) =>
-          client.advance(
-            current.logicalTime + BigInt(1_000_000 * current.timeScale),
-          ),
-        );
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [run, snapshot]);
+    let active = true;
+    let timer: number | undefined;
+    let lastAdvanceAt = performance.now();
+    let lastSaveAt = lastAdvanceAt;
+    const schedule = (delay = WORLD_SYNC_INTERVAL_MS) => {
+      if (active) timer = window.setTimeout(() => void pulse(), delay);
+    };
+    const pulse = async () => {
+      const startedAt = performance.now();
+      const client = clientRef.current;
+      const current = snapshotRef.current;
+      if (client === undefined || current === undefined || busyRef.current) {
+        schedule();
+        return;
+      }
+      if (current.paused) {
+        lastAdvanceAt = startedAt;
+        schedule();
+        return;
+      }
+      try {
+        let result: WorldClientResult;
+        if (current.pendingAdvanceTarget !== undefined)
+          result = await client.continueAdvance();
+        else {
+          const elapsedMs = Math.max(0, startedAt - lastAdvanceAt);
+          lastAdvanceAt = startedAt;
+          result = await client.advance(
+            current.logicalTime +
+              BigInt(Math.floor(elapsedMs * 1000 * current.timeScale)),
+          );
+        }
+        if (!active) return;
+        acceptSnapshot(result.snapshot);
+        if (performance.now() - lastSaveAt >= 1000) {
+          lastSaveAt = performance.now();
+          void saveCurrent(client).catch((reason: unknown) => {
+            if (active)
+              setError(
+                reason instanceof Error
+                  ? reason.message
+                  : 'World autosave failed',
+              );
+          });
+        }
+      } catch (reason) {
+        if (active)
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : 'World clock synchronisation failed',
+          );
+      }
+      const elapsed = performance.now() - startedAt;
+      schedule(Math.max(0, WORLD_SYNC_INTERVAL_MS - elapsed));
+    };
+    schedule();
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [acceptSnapshot, saveCurrent]);
 
   const transformFor = useCallback(
     (activeTool: WorldTool, point: GridPoint): WorldTransform | undefined => {
@@ -262,6 +324,45 @@ export const WorldView = ({
         .find((station) => adjacent(transform, station.transform)),
     [snapshot],
   );
+  const selectedEntity =
+    snapshot === undefined || selected === undefined
+      ? undefined
+      : entityAt(snapshot, selected);
+  const drillMineFor = useCallback(
+    (point: GridPoint) => {
+      if (snapshot === undefined) return undefined;
+      const index = point.y * snapshot.grid.width + point.x;
+      const oreKind = snapshot.grid.oreKinds[index];
+      if (
+        snapshot.grid.oreRemaining[index] === 0 ||
+        (oreKind !== OreKind.IRON && oreKind !== OreKind.COPPER)
+      )
+        return undefined;
+      return snapshot.entities
+        .filter(
+          (entity): entity is Extract<WorldEntity, { kind: 'mine' }> =>
+            entity.kind === 'mine' &&
+            (entity.resourceId === asId<ResourceId>('ironOre')
+              ? oreKind === OreKind.IRON
+              : oreKind === OreKind.COPPER),
+        )
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .find((mine) =>
+          snapshot.entities.some((entity) => {
+            if (
+              entity.id !== mine.id &&
+              (entity.kind !== 'drill' || entity.mineId !== mine.id)
+            )
+              return false;
+            return occupiedCells(entity.transform).some(
+              (cell) =>
+                Math.abs(cell.x - point.x) + Math.abs(cell.y - point.y) === 1,
+            );
+          }),
+        );
+    },
+    [snapshot],
+  );
   const localValidity = useCallback(
     (transform: WorldTransform, activeTool: WorldTool): boolean => {
       if (snapshot === undefined) return false;
@@ -294,9 +395,12 @@ export const WorldView = ({
         )
       )
         return false;
+      if (activeTool === 'drill') {
+        if (drillMineFor(transform.position) === undefined) return false;
+      }
       return true;
     },
-    [snapshot, stationFor],
+    [drillMineFor, snapshot, stationFor],
   );
   const ghostTransform =
     hovered === undefined ? undefined : transformFor(tool, hovered);
@@ -315,21 +419,20 @@ export const WorldView = ({
     tool === 'dismantle' && snapshot !== undefined && hovered !== undefined
       ? entityAt(snapshot, hovered)?.id
       : undefined;
-  const selectedEntity =
-    snapshot === undefined || selected === undefined
-      ? undefined
-      : entityAt(snapshot, selected);
   const selectedRailEdge =
     selectedRailEdgeId === undefined || snapshot === undefined
       ? undefined
       : snapshot.railEdges.find((e) => e.id === selectedRailEdgeId);
 
-  const commitRail = useCallback(async () => {
-    if (railDraft.length < 2) return;
-    const points = railDraft;
-    setRailDraft([]);
-    await run((client) => client.command({ type: 'PLACE_RAIL_PATH', points }));
-  }, [railDraft, run]);
+  const commitRail = useCallback(
+    async (points: readonly GridPoint[]) => {
+      setRailDraft([]);
+      await run((client) =>
+        client.command({ type: 'PLACE_RAIL_PATH', points }),
+      );
+    },
+    [run],
+  );
   const handleMapClick = useCallback(
     async (point: GridPoint) => {
       setSelected(point);
@@ -342,18 +445,6 @@ export const WorldView = ({
         return;
       }
       if (tool === 'rail') {
-        setRailDraft((current) => {
-          if (current.length === 0) return [point];
-          const last = current.at(-1)!;
-          if (last.x !== point.x && last.y !== point.y) {
-            const dx = Math.abs(point.x - last.x);
-            const dy = Math.abs(point.y - last.y);
-            const snapped =
-              dx >= dy ? { x: point.x, y: last.y } : { x: last.x, y: point.y };
-            return samePoint(last, snapped) ? current : [...current, snapped];
-          }
-          return samePoint(last, point) ? current : [...current, point];
-        });
         return;
       }
       if (tool === 'rail-erase') {
@@ -404,18 +495,41 @@ export const WorldView = ({
         return;
       }
       if (tool === 'drill') {
-        const mineId =
-          selectedEntity?.kind === 'mine'
-            ? selectedEntity.id
-            : selectedEntity?.kind === 'drill'
-              ? selectedEntity.mineId
-              : undefined;
-        if (mineId === undefined) {
-          setError('Select a mine before placing its drill chain.');
+        const mine = drillMineFor(point);
+        if (mine === undefined) {
+          const touching = snapshot?.entities.filter((entity) =>
+            occupiedCells(entity.transform).some(
+              (cell) =>
+                Math.abs(cell.x - point.x) + Math.abs(cell.y - point.y) === 1,
+            ),
+          );
+          const unfinishedMine = touching?.find(
+            (entity) =>
+              entity.kind === 'construction-site' &&
+              entity.targetKind === 'mine',
+          );
+          const wrongMine = touching?.find(
+            (entity): entity is Extract<WorldEntity, { kind: 'mine' }> =>
+              entity.kind === 'mine',
+          );
+          if (unfinishedMine !== undefined)
+            setError('The adjacent mine is still under construction.');
+          else if (wrongMine !== undefined)
+            setError(
+              `The adjacent mine extracts ${wrongMine.resourceId === asId<ResourceId>('ironOre') ? 'iron' : 'copper'}, which does not match this ore tile.`,
+            );
+          else
+            setError(
+              'The drill must touch a matching mine or one of its connected drills.',
+            );
           return;
         }
         await run((client) =>
-          client.command({ type: 'PLACE_DRILL', mineId, position: point }),
+          client.command({
+            type: 'PLACE_DRILL',
+            mineId: mine.id,
+            position: point,
+          }),
         );
         return;
       }
@@ -470,8 +584,8 @@ export const WorldView = ({
       activeFactoryId,
       contract,
       mineResource,
+      drillMineFor,
       run,
-      selectedEntity,
       snapshot,
       stationFor,
       tool,
@@ -498,12 +612,11 @@ export const WorldView = ({
       else if (event.key === 'Escape') {
         setRailDraft([]);
         setTool('select');
-      } else if (event.key === 'Enter' && railDraft.length >= 2)
-        void commitRail();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [commitRail, railDraft.length]);
+  }, []);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (
@@ -645,23 +758,7 @@ export const WorldView = ({
         </div>
         {tool === 'rail' && (
           <div className="world-tool-options">
-            <p>
-              {railDraft.length === 0
-                ? 'Start on the round anchor inside a station.'
-                : `${railDraft.length} points · finish on another anchor`}
-            </p>
-            <button
-              disabled={railDraft.length < 2 || busy}
-              onClick={() => void commitRail()}
-            >
-              Finish rail
-            </button>
-            <button
-              disabled={railDraft.length === 0}
-              onClick={() => setRailDraft([])}
-            >
-              Cancel
-            </button>
+            <p>Drag to place a straight directed rail. Space + drag to pan.</p>
           </div>
         )}
         {tool === 'rail-erase' && (
@@ -684,7 +781,7 @@ export const WorldView = ({
           >
             <span>
               <i className="connected" />
-              Connected
+              Directed rail
             </span>
             <span>
               <i className="disconnected" />
@@ -779,8 +876,11 @@ export const WorldView = ({
                 ? {}
                 : { selectedRailEdgeId })}
               railDraft={railDraft}
+              railPlacement={tool === 'rail'}
               onSelect={(point) => void handleMapClick(point)}
               onHover={setHovered}
+              onRailPreview={setRailDraft}
+              onRailPlace={(points) => void commitRail(points)}
             />
           </Suspense>
         )}
@@ -930,6 +1030,23 @@ export const WorldView = ({
             <WorldBuildingInspector
               entity={selectedEntity}
               snapshot={snapshot}
+              busy={busy}
+              onQueuePod={() =>
+                void run((client) =>
+                  client.command({
+                    type: 'QUEUE_POD_PRODUCTION',
+                    depotId: selectedEntity.id,
+                  }),
+                )
+              }
+              onCancelPod={() =>
+                void run((client) =>
+                  client.command({
+                    type: 'CANCEL_POD_PRODUCTION',
+                    depotId: selectedEntity.id,
+                  }),
+                )
+              }
             />
             {(selectedEntity.kind === 'factory' ||
               selectedEntity.kind === 'mine' ||

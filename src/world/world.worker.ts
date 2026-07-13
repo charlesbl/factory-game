@@ -232,8 +232,10 @@ self.onmessage = (event: MessageEvent<WorldCommand>) => {
               ),
             }),
       });
-    } else if (command.type === 'ADD_POD')
-      runtime.addPod(command.pod.id, command.pod.nodeId, command.pod.stationId);
+    } else if (command.type === 'QUEUE_POD_PRODUCTION')
+      runtime.queuePodProduction(command.depotId);
+    else if (command.type === 'CANCEL_POD_PRODUCTION')
+      runtime.cancelPodProduction(command.depotId);
     else if (command.type === 'DISPATCH') runtime.dispatch();
     else if (command.type === 'WAKE_DESTINATION')
       runtime.wakeDestination(command.stationId);

@@ -122,6 +122,9 @@ export const worldContent: WorldContent = {
     extractionIntervalTicks: 1_000_000n,
     outputCapacity: 100,
   },
+  pod: {
+    buildCost: items(10, 5, 2),
+  },
   stationFootprint: gridSize(2, 2),
   storageCapacity: 500,
   depotCapacity: 8,

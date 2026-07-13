@@ -117,6 +117,12 @@ export interface SerializedStorageRecord {
   readonly capacity: number;
   readonly items: readonly WorldItemStack[];
 }
+export interface PodProductionRecord {
+  readonly id: string;
+  readonly depotId: WorldEntityId;
+  readonly sequence: number;
+  readonly state: 'ACTIVE' | 'PENDING' | 'EVACUATING';
+}
 
 export class WorldRuntime {
   readonly entities = new Map<WorldEntityId, WorldEntity>();
@@ -134,12 +140,14 @@ export class WorldRuntime {
   readonly factoryInstances = new Map<WorldEntityId, FactoryRuntimeInstance>();
   readonly factoryContracts = new Map<string, FactoryContract>();
   readonly storageInventories = new Map<WorldEntityId, SharedInventory>();
+  readonly podProductions = new Map<string, PodProductionRecord>();
   revision = 0;
   logicalTime: SimTime = 0n;
   paused = true;
   timeScale: 1 | 5 | 20 = 1;
   #nextSlot = 1;
   #railSequence = 0;
+  #nextPodSequence = 1;
   readonly #slots = new Map<WorldEntityId, number>();
   readonly #scheduledMines = new Set<WorldEntityId>();
   readonly #scheduledFactories = new Set<WorldEntityId>();
@@ -222,7 +230,6 @@ export class WorldRuntime {
       kind: 'depot',
       railNodeId: depotNode,
       podCapacity: 8,
-      podIds: [asId<PodId>('pod-starter-1'), asId<PodId>('pod-starter-2')],
       transform: depotTransform,
       createdAt: 0n,
     });
@@ -295,10 +302,27 @@ export class WorldRuntime {
   get railSequence(): number {
     return this.#railSequence;
   }
+  get nextPodSequence(): number {
+    return this.#nextPodSequence;
+  }
   restoreRailSequence(value: number): void {
     if (!Number.isSafeInteger(value) || value < 0)
       throw new Error('Invalid rail sequence');
     this.#railSequence = value;
+  }
+  restorePodProductions(
+    records: readonly PodProductionRecord[],
+    nextSequence: number,
+  ): void {
+    if (!Number.isSafeInteger(nextSequence) || nextSequence < 1)
+      throw new Error('Invalid pod production sequence');
+    this.#nextPodSequence = nextSequence;
+    for (const record of records) {
+      const depot = this.entities.get(record.depotId);
+      if (depot?.kind !== 'depot')
+        throw new Error('Serialized pod production depot is missing');
+      this.podProductions.set(record.id, { ...record });
+    }
   }
   restoreEntities(
     entities: readonly WorldEntity[],
@@ -396,30 +420,42 @@ export class WorldRuntime {
     this.changed();
   }
   placeRailPath(points: readonly GridPoint[]): readonly RailEdgeId[] {
-    if (points.length < 2)
-      throw new Error('Rail path needs at least two points');
+    if (points.length !== 2)
+      throw new Error('Rail path needs exactly two points');
     const edgeIds: RailEdgeId[] = [];
-    for (let index = 1; index < points.length; index += 1) {
-      const fromPoint = points[index - 1]!;
-      const toPoint = points[index]!;
-      if (fromPoint.x !== toPoint.x && fromPoint.y !== toPoint.y)
-        throw new Error('Rail segments must be cardinal');
+    const start = points[0]!;
+    const end = points[1]!;
+    if (start.x !== end.x && start.y !== end.y)
+      throw new Error('Rail segments must be cardinal');
+    const dx = Math.sign(end.x - start.x);
+    const dy = Math.sign(end.y - start.y);
+    const length = Math.abs(end.x - start.x) + Math.abs(end.y - start.y);
+    if (length === 0) return edgeIds;
+    for (let index = 0; index < length; index += 1) {
+      const fromPoint = gridPoint(start.x + dx * index, start.y + dy * index);
+      const toPoint = gridPoint(fromPoint.x + dx, fromPoint.y + dy);
       const from =
         this.nodeAt(fromPoint) ?? this.createRailNode(fromPoint, 'endpoint');
       const to =
         this.nodeAt(toPoint) ?? this.createRailNode(toPoint, 'endpoint');
+      const existing = [...this.railEdges.values()].find(
+        (edge) => edge.from === from.id && edge.to === to.id,
+      );
+      if (existing !== undefined) {
+        edgeIds.push(existing.id);
+        continue;
+      }
       const id = asId<RailEdgeId>(`rail-${++this.#railSequence}`);
-      const length =
-        Math.abs(fromPoint.x - toPoint.x) + Math.abs(fromPoint.y - toPoint.y);
       this.addRailEdge({
         id,
         from: from.id,
         to: to.id,
         points: [fromPoint, toPoint],
-        length,
+        length: 1,
       });
       edgeIds.push(id);
     }
+    this.refreshAutomaticJunctions();
     return edgeIds;
   }
   removeRailEdge(edgeId: RailEdgeId): void {
@@ -443,7 +479,20 @@ export class WorldRuntime {
         this.railNodes.delete(nodeId);
       }
     }
+    this.refreshAutomaticJunctions();
     this.changed();
+  }
+  private refreshAutomaticJunctions(): void {
+    for (const node of this.railNodes.values()) {
+      if (node.kind === 'station' || node.kind === 'depot') continue;
+      const neighbours = new Set<string>();
+      for (const edge of this.railEdges.values()) {
+        if (edge.from === node.id) neighbours.add(edge.to);
+        if (edge.to === node.id) neighbours.add(edge.from);
+      }
+      const kind = neighbours.size >= 3 ? 'junction' : 'endpoint';
+      if (node.kind !== kind) this.railNodes.set(node.id, { ...node, kind });
+    }
   }
   placeControlNode(
     kind: 'junction' | 'station',
@@ -496,6 +545,28 @@ export class WorldRuntime {
       )
     )
       return { valid: false, reason: 'ORE_MISMATCH' };
+    if (targetKind === 'mine' && resourceId !== undefined) {
+      const oreKind =
+        resourceId === asId<ResourceId>('ironOre')
+          ? OreKind.IRON
+          : OreKind.COPPER;
+      const hasAccessibleOre = occupiedCells(transform).some((cell) =>
+        [
+          gridPoint(cell.x + 1, cell.y),
+          gridPoint(cell.x - 1, cell.y),
+          gridPoint(cell.x, cell.y + 1),
+          gridPoint(cell.x, cell.y - 1),
+        ].some((point) => {
+          const index = gridIndex(this.world.grid, point);
+          return (
+            index >= 0 &&
+            this.world.grid.oreKinds[index] === oreKind &&
+            this.world.grid.oreRemaining[index] !== 0
+          );
+        }),
+      );
+      if (!hasAccessibleOre) return { valid: false, reason: 'ORE_MISMATCH' };
+    }
     if (targetKind !== 'depot') {
       const station =
         stationId === undefined ? undefined : this.stationEntity(stationId);
@@ -590,6 +661,19 @@ export class WorldRuntime {
       entity.kind === 'drill'
     )
       throw new Error('Entity cannot be dismantled as a major building');
+    if (entity.kind === 'depot') {
+      if (
+        [...this.podProductions.values()].some(
+          (production) => production.depotId === entityId,
+        )
+      )
+        throw new Error('Cancel this depot production queue first');
+      if (
+        this.globalPodCapacity() - entity.podCapacity <
+        this.traffic.pods.size + this.reservedPodProductionCount()
+      )
+        throw new Error('Dismantling would exceed global pod capacity');
+    }
     const station = [...this.entities.values()].find(
       (candidate) =>
         candidate.kind === 'station' && candidate.linkedEntityId === entityId,
@@ -760,7 +844,6 @@ export class WorldRuntime {
         kind: 'depot',
         railNodeId: node,
         podCapacity: worldContent.depotCapacity,
-        podIds: [],
         transform: target.transform,
         createdAt: this.logicalTime,
       });
@@ -1072,6 +1155,225 @@ export class WorldRuntime {
     this.traffic.addPod({ id, nodeId, stationId });
     this.changed();
   }
+  private productionStationId(
+    productionId: string,
+    resourceId: ResourceId,
+  ): string {
+    return `pod-production:${productionId}:${resourceId}`;
+  }
+  private productionFallbackId(
+    productionId: string,
+    resourceId: ResourceId,
+  ): string {
+    return `pod-production-fallback:${productionId}:${resourceId}`;
+  }
+  private ensureProductionFallback(
+    productionId: string,
+    resourceId: ResourceId,
+    quantity: number,
+  ): void {
+    if (quantity <= 0) return;
+    const hub = this.storageInventories.get(
+      asId<WorldEntityId>('world-starter-storage'),
+    );
+    const hubNode = this.railNodes.get('rail-starter-storage');
+    if (
+      hub === undefined ||
+      hubNode === undefined ||
+      hub.freeSpaceFor(resourceId) < quantity
+    )
+      return;
+    const id = this.productionFallbackId(productionId, resourceId);
+    const existing = this.traffic.stations.get(id);
+    this.traffic.stations.set(id, {
+      id,
+      railNodeId: hubNode.id,
+      role: 'requester',
+      buffer: new SharedInventoryBuffer(hub, resourceId),
+      priority: -100,
+      target: Math.max(
+        existing?.target ?? 0,
+        hub.amount(resourceId) + quantity,
+      ),
+      minBatch: 1,
+      maxBatch: 10,
+      requestCreatedAt: existing?.requestCreatedAt ?? this.logicalTime,
+    });
+  }
+  private globalPodCapacity(): number {
+    return [...this.entities.values()]
+      .filter(
+        (entity): entity is Extract<WorldEntity, { kind: 'depot' }> =>
+          entity.kind === 'depot',
+      )
+      .reduce((total, depot) => total + depot.podCapacity, 0);
+  }
+  private reservedPodProductionCount(): number {
+    return [...this.podProductions.values()].filter(
+      (production) => production.state !== 'EVACUATING',
+    ).length;
+  }
+  private activateNextPodProduction(depotId: WorldEntityId): void {
+    const blocked = [...this.podProductions.values()].some(
+      (production) =>
+        production.depotId === depotId && production.state !== 'PENDING',
+    );
+    if (blocked) return;
+    const next = [...this.podProductions.values()]
+      .filter(
+        (production) =>
+          production.depotId === depotId && production.state === 'PENDING',
+      )
+      .sort((a, b) => a.sequence - b.sequence)[0];
+    if (next === undefined) return;
+    const depot = this.entities.get(depotId);
+    if (depot?.kind !== 'depot') return;
+    this.podProductions.set(next.id, { ...next, state: 'ACTIVE' });
+    for (const item of worldContent.pod.buildCost)
+      this.addTrafficStation({
+        id: this.productionStationId(next.id, item.resourceId),
+        railNodeId: depot.railNodeId,
+        role: 'requester',
+        buffer: new WorldBuffer(item.resourceId, item.quantity),
+        priority: 100,
+        target: item.quantity,
+        minBatch: 1,
+        maxBatch: 10,
+        requestCreatedAt: this.logicalTime,
+      });
+  }
+  queuePodProduction(depotId: WorldEntityId): void {
+    const depot = this.entities.get(depotId);
+    if (depot?.kind !== 'depot') throw new Error('Unknown pod depot');
+    if (
+      this.traffic.pods.size + this.reservedPodProductionCount() >=
+      this.globalPodCapacity()
+    )
+      throw new Error('Global pod capacity is full');
+    const sequence = this.#nextPodSequence++;
+    const id = `pod-production-${sequence}`;
+    this.podProductions.set(id, {
+      id,
+      depotId,
+      sequence,
+      state: 'PENDING',
+    });
+    this.activateNextPodProduction(depotId);
+    this.dispatch();
+    this.changed();
+  }
+  cancelPodProduction(depotId: WorldEntityId): void {
+    const depot = this.entities.get(depotId);
+    if (depot?.kind !== 'depot') throw new Error('Unknown pod depot');
+    const latest = [...this.podProductions.values()]
+      .filter(
+        (production) =>
+          production.depotId === depotId && production.state !== 'EVACUATING',
+      )
+      .sort((a, b) => b.sequence - a.sequence)[0];
+    if (latest === undefined) throw new Error('Pod production queue is empty');
+    if (latest.state === 'PENDING') {
+      this.podProductions.delete(latest.id);
+    } else {
+      this.podProductions.set(latest.id, {
+        ...latest,
+        state: 'EVACUATING',
+      });
+      for (const item of worldContent.pod.buildCost) {
+        const stationId = this.productionStationId(latest.id, item.resourceId);
+        const station = this.traffic.stations.get(stationId);
+        if (station === undefined) continue;
+        this.traffic.stations.set(stationId, {
+          ...station,
+          role: 'provider',
+          target: 0,
+          priority: 1000,
+        });
+        this.ensureProductionFallback(
+          latest.id,
+          item.resourceId,
+          station.buffer?.quantity ?? 0,
+        );
+      }
+    }
+    this.syncPodProductions();
+    this.dispatch();
+    this.changed();
+  }
+  private syncPodProductions(): void {
+    for (const production of [...this.podProductions.values()].sort(
+      (a, b) => a.sequence - b.sequence,
+    )) {
+      if (production.state === 'PENDING') continue;
+      const quantities = worldContent.pod.buildCost.map((item) => ({
+        ...item,
+        delivered:
+          this.traffic.stations.get(
+            this.productionStationId(production.id, item.resourceId),
+          )?.buffer?.quantity ?? 0,
+      }));
+      if (production.state === 'EVACUATING') {
+        for (const item of quantities)
+          this.ensureProductionFallback(
+            production.id,
+            item.resourceId,
+            item.delivered,
+          );
+        const hasRelatedMission = [...this.traffic.missions.values()].some(
+          (mission) =>
+            mission.status !== 'DELIVERED' &&
+            worldContent.pod.buildCost.some((item) => {
+              const stationId = this.productionStationId(
+                production.id,
+                item.resourceId,
+              );
+              return (
+                mission.requesterId === stationId ||
+                mission.providerId === stationId
+              );
+            }),
+        );
+        if (hasRelatedMission || quantities.some((item) => item.delivered > 0))
+          continue;
+        for (const item of worldContent.pod.buildCost) {
+          this.traffic.stations.delete(
+            this.productionStationId(production.id, item.resourceId),
+          );
+          this.traffic.stations.delete(
+            this.productionFallbackId(production.id, item.resourceId),
+          );
+        }
+        this.podProductions.delete(production.id);
+        this.activateNextPodProduction(production.depotId);
+        continue;
+      }
+      if (quantities.some((item) => item.delivered !== item.quantity)) continue;
+      const depot = this.entities.get(production.depotId);
+      if (depot?.kind !== 'depot') continue;
+      for (const item of worldContent.pod.buildCost)
+        this.traffic.stations.delete(
+          this.productionStationId(production.id, item.resourceId),
+        );
+      const depotStation = [...this.traffic.stations.values()]
+        .filter(
+          (station) =>
+            station.role === 'depot' && station.railNodeId === depot.railNodeId,
+        )
+        .sort((a, b) => a.id.localeCompare(b.id))[0];
+      if (depotStation === undefined)
+        throw new Error('Pod depot traffic station is missing');
+      const podId = `pod-built-${production.sequence}`;
+      this.traffic.addPod({
+        id: podId,
+        nodeId: depot.railNodeId,
+        stationId: depotStation.id,
+      });
+      depotStation.reservedDepotSlots =
+        (depotStation.reservedDepotSlots ?? 0) + 1;
+      this.podProductions.delete(production.id);
+      this.activateNextPodProduction(production.depotId);
+    }
+  }
   dispatch(): void {
     if (this.traffic.dispatch(this.logicalTime).length > 0) this.changed();
   }
@@ -1176,6 +1478,7 @@ export class WorldRuntime {
       this.syncDrillConstruction();
       this.syncFactories();
       this.syncSalvage();
+      this.syncPodProductions();
       this.dispatch();
     }
     const stillPending =
@@ -1192,6 +1495,7 @@ export class WorldRuntime {
     this.syncDrillConstruction();
     this.syncFactories();
     this.syncSalvage();
+    this.syncPodProductions();
     this.changed();
     return { advancedTo: this.logicalTime, exhaustedBudget: stillPending };
   }
@@ -1263,20 +1567,50 @@ export class WorldRuntime {
         drills,
       });
     }
+    const globalPodCapacity = this.globalPodCapacity();
+    const podCount = this.traffic.pods.size;
+    const queuedPodCount = this.reservedPodProductionCount();
     for (const entity of [...this.entities.values()]
       .filter(
         (item): item is Extract<WorldEntity, { kind: 'depot' }> =>
           item.kind === 'depot',
       )
-      .sort((a, b) => a.id.localeCompare(b.id)))
+      .sort((a, b) => a.id.localeCompare(b.id))) {
+      const productions = [...this.podProductions.values()]
+        .filter((production) => production.depotId === entity.id)
+        .sort((a, b) => a.sequence - b.sequence);
+      const active = productions.find(
+        (production) => production.state !== 'PENDING',
+      );
       buildings.push({
         entityId: entity.id,
         kind: 'depot',
         podCapacity: entity.podCapacity,
-        podCount: [...this.traffic.pods.values()].filter(
-          (pod) => pod.nodeId === entity.railNodeId,
+        podCount,
+        globalPodCapacity,
+        queuedPodCount,
+        productionQueueLength: productions.filter(
+          (production) => production.state !== 'EVACUATING',
         ).length,
+        ...(active === undefined
+          ? {}
+          : {
+              activeProduction: {
+                state: active.state === 'EVACUATING' ? 'EVACUATING' : 'ACTIVE',
+                required: stacks(worldContent.pod.buildCost),
+                delivered: stacks(
+                  worldContent.pod.buildCost.map((item) => ({
+                    resourceId: item.resourceId,
+                    quantity:
+                      this.traffic.stations.get(
+                        this.productionStationId(active.id, item.resourceId),
+                      )?.buffer?.quantity ?? 0,
+                  })),
+                ),
+              },
+            }),
       });
+    }
     return {
       schemaVersion: 1,
       worldId: this.world.id,
@@ -1419,6 +1753,14 @@ export class WorldRuntime {
           state: drill.state,
         });
       this.mines.set(entityId, mine);
+      const outputStation = this.traffic.stations.get(
+        `mine-output:${entityId}`,
+      );
+      if (outputStation !== undefined)
+        this.traffic.stations.set(outputStation.id, {
+          ...outputStation,
+          buffer: mine.output,
+        });
     }
   }
   storageRecords(): readonly SerializedStorageRecord[] {
@@ -1442,7 +1784,14 @@ export class WorldRuntime {
           entityId === asId<WorldEntityId>('world-starter-storage') &&
           id.startsWith('hub:');
         const ruleMatch = id.startsWith(`rule:${entityId}:`);
-        if ((!hubMatch && !ruleMatch) || station.buffer === undefined) continue;
+        const podFallbackMatch =
+          entityId === asId<WorldEntityId>('world-starter-storage') &&
+          id.startsWith('pod-production-fallback:');
+        if (
+          (!hubMatch && !ruleMatch && !podFallbackMatch) ||
+          station.buffer === undefined
+        )
+          continue;
         this.traffic.stations.set(id, {
           ...station,
           buffer: new SharedInventoryBuffer(

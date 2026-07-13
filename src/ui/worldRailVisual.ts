@@ -24,12 +24,16 @@ export const railEdgeAt = (
 export const railNodeDegrees = (
   edges: readonly WorldRailEdge[],
 ): ReadonlyMap<RailNodeId, number> => {
-  const degrees = new Map<RailNodeId, number>();
+  const neighbours = new Map<RailNodeId, Set<RailNodeId>>();
   for (const edge of edges) {
-    degrees.set(edge.from, (degrees.get(edge.from) ?? 0) + 1);
-    degrees.set(edge.to, (degrees.get(edge.to) ?? 0) + 1);
+    const from = neighbours.get(edge.from) ?? new Set<RailNodeId>();
+    const to = neighbours.get(edge.to) ?? new Set<RailNodeId>();
+    from.add(edge.to);
+    to.add(edge.from);
+    neighbours.set(edge.from, from);
+    neighbours.set(edge.to, to);
   }
-  return degrees;
+  return new Map([...neighbours].map(([id, adjacent]) => [id, adjacent.size]));
 };
 
 export const railNodeConnectionState = (

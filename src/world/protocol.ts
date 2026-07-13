@@ -153,12 +153,12 @@ export type WorldCommand =
       readonly station: TrafficStationInput;
     })
   | (RevisionRequest & {
-      readonly type: 'ADD_POD';
-      readonly pod: {
-        readonly id: string;
-        readonly nodeId: string;
-        readonly stationId: string;
-      };
+      readonly type: 'QUEUE_POD_PRODUCTION';
+      readonly depotId: WorldEntityId;
+    })
+  | (RevisionRequest & {
+      readonly type: 'CANCEL_POD_PRODUCTION';
+      readonly depotId: WorldEntityId;
     })
   | (RevisionRequest & { readonly type: 'DISPATCH' })
   | (RevisionRequest & {

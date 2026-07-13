@@ -141,7 +141,6 @@ export interface DepotWorldEntity extends EntityBase {
   readonly kind: 'depot';
   readonly railNodeId: RailNodeId;
   readonly podCapacity: number;
-  readonly podIds: readonly PodId[];
 }
 export interface ConstructionSiteWorldEntity extends EntityBase {
   readonly kind: 'construction-site';
@@ -312,6 +311,14 @@ export type WorldBuildingSnapshot =
       readonly kind: 'depot';
       readonly podCapacity: number;
       readonly podCount: number;
+      readonly globalPodCapacity: number;
+      readonly queuedPodCount: number;
+      readonly productionQueueLength: number;
+      readonly activeProduction?: {
+        readonly required: readonly WorldItemStack[];
+        readonly delivered: readonly WorldItemStack[];
+        readonly state: 'ACTIVE' | 'EVACUATING';
+      };
     };
 
 export interface WorldSnapshot {

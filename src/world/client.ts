@@ -149,16 +149,22 @@ export const applyWorldDelta = (
   delta: WorldDelta,
 ): WorldSnapshot => {
   if (delta.revision < snapshot.revision) return snapshot;
-  const oreRemaining = snapshot.grid.oreRemaining.slice();
-  for (const change of delta.oreChanges)
-    oreRemaining[change.index] = change.remaining;
+  const grid =
+    delta.oreChanges.length === 0
+      ? snapshot.grid
+      : (() => {
+          const oreRemaining = snapshot.grid.oreRemaining.slice();
+          for (const change of delta.oreChanges)
+            oreRemaining[change.index] = change.remaining;
+          return { ...snapshot.grid, oreRemaining };
+        })();
   const { pendingAdvanceTarget, ...base } = snapshot;
   void pendingAdvanceTarget;
   return {
     ...base,
     revision: delta.revision,
     logicalTime: delta.logicalTime,
-    grid: { ...snapshot.grid, oreRemaining },
+    grid,
     entities: delta.entities.filter(
       (entity) => !delta.removedEntityIds.includes(entity.id),
     ),
