@@ -1,5 +1,15 @@
 # Remaining implementation plan
 
+## Current priority: 3D world and interface overhaul
+
+[1 — 3D world view and game interface](1-3d-world-view-and-interface.md) defines
+the new visual direction, asset generation and model contracts, direct Three.js
+architecture, staged migration, and acceptance criteria. Read its implementation
+guardrails before starting. It supersedes the PixiJS renderer choice in stage 17;
+the existing domain, logistics, construction, and persistence remain its baseline.
+
+## Earlier roadmap
+
 This plan was audited against the current worktree on 2026-07-06. It contains
 only work that is not implemented, or whose current implementation does not yet
 meet the acceptance criteria in [`factory-graph-design.md`](../factory-graph-design.md).
