@@ -1,3 +1,4 @@
+import type { PodPresentationInterval } from './presentation';
 import type {
   FactoryId,
   GridPoint,
@@ -26,9 +27,10 @@ import type {
   PodMission,
 } from './model';
 
-export const WORLD_PROTOCOL_VERSION = 2 as const;
+export const WORLD_PROTOCOL_VERSION = 3 as const;
 interface RequestBase {
-  readonly protocolVersion: 2;
+  readonly metrics?: boolean;
+  readonly protocolVersion: 3;
   readonly requestId: string;
 }
 interface RevisionRequest extends RequestBase {
@@ -45,7 +47,15 @@ export type WorldCommand =
     })
   | (RevisionRequest & {
       readonly type: 'VALIDATE_GHOST';
-      readonly targetKind: 'factory' | 'mine' | 'storage' | 'depot';
+      readonly targetKind:
+        | 'factory'
+        | 'mine'
+        | 'storage'
+        | 'depot'
+        | 'drill'
+        | 'station'
+        | 'junction';
+      readonly mineId?: WorldEntityId;
       readonly position: GridPoint;
       readonly size: { readonly width: number; readonly height: number };
       readonly rotation: QuarterTurn;
@@ -123,14 +133,16 @@ export type WorldCommand =
     })
   | (RevisionRequest & {
       readonly type: 'ADVANCE';
+      readonly recordPresentation?: boolean;
       readonly target: SimTime;
       readonly eventBudget?: number;
     })
   | (RevisionRequest & {
       readonly type: 'CONTINUE_ADVANCE';
+      readonly recordPresentation?: boolean;
       readonly eventBudget?: number;
     })
-  | (RequestBase & { readonly type: 'SAVE' })
+  | (RequestBase & { readonly type: 'SAVE'; readonly serialized?: boolean })
   | (RequestBase & { readonly type: 'SNAPSHOT' })
   | (RevisionRequest & {
       readonly type: 'PLACE_ENTITY';
@@ -188,11 +200,16 @@ export type WorldCommandInput = WorldCommand extends infer Command
     : never
   : never;
 export interface WorldDelta {
+  readonly presentation: PodPresentationInterval;
   readonly baseRevision: number;
   readonly revision: number;
   readonly logicalTime: SimTime;
   readonly entities: readonly WorldEntity[];
   readonly removedEntityIds: readonly WorldEntityId[];
+  readonly occupancyChanges: readonly {
+    readonly index: number;
+    readonly slot: number;
+  }[];
   readonly railNodes: readonly WorldRailNode[];
   readonly railEdges: readonly WorldRailEdge[];
   readonly railBlocks: readonly WorldRailBlock[];
@@ -205,48 +222,72 @@ export interface WorldDelta {
     readonly index: number;
     readonly remaining: number;
   }[];
+  readonly drillExtractionIds: readonly WorldEntityId[];
   readonly paused: boolean;
   readonly timeScale: 1 | 5 | 20;
   readonly scheduledEvents: number;
   readonly pendingAdvanceTarget?: SimTime;
 }
-export type WorldWorkerResponse =
+type WorldWorkerResponseMessage =
   | {
-      readonly protocolVersion: 2;
+      readonly protocolVersion: 3;
       readonly requestId: string;
       readonly type: 'READY';
       readonly snapshot: WorldSnapshot;
     }
   | {
-      readonly protocolVersion: 2;
+      readonly protocolVersion: 3;
       readonly requestId: string;
       readonly type: 'DELTA';
       readonly delta: WorldDelta;
     }
   | {
-      readonly protocolVersion: 2;
+      readonly protocolVersion: 3;
       readonly requestId: string;
       readonly type: 'ADVANCE_PAUSED';
       readonly delta: WorldDelta;
     }
   | {
-      readonly protocolVersion: 2;
+      readonly protocolVersion: 3;
+      readonly requestId: string;
+      readonly type: 'WORLD_ERROR';
+      readonly message: string;
+      readonly lastSavedStateAvailable: boolean;
+    }
+  | {
+      readonly protocolVersion: 3;
       readonly requestId: string;
       readonly type: 'VALIDATION';
       readonly revision: number;
       readonly validation: WorldValidationResult;
     }
   | {
-      readonly protocolVersion: 2;
+      readonly protocolVersion: 3;
       readonly requestId: string;
       readonly type: 'SAVE_RESULT';
       readonly revision: number;
       readonly state: SerializedWorldState;
     }
   | {
-      readonly protocolVersion: 2;
+      readonly protocolVersion: 3;
+      readonly requestId: string;
+      readonly type: 'SAVE_PAYLOAD';
+      readonly revision: number;
+      readonly payload: string;
+    }
+  | {
+      readonly protocolVersion: 3;
       readonly requestId: string;
       readonly type: 'ERROR';
       readonly error: string;
       readonly revision?: number;
     };
+
+export interface WorldWorkerMetrics {
+  readonly workerMs: number;
+  readonly deltaMs: number;
+  readonly previousPostMessageMs: number;
+}
+export type WorldWorkerResponse = WorldWorkerResponseMessage & {
+  readonly metrics?: WorldWorkerMetrics;
+};

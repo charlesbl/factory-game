@@ -15,6 +15,43 @@ export interface PlacementResult {
     'INVALID_TRANSFORM' | 'OUT_OF_BOUNDS' | 'OBSTACLE' | 'OCCUPIED';
 }
 
+/** Shared by the draft and the worker. Validate the entire path before mutation. */
+export const validateRailPath = (
+  grid: Pick<WorldGrid, 'width' | 'height' | 'occupancy'>,
+  points: readonly GridPoint[],
+): { readonly valid: boolean; readonly reason?: string } => {
+  if (
+    points.length < 2 ||
+    points.every((p) => p.x === points[0]!.x && p.y === points[0]!.y)
+  )
+    return {
+      valid: false,
+      reason: 'Rail path needs at least two distinct points',
+    };
+  for (const point of points)
+    if (gridIndex(grid, point) < 0)
+      return { valid: false, reason: 'Rail path must stay inside the world' };
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1]!,
+      b = points[i]!;
+    if (a.x !== b.x && a.y !== b.y)
+      return { valid: false, reason: 'Rail segments must be cardinal' };
+    const length = Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
+    const dx = Math.sign(b.x - a.x),
+      dy = Math.sign(b.y - a.y);
+    for (let step = 0; step <= length; step++) {
+      const x = a.x + dx * step,
+        y = a.y + dy * step;
+      if (grid.occupancy[y * grid.width + x] !== 0)
+        return {
+          valid: false,
+          reason: `Rail crosses a building at ${x}, ${y}. Route around its footprint; connect stations and depots at their exterior hookup.`,
+        };
+    }
+  }
+  return { valid: true };
+};
+
 const validTransform = (transform: WorldTransform): boolean =>
   Number.isSafeInteger(transform.position.x) &&
   Number.isSafeInteger(transform.position.y) &&
@@ -86,3 +123,38 @@ export const rotateQuarter = (
   rotation: QuarterTurn,
   delta: 1 | -1 = 1,
 ): QuarterTurn => ((rotation + delta + 4) % 4) as QuarterTurn;
+
+/** Outward direction of the building's front edge per quarter turn. Rotation 0
+ * fronts +Y (south); each turn is one clockwise map turn (Y rotation -PI/2). */
+export const frontDirection = (rotation: QuarterTurn): GridPoint => {
+  if (rotation === 0) return { x: 0, y: 1 };
+  if (rotation === 1) return { x: -1, y: 0 };
+  if (rotation === 2) return { x: 0, y: -1 };
+  return { x: 1, y: 0 };
+};
+
+/** The rail hookup cell of a rotated footprint: one cell outside the centre of
+ * the front edge of the rotated occupied rectangle. Along the edge the cell is
+ * `min + floor(len / 2)`, deterministic for even sizes. */
+export const hookupCell = (transform: WorldTransform): GridPoint => {
+  const size = rotatedSize(transform.size, transform.rotation);
+  const direction = frontDirection(transform.rotation);
+  const centre =
+    direction.x === 0
+      ? transform.position.x + Math.floor(size.width / 2)
+      : transform.position.y + Math.floor(size.height / 2);
+  return {
+    x:
+      direction.x === 0
+        ? centre
+        : direction.x > 0
+          ? transform.position.x + size.width
+          : transform.position.x - 1,
+    y:
+      direction.x !== 0
+        ? centre
+        : direction.y > 0
+          ? transform.position.y + size.height
+          : transform.position.y - 1,
+  };
+};

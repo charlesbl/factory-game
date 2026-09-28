@@ -236,6 +236,10 @@ export class MineRuntime {
   }
   placeDrill(id: WorldEntityId, position: GridPoint, placedAt: SimTime): void {
     if (this.drills.has(id)) throw new Error('Duplicate drill');
+    this.validateDrill(position);
+    this.drills.set(id, { id, position, placedAt, state: 'GHOST' });
+  }
+  validateDrill(position: GridPoint): void {
     const index = gridIndex(this.grid, position);
     if (
       index < 0 ||
@@ -257,7 +261,6 @@ export class MineRuntime {
       );
     if (!connected)
       throw new Error('Drill must touch the mine or another drill');
-    this.drills.set(id, { id, position, placedAt, state: 'GHOST' });
   }
   nextGhost(): DrillGhost | undefined {
     return [...this.drills.values()]

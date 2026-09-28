@@ -1,3 +1,4 @@
+import type { PodPresentationInterval } from './presentation';
 import type {
   ConstructionSiteId,
   DeliveryId,
@@ -15,6 +16,7 @@ import type {
   WorldEntityId,
   WorldId,
 } from '../domain';
+import type { SerializedFactoryContract } from '../compiler';
 
 export const WORLD_SCHEMA_VERSION = 1 as const;
 export const WORLD_GENERATOR_VERSION = 1 as const;
@@ -193,10 +195,14 @@ export interface WorldRailBlock {
   readonly reservedById?: PodId;
 }
 export interface PodMotion {
+  readonly edgeId: RailEdgeId;
   readonly from: GridPoint;
   readonly to: GridPoint;
   readonly startsAt: SimTime;
   readonly endsAt: SimTime;
+}
+export interface PodMotionEvent extends PodMotion {
+  readonly podId: PodId;
 }
 export type PodState =
   | 'IDLE'
@@ -252,9 +258,11 @@ export interface WorldValidationResult {
     | 'OBSTACLE'
     | 'OCCUPIED'
     | 'INVALID_TRANSFORM'
+    | 'HOOKUP_BLOCKED'
     | 'ORE_MISMATCH'
     | 'MISSING_STATION'
     | 'STATION_IN_USE'
+    | 'RAIL_IN_USE'
     | 'NOT_ORTHOGONAL'
     | 'NOT_CONNECTED';
 }
@@ -280,6 +288,8 @@ export type WorldBuildingSnapshot =
   | {
       readonly entityId: WorldEntityId;
       readonly kind: 'factory';
+      /** Contract accepted when this placed factory was constructed. */
+      readonly contract: SerializedFactoryContract;
       readonly state:
         | 'RUNNING'
         | 'WAITING_INPUT'
@@ -322,16 +332,28 @@ export type WorldBuildingSnapshot =
     };
 
 export interface WorldSnapshot {
+  readonly presentation: PodPresentationInterval;
   readonly schemaVersion: 1;
   readonly worldId: WorldId;
+  readonly generation: {
+    readonly config: WorldGenerationConfig;
+    readonly spawn: GridPoint;
+  };
   readonly revision: number;
   readonly logicalTime: SimTime;
   readonly grid: WorldGrid;
+  readonly presentationOreChanges: readonly {
+    readonly index: number;
+    readonly remaining: number;
+  }[];
+  /** Drills which actually removed ore since the preceding worker publication. */
+  readonly drillExtractionIds: readonly WorldEntityId[];
   readonly entities: readonly WorldEntity[];
   readonly railNodes: readonly WorldRailNode[];
   readonly railEdges: readonly WorldRailEdge[];
   readonly railBlocks: readonly WorldRailBlock[];
   readonly pods: readonly WorldPod[];
+  /** Presentation-only route segments since the previous accepted publication. */
   readonly missions: readonly PodMission[];
   readonly stations: readonly WorldStationSnapshot[];
   readonly buildings: readonly WorldBuildingSnapshot[];

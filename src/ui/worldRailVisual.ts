@@ -3,11 +3,11 @@ import type { WorldRailEdge, WorldRailNode, WorldSnapshot } from '../world';
 
 export type RailConnectionState = 'connected' | 'disconnected';
 
-export const railEdgeAt = (
+export const railEdgesAt = (
   snapshot: Pick<WorldSnapshot, 'railEdges'>,
   point: GridPoint,
-): WorldRailEdge | undefined =>
-  snapshot.railEdges.find((edge) =>
+): readonly WorldRailEdge[] =>
+  snapshot.railEdges.filter((edge) =>
     edge.points.slice(1).some((end, index) => {
       const start = edge.points[index];
       if (start === undefined) return false;
@@ -20,6 +20,11 @@ export const railEdgeAt = (
             point.x <= Math.max(start.x, end.x);
     }),
   );
+
+export const railEdgeAt = (
+  snapshot: Pick<WorldSnapshot, 'railEdges'>,
+  point: GridPoint,
+): WorldRailEdge | undefined => railEdgesAt(snapshot, point)[0];
 
 export const railNodeDegrees = (
   edges: readonly WorldRailEdge[],
@@ -61,4 +66,54 @@ export const railEdgeConnectionState = (
     railNodeConnectionState(to, degrees) === 'connected'
     ? 'connected'
     : 'disconnected';
+};
+
+/** Geometric turns include imported polyline vertices and both rail directions. */
+export const railCorners = (
+  edges: readonly WorldRailEdge[],
+): ReadonlyMap<string, { point: GridPoint; angle: number }> => {
+  const directions = new Map<string, { point: GridPoint; arms: Set<string> }>();
+  const arm = (point: GridPoint, other: GridPoint) => {
+    const key = point.x + ':' + point.y;
+    let entry = directions.get(key);
+    if (!entry) {
+      entry = { point, arms: new Set() };
+      directions.set(key, entry);
+    }
+    entry.arms.add(
+      other.x > point.x
+        ? 'E'
+        : other.x < point.x
+          ? 'W'
+          : other.y > point.y
+            ? 'S'
+            : 'N',
+    );
+  };
+  for (const edge of edges)
+    for (let i = 1; i < edge.points.length; i++) {
+      const a = edge.points[i - 1]!,
+        b = edge.points[i]!;
+      if (a.x === b.x && a.y === b.y) continue;
+      arm(a, b);
+      arm(b, a);
+    }
+  const corners = new Map<string, { point: GridPoint; angle: number }>();
+  for (const [key, { point, arms }] of directions) {
+    if (
+      arms.size !== 2 ||
+      (arms.has('N') && arms.has('S')) ||
+      (arms.has('E') && arms.has('W'))
+    )
+      continue;
+    const angle = arms.has('N')
+      ? arms.has('E')
+        ? 0
+        : Math.PI / 2
+      : arms.has('E')
+        ? -Math.PI / 2
+        : Math.PI;
+    corners.set(key, { point, angle });
+  }
+  return corners;
 };

@@ -12,26 +12,29 @@
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "format": "prettier --write \"{src,benchmarks,tests}/**/*.{ts,tsx,css,html}\" \"*.{ts,js,mjs,cjs}\"",
-    "format:check": "prettier --check \"{src,benchmarks,tests}/**/*.{ts,tsx,css,html}\" \"*.{ts,js,mjs,cjs}\"",
+    "format": "prettier --write \"{src,benchmarks,tests}/**/*.{ts,tsx,css,html}\" \"*.{ts,js,mjs,cjs}\" \"scripts/**/*.mjs\"",
+    "format:check": "prettier --check \"{src,benchmarks,tests}/**/*.{ts,tsx,css,html}\" \"*.{ts,js,mjs,cjs}\" \"scripts/**/*.mjs\"",
     "postformat": "npm run format:check",
     "lint:check": "npm run lint && npm run format:check",
     "lint:all": "npm run typecheck && npm run lint && npm run format:check",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build",
+    "check": "npm run assets:validate && npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:invariants": "vitest run src/invariants.property.test.ts",
     "build": "tsc --noEmit && vite build",
-    "benchmark": "vitest bench --run"
+    "benchmark": "vitest bench --run",
+    "assets:build": "node scripts/assets/blender.mjs",
+    "assets:preview": "node scripts/assets/blender.mjs --preview",
+    "assets:validate": "node scripts/assets/validate_world_assets.mjs"
   },
   "dependencies": {
     "@xyflow/react": "12.11.1",
     "dexie": "4.4.4",
     "glpk.js": "5.0.0",
-    "pixi.js": "^8.19.0",
     "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react-dom": "19.2.7",
+    "three": "0.186.1"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -40,6 +43,7 @@
     "@types/node": "24.13.2",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
+    "@types/three": "0.186.0",
     "@vitejs/plugin-react": "6.0.3",
     "eslint": "10.6.0",
     "eslint-config-prettier": "^10.1.8",

@@ -2,11 +2,9 @@
 
 ## Current priority: 3D world and interface overhaul
 
-[1 — 3D world view and game interface](1-3d-world-view-and-interface.md) defines
-the new visual direction, asset generation and model contracts, direct Three.js
-architecture, staged migration, and acceptance criteria. Read its implementation
-guardrails before starting. It supersedes the PixiJS renderer choice in stage 17;
-the existing domain, logistics, construction, and persistence remain its baseline.
+[1 — 3D world view and game interface](1-3d-world-view-and-interface.md) now
+tracks only the remaining final qualification work for the Three.js migration.
+Completed implementation and acceptance work has been removed from that plan.
 
 ## Earlier roadmap
 

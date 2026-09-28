@@ -139,3 +139,38 @@ describe('modular mines', () => {
     ]);
   });
 });
+
+describe('construction site delivery cap and completion', () => {
+  it('caps deliveries at the required quantity and blocks completion until the exact match', () => {
+    const iron = asId<ResourceId>('ironPlate');
+    const copper = asId<ResourceId>('copperWire');
+    const site = new ConstructionSiteRuntime([
+      { resourceId: iron, quantity: 4 },
+      { resourceId: copper, quantity: 2 },
+    ]);
+    // The delivery inventory is capped at the required totals (the plan's
+    // construction cap, section 3 material delivery progress).
+    expect(site.delivered.capacity).toBe(6);
+    expect(site.missing(iron)).toBe(4);
+    expect(() => site.deliver(iron, 5)).toThrow(/exceeds/);
+    site.deliver(iron, 4);
+    expect(site.missing(iron)).toBe(0);
+    // One fully delivered resource is not completion: the site waits for the
+    // accepted lifecycle transition on the exact per-resource match.
+    expect(site.state).toBe('WAITING');
+    expect(() => site.complete()).toThrow(/incomplete/);
+    site.deliver(copper, 2);
+    expect(site.state).toBe('READY');
+    expect(site.complete()).toEqual([
+      { resourceId: copper, quantity: 2 },
+      { resourceId: iron, quantity: 4 },
+    ]);
+    expect(site.state).toBe('COMPLETED');
+  });
+
+  it('waits for the accepted lifecycle transition when nothing is required', () => {
+    const site = new ConstructionSiteRuntime([]);
+    expect(site.state).toBe('WAITING');
+    expect(() => site.complete()).toThrow(/incomplete/);
+  });
+});

@@ -378,6 +378,9 @@ export const FactoryGraphEditor = ({
       return {
         id: node.id,
         type: 'factory' as const,
+        zIndex: 20,
+        width: gridToPixel(node.footprint.width),
+        height: gridToPixel(node.footprint.height),
         position: {
           x: gridToPixel(node.position.x),
           y: gridToPixel(node.position.y),
@@ -417,6 +420,8 @@ export const FactoryGraphEditor = ({
         return {
           id: node.id,
           type: 'factory',
+          width: gridToPixel(node.footprint.width),
+          height: gridToPixel(node.footprint.height),
           position: {
             x: gridToPixel(node.position.x),
             y: gridToPixel(node.position.y),
@@ -567,7 +572,16 @@ export const FactoryGraphEditor = ({
   const [edgeProjection, setEdgeProjection] = useState(projectedEdges);
   if (nodeProjection !== projectedNodes) {
     setNodeProjection(projectedNodes);
-    setNodes(projectedNodes);
+    // Compilation republishes node data without changing its measured footprint.
+    // Retain dimensions so React Flow does not discard cached handle bounds while
+    // ResizeObserver sees no size change and therefore sends no replacement.
+    setNodes((current) => {
+      const measured = new Map(current.map((node) => [node.id, node.measured]));
+      return projectedNodes.map((node) => ({
+        ...node,
+        ...(measured.get(node.id) ? { measured: measured.get(node.id)! } : {}),
+      }));
+    });
   }
   if (edgeProjection !== projectedEdges) {
     setEdgeProjection(projectedEdges);

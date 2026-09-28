@@ -9,6 +9,7 @@ export default tseslint.config(
   {
     ignores: [
       'dist',
+      'benchmarks/generated',
       'coverage',
       'node_modules',
       'playwright-report',
@@ -21,6 +22,10 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   eslintPluginPrettierRecommended,
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: { globals: globals.node },
+  },
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {

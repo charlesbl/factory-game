@@ -13,3 +13,10 @@ npm-debug.log*
 save.json
 /saves
 .eslintcache
+
+/benchmarks/generated
+/*-world.log
+/asset-build.log
+/asset-preview.log
+
+/debug.log

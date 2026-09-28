@@ -1,4 +1,11 @@
-import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
+import { useLayoutEffect } from 'react';
+import {
+  useUpdateNodeInternals,
+  Handle,
+  Position,
+  type Node,
+  type NodeProps,
+} from '@xyflow/react';
 import { formatRate, resourceById } from '../domain';
 import type { PortId, RateRaw, ResourceId } from '../domain';
 import type { FactoryContract } from '../compiler';
@@ -39,6 +46,19 @@ export const FactoryNodeView = ({
   selected,
 }: NodeProps<FactoryFlowNode>) => {
   const { node } = data;
+  const updateNodeInternals = useUpdateNodeInternals();
+  const ports = node.ports
+    .map((port) => port.id + ':' + port.anchor.x + ':' + port.anchor.y)
+    .join('|');
+  useLayoutEffect(() => {
+    updateNodeInternals(node.id);
+  }, [
+    node.id,
+    node.footprint.width,
+    node.footprint.height,
+    ports,
+    updateNodeInternals,
+  ]);
   return (
     <article
       className={`graph-node graph-node--${node.kind}${selected ? ' is-selected' : ''}${data.issueSeverity !== undefined ? ` has-${data.issueSeverity}` : ''}`}

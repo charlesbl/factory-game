@@ -1,0 +1,2465 @@
+{
+  "schemaVersion": 1,
+  "palette": {
+    "cream": "#E8DEC7",
+    "teal": "#4C9690",
+    "graphite": "#3D4B50",
+    "copper": "#C77B4A",
+    "amber": "#D9B45F",
+    "ground": "#819778",
+    "rock": "#68746B",
+    "dark": "#25363C",
+    "iron": "#B8754B",
+    "oreCopper": "#7AB3A5"
+  },
+  "assets": [
+    {
+      "id": "factory",
+      "footprint": [
+        4,
+        4
+      ],
+      "budget": 3000,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.14,
+            0
+          ],
+          "size": [
+            3.84,
+            0.28,
+            3.84
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "cream",
+          "position": [
+            0,
+            1.1,
+            0
+          ],
+          "size": [
+            3.5,
+            1.7,
+            3.5
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "teal",
+          "position": [
+            0,
+            2.06,
+            0
+          ],
+          "size": [
+            3.72,
+            0.24,
+            3.72
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "cream",
+          "position": [
+            0,
+            2.33,
+            -0.18
+          ],
+          "size": [
+            2.7,
+            0.3,
+            2.6
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "dark",
+          "position": [
+            0,
+            1,
+            1.79
+          ],
+          "size": [
+            1.2,
+            1.5,
+            0.06
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "amber",
+          "position": [
+            0.72,
+            1.68,
+            1.81
+          ],
+          "size": [
+            0.18,
+            0.2,
+            0.08
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "teal",
+          "position": [
+            -1.28,
+            1.25,
+            -1.79
+          ],
+          "size": [
+            0.58,
+            0.64,
+            0.07
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            -1.28,
+            1.25,
+            -1.84
+          ],
+          "size": [
+            0.04,
+            0.66,
+            0.07
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "teal",
+          "position": [
+            -0.45,
+            1.25,
+            -1.79
+          ],
+          "size": [
+            0.58,
+            0.64,
+            0.07
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            -0.45,
+            1.25,
+            -1.84
+          ],
+          "size": [
+            0.04,
+            0.66,
+            0.07
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "teal",
+          "position": [
+            0.45,
+            1.25,
+            -1.79
+          ],
+          "size": [
+            0.58,
+            0.64,
+            0.07
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            0.45,
+            1.25,
+            -1.84
+          ],
+          "size": [
+            0.04,
+            0.66,
+            0.07
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "teal",
+          "position": [
+            1.28,
+            1.25,
+            -1.79
+          ],
+          "size": [
+            0.58,
+            0.64,
+            0.07
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            1.28,
+            1.25,
+            -1.84
+          ],
+          "size": [
+            0.04,
+            0.66,
+            0.07
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            -1.25,
+            0.9,
+            1.78
+          ],
+          "size": [
+            0.15,
+            1.3,
+            0.1
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            1.25,
+            0.9,
+            1.78
+          ],
+          "size": [
+            0.15,
+            1.3,
+            0.1
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            2.57,
+            -0.3
+          ],
+          "size": [
+            1.28,
+            0.2,
+            1.28
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "teal",
+          "position": [
+            0,
+            2.72,
+            -0.3
+          ],
+          "size": [
+            1.1,
+            0.12,
+            1.1
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "cylinder"
+        },
+        {
+          "material": "cream",
+          "position": [
+            0,
+            2.82,
+            -0.3
+          ],
+          "size": [
+            1,
+            0.06,
+            0.17
+          ],
+          "lastLod": 0,
+          "node": "fan",
+          "shape": "box"
+        },
+        {
+          "material": "cream",
+          "position": [
+            0,
+            2.82,
+            -0.3
+          ],
+          "size": [
+            0.17,
+            0.06,
+            1
+          ],
+          "lastLod": 0,
+          "node": "fan",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            2.86,
+            -0.3
+          ],
+          "size": [
+            0.24,
+            0.12,
+            0.24
+          ],
+          "lastLod": 0,
+          "node": "fan",
+          "shape": "cylinder"
+        }
+      ],
+      "pivots": {
+        "fan": [
+          0,
+          2.82,
+          -0.3
+        ]
+      },
+      "sockets": {
+        "socket_loading": [
+          0,
+          0.15,
+          1.9
+        ],
+        "anchor_status": [
+          0,
+          2.95,
+          0
+        ]
+      }
+    },
+    {
+      "id": "factory-wall-bay",
+      "footprint": [
+        1,
+        0.18
+      ],
+      "budget": 150,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "cream",
+          "position": [
+            0,
+            0.65,
+            0
+          ],
+          "size": [
+            0.98,
+            1.3,
+            0.14
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.12,
+            0
+          ],
+          "size": [
+            0.98,
+            0.22,
+            0.16
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "teal",
+          "position": [
+            0,
+            0.75,
+            0.075
+          ],
+          "size": [
+            0.5,
+            0.35,
+            0.03
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        }
+      ]
+    },
+    {
+      "id": "factory-corner",
+      "footprint": [
+        0.22,
+        0.22
+      ],
+      "budget": 150,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.7,
+            0
+          ],
+          "size": [
+            0.2,
+            1.4,
+            0.2
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "teal",
+          "position": [
+            0,
+            1.37,
+            0
+          ],
+          "size": [
+            0.21,
+            0.05,
+            0.21
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        }
+      ]
+    },
+    {
+      "id": "factory-roof-bay",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 150,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "teal",
+          "position": [
+            0,
+            0.08,
+            0
+          ],
+          "size": [
+            0.98,
+            0.16,
+            0.98
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.19,
+            0
+          ],
+          "size": [
+            0.6,
+            0.06,
+            0.6
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        }
+      ]
+    },
+    {
+      "id": "mine",
+      "footprint": [
+        4,
+        4
+      ],
+      "budget": 2000,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.14,
+            0
+          ],
+          "size": [
+            3.84,
+            0.28,
+            3.84
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "cream",
+          "position": [
+            0.4,
+            0.85,
+            0.2
+          ],
+          "size": [
+            2.8,
+            1.4,
+            2.8
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "copper",
+          "position": [
+            0.4,
+            1.68,
+            0.2
+          ],
+          "size": [
+            2.95,
+            0.25,
+            2.92
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            -0.75,
+            2,
+            -0.65
+          ],
+          "size": [
+            1,
+            2.8,
+            0.9
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "copper",
+          "position": [
+            -0.75,
+            3.23,
+            -0.65
+          ],
+          "size": [
+            1.3,
+            0.25,
+            1.3
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "copper",
+          "position": [
+            -0.75,
+            2.65,
+            -0.65
+          ],
+          "size": [
+            0.75,
+            0.7,
+            0.75
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "dark",
+          "position": [
+            0.45,
+            0.85,
+            1.65
+          ],
+          "size": [
+            1,
+            1.1,
+            0.08
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "amber",
+          "position": [
+            1.2,
+            1.95,
+            0.7
+          ],
+          "size": [
+            0.7,
+            0.38,
+            0.65
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            -0.9,
+            1.9,
+            0.3
+          ],
+          "size": [
+            0.18,
+            1.9,
+            0.18
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "copper",
+          "position": [
+            -0.7,
+            2,
+            0.3
+          ],
+          "size": [
+            0.16,
+            1.7,
+            0.16
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        }
+      ],
+      "sockets": {
+        "socket_loading": [
+          0.45,
+          0.1,
+          1.85
+        ]
+      }
+    },
+    {
+      "id": "drill",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 800,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.12,
+            0
+          ],
+          "size": [
+            0.9,
+            0.24,
+            0.9
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "copper",
+          "position": [
+            -0.34,
+            0.91,
+            0
+          ],
+          "size": [
+            0.12,
+            1.6,
+            0.15
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "copper",
+          "position": [
+            0.34,
+            0.91,
+            0
+          ],
+          "size": [
+            0.12,
+            1.6,
+            0.15
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "amber",
+          "position": [
+            0,
+            1.76,
+            0
+          ],
+          "size": [
+            0.84,
+            0.19,
+            0.42
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "copper",
+          "position": [
+            0,
+            1.12,
+            0
+          ],
+          "size": [
+            0.4,
+            0.45,
+            0.42
+          ],
+          "lastLod": 1,
+          "node": "drill_head",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.64,
+            0
+          ],
+          "size": [
+            0.13,
+            0.8,
+            0.13
+          ],
+          "lastLod": 1,
+          "node": "drill_head",
+          "shape": "cylinder"
+        },
+        {
+          "material": "dark",
+          "position": [
+            0,
+            0.3,
+            0.24
+          ],
+          "size": [
+            0.42,
+            0.12,
+            0.2
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        }
+      ],
+      "pivots": {
+        "drill_head": [
+          0,
+          1.12,
+          0
+        ]
+      }
+    },
+    {
+      "id": "storage",
+      "footprint": [
+        4,
+        4
+      ],
+      "budget": 1800,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.14,
+            0
+          ],
+          "size": [
+            3.84,
+            0.28,
+            3.84
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "cream",
+          "position": [
+            -0.65,
+            1.1,
+            -0.3
+          ],
+          "size": [
+            2.2,
+            1.8,
+            2.8
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            -0.65,
+            2.08,
+            -0.3
+          ],
+          "size": [
+            2.4,
+            0.18,
+            3
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "teal",
+          "position": [
+            -0.65,
+            1,
+            1.14
+          ],
+          "size": [
+            1.4,
+            1.4,
+            0.06
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "copper",
+          "position": [
+            1.05,
+            0.5,
+            -1.1
+          ],
+          "size": [
+            0.62,
+            0.68,
+            0.62
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "copper",
+          "position": [
+            1.05,
+            1.25,
+            -1.1
+          ],
+          "size": [
+            0.62,
+            0.68,
+            0.62
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "copper",
+          "position": [
+            1.05,
+            0.5,
+            -0.32
+          ],
+          "size": [
+            0.62,
+            0.68,
+            0.62
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "copper",
+          "position": [
+            1.05,
+            1.25,
+            -0.32
+          ],
+          "size": [
+            0.62,
+            0.68,
+            0.62
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "copper",
+          "position": [
+            1.05,
+            0.5,
+            0.46
+          ],
+          "size": [
+            0.62,
+            0.68,
+            0.62
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "copper",
+          "position": [
+            1.05,
+            1.25,
+            0.46
+          ],
+          "size": [
+            0.62,
+            0.68,
+            0.62
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        }
+      ],
+      "sockets": {
+        "socket_loading": [
+          -0.65,
+          0.1,
+          1.8
+        ]
+      }
+    },
+    {
+      "id": "station",
+      "footprint": [
+        2,
+        2
+      ],
+      "budget": 1200,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.15,
+            0
+          ],
+          "size": [
+            1.92,
+            0.3,
+            1.92
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "cream",
+          "position": [
+            0.38,
+            0.41,
+            0
+          ],
+          "size": [
+            0.74,
+            0.22,
+            1.8
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "teal",
+          "position": [
+            0.77,
+            1.05,
+            -0.73
+          ],
+          "size": [
+            0.14,
+            1.4,
+            0.14
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "teal",
+          "position": [
+            0.77,
+            1.05,
+            0.73
+          ],
+          "size": [
+            0.14,
+            1.4,
+            0.14
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "teal",
+          "position": [
+            0,
+            1.78,
+            0
+          ],
+          "size": [
+            1.92,
+            0.2,
+            1.9
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "amber",
+          "position": [
+            -0.65,
+            0.36,
+            -0.5
+          ],
+          "size": [
+            0.45,
+            0.08,
+            0.12
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "amber",
+          "position": [
+            -0.85,
+            0.38,
+            -0.5
+          ],
+          "size": [
+            0.1,
+            0.1,
+            0.3
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        }
+      ],
+      "sockets": {
+        "socket_loading": [
+          -0.5,
+          0.15,
+          -0.5
+        ]
+      }
+    },
+    {
+      "id": "depot",
+      "footprint": [
+        4,
+        4
+      ],
+      "budget": 2000,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.14,
+            0
+          ],
+          "size": [
+            3.84,
+            0.28,
+            3.84
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "cream",
+          "position": [
+            0,
+            1,
+            -0.3
+          ],
+          "size": [
+            3.5,
+            1.65,
+            2.8
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "amber",
+          "position": [
+            0,
+            1.99,
+            -0.3
+          ],
+          "size": [
+            3.7,
+            0.3,
+            3
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            2.21,
+            -0.4
+          ],
+          "size": [
+            1,
+            0.22,
+            1.5
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "dark",
+          "position": [
+            -1.12,
+            0.9,
+            1.12
+          ],
+          "size": [
+            0.84,
+            1.3,
+            0.06
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "dark",
+          "position": [
+            0,
+            0.9,
+            1.12
+          ],
+          "size": [
+            0.84,
+            1.3,
+            0.06
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "dark",
+          "position": [
+            1.12,
+            0.9,
+            1.12
+          ],
+          "size": [
+            0.84,
+            1.3,
+            0.06
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "amber",
+          "position": [
+            -1.67,
+            0.18,
+            1.56
+          ],
+          "size": [
+            0.12,
+            0.03,
+            0.5
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "amber",
+          "position": [
+            -0.56,
+            0.18,
+            1.56
+          ],
+          "size": [
+            0.12,
+            0.03,
+            0.5
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "amber",
+          "position": [
+            0.56,
+            0.18,
+            1.56
+          ],
+          "size": [
+            0.12,
+            0.03,
+            0.5
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "amber",
+          "position": [
+            1.67,
+            0.18,
+            1.56
+          ],
+          "size": [
+            0.12,
+            0.03,
+            0.5
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        }
+      ],
+      "sockets": {
+        "socket_loading": [
+          0,
+          0.1,
+          1.85
+        ]
+      }
+    },
+    {
+      "id": "pod",
+      "footprint": [
+        0.7,
+        0.95
+      ],
+      "budget": 500,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.18,
+            0
+          ],
+          "size": [
+            0.64,
+            0.28,
+            0.89
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "teal",
+          "position": [
+            0,
+            0.41,
+            -0.25
+          ],
+          "size": [
+            0.57,
+            0.21,
+            0.31
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "amber",
+          "position": [
+            0,
+            0.38,
+            0.37
+          ],
+          "size": [
+            0.45,
+            0.13,
+            0.1
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "cream",
+          "position": [
+            0,
+            0.47,
+            0.07
+          ],
+          "size": [
+            0.48,
+            0.34,
+            0.46
+          ],
+          "lastLod": 1,
+          "node": "cargo",
+          "shape": "box"
+        },
+        {
+          "material": "dark",
+          "position": [
+            -0.28,
+            0.12,
+            0
+          ],
+          "size": [
+            0.08,
+            0.16,
+            0.65
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "dark",
+          "position": [
+            0.28,
+            0.12,
+            0
+          ],
+          "size": [
+            0.08,
+            0.16,
+            0.65
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        }
+      ],
+      "pivots": {
+        "cargo": [
+          0,
+          0.47,
+          0.07
+        ]
+      }
+    },
+    {
+      "id": "rail-straight",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 160,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "graphite",
+          "position": [
+            -0.22,
+            0.09,
+            0
+          ],
+          "size": [
+            0.085,
+            0.12,
+            1
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "graphite",
+          "position": [
+            0.22,
+            0.09,
+            0
+          ],
+          "size": [
+            0.085,
+            0.12,
+            1
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "cream",
+          "position": [
+            0,
+            0.04,
+            -0.32
+          ],
+          "size": [
+            0.66,
+            0.06,
+            0.12
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "cream",
+          "position": [
+            0,
+            0.04,
+            0.32
+          ],
+          "size": [
+            0.66,
+            0.06,
+            0.12
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        }
+      ]
+    },
+    {
+      "id": "rail-corner",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 160,
+      "policy": "fixed",
+      "parts": [
+        {
+          "position": [
+            -0.22,
+            0.09,
+            -0.14
+          ],
+          "size": [
+            0.085,
+            0.12,
+            0.72
+          ],
+          "material": "graphite",
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "position": [
+            0.14,
+            0.09,
+            0.22
+          ],
+          "size": [
+            0.72,
+            0.12,
+            0.085
+          ],
+          "material": "graphite",
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "position": [
+            0.22,
+            0.09,
+            -0.36
+          ],
+          "size": [
+            0.085,
+            0.12,
+            0.28
+          ],
+          "material": "graphite",
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "position": [
+            0.36,
+            0.09,
+            -0.22
+          ],
+          "size": [
+            0.28,
+            0.12,
+            0.085
+          ],
+          "material": "graphite",
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "position": [
+            0,
+            0.025,
+            0
+          ],
+          "size": [
+            0.7,
+            0.05,
+            0.7
+          ],
+          "material": "cream",
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        }
+      ]
+    },
+    {
+      "id": "rail-endpoint",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 160,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.12,
+            0
+          ],
+          "size": [
+            0.66,
+            0.24,
+            0.16
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "amber",
+          "position": [
+            0,
+            0.25,
+            0
+          ],
+          "size": [
+            0.64,
+            0.08,
+            0.14
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        }
+      ]
+    },
+    {
+      "id": "rail-junction",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 160,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.09,
+            0
+          ],
+          "size": [
+            0.8,
+            0.18,
+            0.8
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "cylinder"
+        },
+        {
+          "material": "amber",
+          "position": [
+            0,
+            0.19,
+            0
+          ],
+          "size": [
+            0.55,
+            0.035,
+            0.14
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "amber",
+          "position": [
+            0,
+            0.19,
+            0
+          ],
+          "size": [
+            0.14,
+            0.035,
+            0.55
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        }
+      ]
+    },
+    {
+      "id": "rail-arrow",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 160,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "amber",
+          "position": [
+            0,
+            0.018,
+            -0.1
+          ],
+          "size": [
+            0.07,
+            0.035,
+            0.48
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "amber",
+          "position": [
+            -0.1,
+            0.018,
+            0.13
+          ],
+          "size": [
+            0.065,
+            0.035,
+            0.3
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box",
+          "rotation": -0.7,
+          "bevel": 0
+        },
+        {
+          "material": "amber",
+          "position": [
+            0.1,
+            0.018,
+            0.13
+          ],
+          "size": [
+            0.065,
+            0.035,
+            0.3
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box",
+          "rotation": 0.7,
+          "bevel": 0
+        }
+      ]
+    },
+    {
+      "id": "construction",
+      "footprint": [
+        4,
+        4
+      ],
+      "budget": 800,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.08,
+            0
+          ],
+          "size": [
+            3.86,
+            0.16,
+            3.86
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "amber",
+          "position": [
+            -1.75,
+            0.78,
+            -1.75
+          ],
+          "size": [
+            0.12,
+            1.4,
+            0.12
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "amber",
+          "position": [
+            -1.75,
+            0.78,
+            1.75
+          ],
+          "size": [
+            0.12,
+            1.4,
+            0.12
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "amber",
+          "position": [
+            1.75,
+            0.78,
+            -1.75
+          ],
+          "size": [
+            0.12,
+            1.4,
+            0.12
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "amber",
+          "position": [
+            1.75,
+            0.78,
+            1.75
+          ],
+          "size": [
+            0.12,
+            1.4,
+            0.12
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "amber",
+          "position": [
+            0,
+            1.42,
+            -1.75
+          ],
+          "size": [
+            3.6,
+            0.12,
+            0.12
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "amber",
+          "position": [
+            0,
+            1.42,
+            1.75
+          ],
+          "size": [
+            3.6,
+            0.12,
+            0.12
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "copper",
+          "position": [
+            -0.9,
+            0.43,
+            -0.8
+          ],
+          "size": [
+            0.62,
+            0.65,
+            0.62
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "copper",
+          "position": [
+            -0.2,
+            0.35,
+            -0.8
+          ],
+          "size": [
+            0.62,
+            0.49,
+            0.62
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        }
+      ]
+    },
+    {
+      "id": "terrain-rock",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 250,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "rock",
+          "position": [
+            0,
+            0.38,
+            0
+          ],
+          "size": [
+            0.88,
+            0.76,
+            0.82
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "rock"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            0.25,
+            0.17,
+            0.18
+          ],
+          "size": [
+            0.38,
+            0.34,
+            0.4
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "rock"
+        }
+      ]
+    },
+    {
+      "id": "terrain-tree",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 250,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.31,
+            0
+          ],
+          "size": [
+            0.13,
+            0.62,
+            0.13
+          ],
+          "lastLod": 1,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "ground",
+          "position": [
+            0,
+            0.78,
+            0
+          ],
+          "size": [
+            0.76,
+            0.9,
+            0.76
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "rock"
+        },
+        {
+          "material": "ground",
+          "position": [
+            0,
+            1.24,
+            0
+          ],
+          "size": [
+            0.44,
+            0.55,
+            0.44
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "rock"
+        }
+      ]
+    },
+    {
+      "id": "terrain-surface",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 40,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "ground",
+          "position": [
+            0,
+            -0.09,
+            0
+          ],
+          "size": [
+            1,
+            0.18,
+            1
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        }
+      ]
+    },
+    {
+      "id": "ore-iron",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 200,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "rock",
+          "position": [
+            0,
+            0.07,
+            0
+          ],
+          "size": [
+            0.89,
+            0.14,
+            0.88
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "rock"
+        },
+        {
+          "material": "iron",
+          "position": [
+            -0.13,
+            0.235,
+            -0.1
+          ],
+          "size": [
+            0.43,
+            0.47,
+            0.43
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "rock"
+        },
+        {
+          "material": "iron",
+          "position": [
+            0.23,
+            0.17,
+            0.1
+          ],
+          "size": [
+            0.3,
+            0.34,
+            0.3
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "rock"
+        },
+        {
+          "material": "iron",
+          "position": [
+            -0.2,
+            0.13,
+            0.26
+          ],
+          "size": [
+            0.27,
+            0.26,
+            0.27
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "rock"
+        }
+      ]
+    },
+    {
+      "id": "ore-copper",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 200,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "rock",
+          "position": [
+            0,
+            0.07,
+            0
+          ],
+          "size": [
+            0.89,
+            0.14,
+            0.88
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "rock"
+        },
+        {
+          "material": "oreCopper",
+          "position": [
+            -0.13,
+            0.235,
+            -0.1
+          ],
+          "size": [
+            0.43,
+            0.47,
+            0.43
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "rock"
+        },
+        {
+          "material": "oreCopper",
+          "position": [
+            0.23,
+            0.17,
+            0.1
+          ],
+          "size": [
+            0.3,
+            0.34,
+            0.3
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "rock"
+        },
+        {
+          "material": "oreCopper",
+          "position": [
+            -0.2,
+            0.13,
+            0.26
+          ],
+          "size": [
+            0.27,
+            0.26,
+            0.27
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "rock"
+        }
+      ]
+    },
+    {
+      "id": "hookup-crane",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 1200,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.05,
+            -0.38
+          ],
+          "size": [
+            0.44,
+            0.1,
+            0.24
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.64,
+            -0.38
+          ],
+          "size": [
+            0.16,
+            1.28,
+            0.16
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            1.3,
+            -0.02
+          ],
+          "size": [
+            0.13,
+            0.1,
+            0.76
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box"
+        },
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            1.2,
+            0
+          ],
+          "size": [
+            0.2,
+            0.1,
+            0.16
+          ],
+          "lastLod": 1,
+          "node": "trolley",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.99,
+            0
+          ],
+          "size": [
+            0.05,
+            0.32,
+            0.05
+          ],
+          "lastLod": 1,
+          "node": "trolley",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "amber",
+          "position": [
+            0,
+            0.805,
+            0
+          ],
+          "size": [
+            0.12,
+            0.05,
+            0.08
+          ],
+          "lastLod": 1,
+          "node": "trolley",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "amber",
+          "position": [
+            0.068,
+            1.3,
+            -0.02
+          ],
+          "size": [
+            0.012,
+            0.06,
+            0.68
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "amber",
+          "position": [
+            -0.068,
+            1.3,
+            -0.02
+          ],
+          "size": [
+            0.012,
+            0.06,
+            0.68
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "amber",
+          "position": [
+            0,
+            0.105,
+            -0.38
+          ],
+          "size": [
+            0.46,
+            0.01,
+            0.22
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        }
+      ],
+      "pivots": {
+        "trolley": [
+          0,
+          1.25,
+          0
+        ]
+      },
+      "sockets": {
+        "socket_hook": [
+          0,
+          0.78,
+          0
+        ]
+      }
+    },
+    {
+      "id": "hookup-marker",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 160,
+      "policy": "fixed",
+      "parts": [
+        {
+          "material": "graphite",
+          "position": [
+            0,
+            0.025,
+            0
+          ],
+          "size": [
+            0.9,
+            0.05,
+            0.9
+          ],
+          "lastLod": 2,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        },
+        {
+          "material": "amber",
+          "position": [
+            0,
+            0.054,
+            0.3
+          ],
+          "size": [
+            0.7,
+            0.008,
+            0.12
+          ],
+          "lastLod": 0,
+          "node": "body",
+          "shape": "box",
+          "bevel": 0
+        }
+      ],
+      "sockets": {
+        "socket_stop": [
+          0,
+          0.03,
+          0
+        ]
+      }
+    }
+  ]
+}

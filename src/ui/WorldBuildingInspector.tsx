@@ -1,4 +1,4 @@
-import { resourceById, worldContent } from '../domain';
+import { asId, formatRate, resourceById, worldContent } from '../domain';
 import type { ResourceId } from '../domain';
 import type {
   WorldBuildingSnapshot,
@@ -7,6 +7,8 @@ import type {
   WorldSnapshot,
   WorldStationSnapshot,
 } from '../world';
+import { hookupCell } from '../world';
+import { railNodeConnectionState, railNodeDegrees } from './worldRailVisual';
 
 interface Props {
   readonly entity: WorldEntity;
@@ -91,6 +93,35 @@ const FactoryState = ({
       <b className={`badge ${stateClass(state.state)}`}>
         {stateLabel(state.state)}
       </b>
+    </div>
+    <div className="world-buffer-group">
+      <h4>Placed factory design rates</h4>
+      {[...state.contract.inputRates, ...state.contract.outputRates].length ===
+      0 ? (
+        <p className="world-empty-state">No external contract rates</p>
+      ) : (
+        <ul className="world-design-rates">
+          {[
+            ...[...state.contract.inputRates].map(([id, rate]) => ({
+              id,
+              rate,
+              role: 'Input',
+            })),
+            ...[...state.contract.outputRates].map(([id, rate]) => ({
+              id,
+              rate,
+              role: 'Output',
+            })),
+          ].map(({ id, rate, role }) => (
+            <li key={`${role}-${id}`}>
+              <span>
+                {role} · {resourceById.get(asId<ResourceId>(id))?.name ?? id}
+              </span>
+              <b>{formatRate(BigInt(rate))}/s</b>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
     {state.nextEventAt !== undefined && (
       <p className="world-runtime-note">
@@ -203,7 +234,7 @@ const Logistics = ({
             <>
               <small>
                 Buffer {station.quantity} / {station.capacity} · target{' '}
-                {station.target}
+                {station.target} · priority {station.priority}
               </small>
               <Meter value={percent(station.quantity, station.capacity)} />
             </>
@@ -237,8 +268,15 @@ export const WorldBuildingInspector = ({
   const entityState = 'state' in entity ? entity.state : undefined;
   return (
     <>
+      <details className="world-developer-details">
+        <summary>Developer details</summary>
+        <code>{entity.id}</code>
+        {entity.kind === 'factory' && (
+          <span>Factory definition: {entity.factoryId}</span>
+        )}
+      </details>
       <div className="world-building-identity">
-        <p title={entity.id}>{entity.id}</p>
+        <p>{entity.kind.replaceAll('-', ' ')}</p>
         {entityState !== undefined && (
           <span className={`badge ${stateClass(entityState)}`}>
             {stateLabel(entityState)}
@@ -258,6 +296,27 @@ export const WorldBuildingInspector = ({
             {entity.transform.size.width} × {entity.transform.size.height}
           </dd>
         </div>
+        {(entity.kind === 'station' || entity.kind === 'depot') && (
+          <div>
+            <dt>Rail hookup</dt>
+            <dd>
+              {(() => {
+                const node = snapshot.railNodes.find(
+                  (candidate) => candidate.id === entity.railNodeId,
+                );
+                const cell = node?.position ?? hookupCell(entity.transform);
+                const connection =
+                  node === undefined
+                    ? 'disconnected'
+                    : railNodeConnectionState(
+                        node,
+                        railNodeDegrees(snapshot.railEdges),
+                      );
+                return `${cell.x}, ${cell.y} · ${connection === 'connected' ? 'connected' : 'not connected'}`;
+              })()}
+            </dd>
+          </div>
+        )}
       </dl>
       {state?.kind === 'factory' && <FactoryState state={state} />}
       {state?.kind === 'storage' && (
@@ -364,13 +423,69 @@ export const WorldBuildingInspector = ({
       {entity.kind === 'drill' && (
         <dl className="world-building-counts">
           <div>
+            <dt>State</dt>
+            <dd>{stateLabel(entity.state)}</dd>
+          </div>
+          <div>
             <dt>Resource</dt>
             <dd>{resourceName(entity.resourceId)}</dd>
           </div>
           <div>
             <dt>Mine</dt>
-            <dd>{entity.mineId}</dd>
+            <dd>
+              {(() => {
+                const mine = snapshot.entities.find(
+                  (candidate) => candidate.id === entity.mineId,
+                );
+                return mine?.kind === 'mine'
+                  ? `Mine at ${mine.transform.position.x}, ${mine.transform.position.y}`
+                  : 'Mine unavailable';
+              })()}
+            </dd>
           </div>
+          <div>
+            <dt>Ore remaining</dt>
+            <dd>
+              {snapshot.grid.oreRemaining[
+                entity.transform.position.y * snapshot.grid.width +
+                  entity.transform.position.x
+              ] ?? 0}
+            </dd>
+          </div>
+          <div>
+            <dt>Mine output</dt>
+            <dd>
+              {(() => {
+                const mineState =
+                  entity.kind === 'drill'
+                    ? snapshot.buildings.find(
+                        (item) =>
+                          item.kind === 'mine' &&
+                          item.entityId === entity.mineId,
+                      )
+                    : undefined;
+                return mineState?.kind === 'mine'
+                  ? `${mineState.output.quantity} / ${mineState.output.capacity}`
+                  : 'Mine unavailable';
+              })()}
+            </dd>
+          </div>
+          {(() => {
+            const mineState =
+              entity.kind === 'drill'
+                ? snapshot.buildings.find(
+                    (item) =>
+                      item.kind === 'mine' && item.entityId === entity.mineId,
+                  )
+                : undefined;
+            return mineState?.kind === 'mine' &&
+              mineState.output.quantity >= mineState.output.capacity ? (
+              <div>
+                <dt>Output blockage</dt>
+                <dd>Mine output full</dd>
+              </div>
+            ) : null;
+          })()}
         </dl>
       )}
       <Logistics stations={stations} />

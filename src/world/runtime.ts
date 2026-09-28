@@ -1,3 +1,4 @@
+import { PresentationRecorder } from './presentation';
 import { asId, gridPoint, gridSize, worldContent } from '../domain';
 import type {
   ConstructionSiteId,
@@ -33,10 +34,13 @@ import { generateWorld } from './generation';
 import {
   MAX_OCCUPANCY_SLOT,
   OreKind,
+  TerrainKind,
   gridIndex,
   type ConstructionSiteWorldEntity,
+  type DepotWorldEntity,
   type FactoryWorldEntity,
   type GeneratedWorld,
+  type StationWorldEntity,
   type WorldBuildingSnapshot,
   type WorldDiagnostic,
   type WorldEntity,
@@ -48,7 +52,14 @@ import {
   type WorldTransform,
   type WorldValidationResult,
 } from './model';
-import { occupy, occupiedCells, release, validatePlacement } from './placement';
+import {
+  hookupCell,
+  occupy,
+  occupiedCells,
+  release,
+  validatePlacement,
+  validateRailPath,
+} from './placement';
 import { WorldEventQueue, type SerializedWorldEventQueue } from './scheduler';
 import { MineRuntime, SharedInventory, SharedInventoryBuffer } from './systems';
 
@@ -151,6 +162,10 @@ export class WorldRuntime {
   readonly #slots = new Map<WorldEntityId, number>();
   readonly #scheduledMines = new Set<WorldEntityId>();
   readonly #scheduledFactories = new Set<WorldEntityId>();
+  readonly #drillExtractionEvents = new Set<WorldEntityId>();
+  readonly presentation = new PresentationRecorder();
+  readonly #oreChanges = new Map<number, number>();
+  readonly #occupancyChanges = new Map<number, number>();
   constructor(readonly world: GeneratedWorld) {
     this.traffic = new PodTrafficSystem(this.rails);
   }
@@ -186,18 +201,12 @@ export class WorldRuntime {
     };
     this.addRailNode({
       id: stationNode,
-      position: gridPoint(
-        stationTransform.position.x,
-        stationTransform.position.y,
-      ),
+      position: hookupCell(stationTransform),
       kind: 'station',
     });
     this.addRailNode({
       id: depotNode,
-      position: gridPoint(
-        depotTransform.position.x + 1,
-        depotTransform.position.y + 1,
-      ),
+      position: hookupCell(depotTransform),
       kind: 'depot',
     });
     const hubItems = [
@@ -272,6 +281,10 @@ export class WorldRuntime {
       throw new RangeError('World entity occupancy slots are exhausted');
     const slot = this.#nextSlot++;
     occupy(this.world.grid, entity.transform, slot);
+    for (const point of occupiedCells(entity.transform)) {
+      const index = gridIndex(this.world.grid, point);
+      this.#occupancyChanges.set(index, slot);
+    }
     this.#slots.set(entity.id, slot);
     this.entities.set(entity.id, entity);
     this.changed();
@@ -283,8 +296,14 @@ export class WorldRuntime {
     if (slot === undefined)
       throw new Error('World entity is missing its occupancy slot');
     release(this.world.grid, entity.transform, slot);
+    for (const point of occupiedCells(entity.transform)) {
+      const index = gridIndex(this.world.grid, point);
+      this.#occupancyChanges.set(index, 0);
+    }
     this.#slots.delete(entityId);
     this.entities.delete(entityId);
+    if (entity.kind === 'station' || entity.kind === 'depot')
+      this.releaseRailNode(entity);
     this.changed();
     return entity;
   }
@@ -419,53 +438,156 @@ export class WorldRuntime {
     this.railEdges.set(edge.id, edge);
     this.changed();
   }
-  placeRailPath(points: readonly GridPoint[]): readonly RailEdgeId[] {
-    if (points.length !== 2)
-      throw new Error('Rail path needs exactly two points');
-    const edgeIds: RailEdgeId[] = [];
-    const start = points[0]!;
-    const end = points[1]!;
-    if (start.x !== end.x && start.y !== end.y)
-      throw new Error('Rail segments must be cardinal');
-    const dx = Math.sign(end.x - start.x);
-    const dy = Math.sign(end.y - start.y);
-    const length = Math.abs(end.x - start.x) + Math.abs(end.y - start.y);
-    if (length === 0) return edgeIds;
-    for (let index = 0; index < length; index += 1) {
-      const fromPoint = gridPoint(start.x + dx * index, start.y + dy * index);
-      const toPoint = gridPoint(fromPoint.x + dx, fromPoint.y + dy);
-      const from =
-        this.nodeAt(fromPoint) ?? this.createRailNode(fromPoint, 'endpoint');
-      const to =
-        this.nodeAt(toPoint) ?? this.createRailNode(toPoint, 'endpoint');
-      const existing = [...this.railEdges.values()].find(
-        (edge) => edge.from === from.id && edge.to === to.id,
-      );
-      if (existing !== undefined) {
-        edgeIds.push(existing.id);
-        continue;
+  private pointOnRailSegment(
+    point: GridPoint,
+    a: GridPoint,
+    b: GridPoint,
+  ): boolean {
+    return (
+      (a.x === b.x &&
+        point.x === a.x &&
+        point.y >= Math.min(a.y, b.y) &&
+        point.y <= Math.max(a.y, b.y)) ||
+      (a.y === b.y &&
+        point.y === a.y &&
+        point.x >= Math.min(a.x, b.x) &&
+        point.x <= Math.max(a.x, b.x))
+    );
+  }
+  private railContainsInterior(edge: WorldRailEdge, point: GridPoint): boolean {
+    const same = (other: GridPoint) =>
+      other.x === point.x && other.y === point.y;
+    return (
+      !same(edge.points[0]!) &&
+      !same(edge.points.at(-1)!) &&
+      edge.points
+        .slice(1)
+        .some((end, i) => this.pointOnRailSegment(point, edge.points[i]!, end))
+    );
+  }
+  private railEdgeInUse(edgeId: RailEdgeId): boolean {
+    const block = this.rails.blocks.get('block:' + edgeId);
+    return (
+      block?.occupantId !== undefined ||
+      block?.reservedById !== undefined ||
+      [...this.traffic.pods.values()].some((pod) =>
+        pod.route?.edgeIds.includes(edgeId),
+      ) ||
+      [...this.traffic.missions.values()].some(
+        (mission) =>
+          mission.status !== 'DELIVERED' &&
+          (mission.approachRoute.edgeIds.includes(edgeId) ||
+            mission.deliveryRoute.edgeIds.includes(edgeId)),
+      )
+    );
+  }
+  private assertRailConnectionsAvailable(points: readonly GridPoint[]): void {
+    for (const edge of this.railEdges.values())
+      if (
+        points.some((point) => this.railContainsInterior(edge, point)) &&
+        this.railEdgeInUse(edge.id)
+      )
+        throw new Error(
+          'Cannot join this rail while a pod uses or has reserved its route. Connect at an existing endpoint or wait until the route is free.',
+        );
+  }
+  private addDirectedRail(from: WorldRailNode, to: WorldRailNode): RailEdgeId {
+    const duplicate = [...this.railEdges.values()].find(
+      (edge) =>
+        edge.from === from.id && edge.to === to.id && edge.points.length === 2,
+    );
+    if (duplicate) return duplicate.id;
+    const id = asId<RailEdgeId>('rail-' + ++this.#railSequence);
+    this.addRailEdge({
+      id,
+      from: from.id,
+      to: to.id,
+      points: [from.position, to.position],
+      length:
+        Math.abs(from.position.x - to.position.x) +
+        Math.abs(from.position.y - to.position.y),
+    });
+    return id;
+  }
+  private connectRailsAt(position: GridPoint): WorldRailNode {
+    const node =
+      this.nodeAt(position) ?? this.createRailNode(position, 'endpoint');
+    for (const edge of [...this.railEdges.values()]) {
+      if (!this.railContainsInterior(edge, position)) continue;
+      const points: GridPoint[] = [edge.points[0]!];
+      for (let i = 1; i < edge.points.length; i++) {
+        const previous = edge.points[i - 1]!,
+          next = edge.points[i]!;
+        if (
+          this.pointOnRailSegment(position, previous, next) &&
+          !(position.x === previous.x && position.y === previous.y) &&
+          !(position.x === next.x && position.y === next.y)
+        )
+          points.push(position);
+        points.push(next);
       }
-      const id = asId<RailEdgeId>(`rail-${++this.#railSequence}`);
-      this.addRailEdge({
-        id,
-        from: from.id,
-        to: to.id,
-        points: [fromPoint, toPoint],
-        length: 1,
-      });
-      edgeIds.push(id);
+      this.rails.removeEdge(edge.id);
+      this.railEdges.delete(edge.id);
+      for (let i = 1; i < points.length; i++) {
+        const from =
+          this.nodeAt(points[i - 1]!) ??
+          this.createRailNode(points[i - 1]!, 'endpoint');
+        const to =
+          this.nodeAt(points[i]!) ??
+          this.createRailNode(points[i]!, 'endpoint');
+        if (from.id !== to.id) this.addDirectedRail(from, to);
+      }
+    }
+    return node;
+  }
+  placeRailPath(points: readonly GridPoint[]): readonly RailEdgeId[] {
+    const clearance = validateRailPath(this.world.grid, points);
+    if (!clearance.valid) throw new Error(clearance.reason);
+    const path = points.filter(
+      (point, i) =>
+        i === 0 || point.x !== points[i - 1]!.x || point.y !== points[i - 1]!.y,
+    );
+    if (path.length < 2)
+      throw new Error('Rail path needs at least two distinct points');
+    const connections = [
+      ...path,
+      ...[...this.railNodes.values()]
+        .filter((node) =>
+          path
+            .slice(1)
+            .some((end, i) =>
+              this.pointOnRailSegment(node.position, path[i]!, end),
+            ),
+        )
+        .map((node) => node.position),
+    ];
+    this.assertRailConnectionsAvailable(connections);
+    for (const point of connections) this.connectRailsAt(point);
+    const placed = new Set<RailEdgeId>();
+    for (let i = 1; i < path.length; i++) {
+      const a = path[i - 1]!,
+        b = path[i]!;
+      const dx = Math.sign(b.x - a.x),
+        dy = Math.sign(b.y - a.y);
+      const length = Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
+      const nodes: WorldRailNode[] = [];
+      for (let step = 0; step <= length; step++) {
+        const point = gridPoint(a.x + dx * step, a.y + dy * step);
+        nodes.push(
+          this.nodeAt(point) ?? this.createRailNode(point, 'endpoint'),
+        );
+      }
+      for (let j = 1; j < nodes.length; j++)
+        placed.add(this.addDirectedRail(nodes[j - 1]!, nodes[j]!));
     }
     this.refreshAutomaticJunctions();
-    return edgeIds;
+    return [...placed];
   }
+
   removeRailEdge(edgeId: RailEdgeId): void {
     const edge = this.railEdges.get(edgeId);
     if (edge === undefined) throw new Error('Unknown world rail edge');
-    if (
-      [...this.traffic.pods.values()].some((pod) =>
-        pod.route?.edgeIds.includes(edgeId),
-      )
-    )
+    if (this.railEdgeInUse(edgeId))
       throw new Error('Rail edge is part of an active pod route');
     this.rails.removeEdge(edgeId);
     this.railEdges.delete(edgeId);
@@ -498,16 +620,49 @@ export class WorldRuntime {
     kind: 'junction' | 'station',
     position: GridPoint,
   ): WorldRailNode {
-    const existing = this.nodeAt(position);
-    if (existing !== undefined) {
-      if (existing.kind !== 'endpoint' && existing.kind !== kind)
-        throw new Error('Rail control point is occupied');
-      const upgraded = { ...existing, kind };
-      this.railNodes.set(existing.id, upgraded);
-      this.changed();
-      return upgraded;
+    // A station's rail control point is its hookup cell outside the building;
+    // the building itself stays anchored at the command position.
+    const transform: WorldTransform | undefined =
+      kind === 'station'
+        ? { position, size: worldContent.stationFootprint, rotation: 0 }
+        : undefined;
+    const target = transform === undefined ? position : hookupCell(transform);
+    if (transform !== undefined) {
+      const hookup = this.validateHookup(transform);
+      if (!hookup.valid)
+        throw new Error(`Invalid station hookup: ${hookup.reason}`);
     }
-    return this.createRailNode(position, kind);
+    const existing = this.nodeAt(target);
+    if (existing && existing.kind !== 'endpoint' && existing.kind !== kind)
+      throw new Error('Rail control point is occupied');
+    this.assertRailConnectionsAvailable([target]);
+    this.connectRailsAt(target);
+    const connected = this.nodeAt(target)!;
+    const upgraded = { ...connected, kind };
+    this.railNodes.set(connected.id, upgraded);
+    this.changed();
+    return upgraded;
+  }
+
+  takeGridChanges(): {
+    readonly oreChanges: readonly {
+      readonly index: number;
+      readonly remaining: number;
+    }[];
+    readonly occupancyChanges: readonly {
+      readonly index: number;
+      readonly slot: number;
+    }[];
+  } {
+    const oreChanges = [...this.#oreChanges]
+      .sort(([a], [b]) => a - b)
+      .map(([index, remaining]) => ({ index, remaining }));
+    const occupancyChanges = [...this.#occupancyChanges]
+      .sort(([a], [b]) => a - b)
+      .map(([index, slot]) => ({ index, slot }));
+    this.#oreChanges.clear();
+    this.#occupancyChanges.clear();
+    return { oreChanges, occupancyChanges };
   }
   private createRailNode(
     position: GridPoint,
@@ -527,6 +682,59 @@ export class WorldRuntime {
         node.position.x === position.x && node.position.y === position.y,
     );
   }
+  /** Removing a building releases its hookup node: deleted when nothing
+   * references it, downgraded to a plain endpoint when rails or traffic still
+   * do, so rebuilding on the same cell reclaims the node in place. */
+  private releaseRailNode(entity: StationWorldEntity | DepotWorldEntity): void {
+    const own = entity.kind === 'depot' ? `depot:${entity.id}` : undefined;
+    const node = this.railNodes.get(entity.railNodeId);
+    if (node === undefined) {
+      if (own !== undefined) this.traffic.stations.delete(own);
+      return;
+    }
+    const owned = [...this.entities.values()].some(
+      (other) =>
+        (other.kind === 'station' || other.kind === 'depot') &&
+        other.railNodeId === node.id,
+    );
+    if (owned) return;
+    const referenced =
+      [...this.railEdges.values()].some(
+        (edge) => edge.from === node.id || edge.to === node.id,
+      ) ||
+      [...this.traffic.stations].some(
+        ([id, station]) => id !== own && station.railNodeId === node.id,
+      );
+    if (own !== undefined) this.traffic.stations.delete(own);
+    if (referenced) this.railNodes.set(node.id, { ...node, kind: 'endpoint' });
+    else this.railNodes.delete(node.id);
+  }
+
+  /** A station/depot hookup cell must be on the map, passable, free of other
+   *  entities, and unclaimed by another station/depot rail node or by a pending
+   *  depot construction site. */
+  private validateHookup(transform: WorldTransform): WorldValidationResult {
+    const cell = hookupCell(transform);
+    const index = gridIndex(this.world.grid, cell);
+    if (index < 0) return { valid: false, reason: 'HOOKUP_BLOCKED' };
+    if (this.world.grid.terrain[index] === TerrainKind.OBSTACLE)
+      return { valid: false, reason: 'HOOKUP_BLOCKED' };
+    if (this.world.grid.occupancy[index] !== 0)
+      return { valid: false, reason: 'HOOKUP_BLOCKED' };
+    const node = this.nodeAt(cell);
+    if (node !== undefined && node.kind !== 'endpoint')
+      return { valid: false, reason: 'HOOKUP_BLOCKED' };
+    for (const [id, target] of this.constructionTargets) {
+      if (target.targetKind !== 'depot') continue;
+      const site = this.entities.get(id);
+      if (site?.kind !== 'construction-site' || site.state === 'EVACUATING')
+        continue;
+      const claimed = hookupCell(target.transform);
+      if (claimed.x === cell.x && claimed.y === cell.y)
+        return { valid: false, reason: 'HOOKUP_BLOCKED' };
+    }
+    return { valid: true };
+  }
 
   validateGhost(
     targetKind: ConstructionTargetRecord['targetKind'],
@@ -536,6 +744,10 @@ export class WorldRuntime {
   ): WorldValidationResult {
     const placement = validatePlacement(this.world.grid, transform);
     if (!placement.valid) return placement;
+    if (targetKind === 'depot') {
+      const hookup = this.validateHookup(transform);
+      if (!hookup.valid) return hookup;
+    }
     if (
       targetKind === 'mine' &&
       occupiedCells(transform).some(
@@ -577,6 +789,57 @@ export class WorldRuntime {
     }
     if (targetKind === 'mine' && resourceId === undefined)
       return { valid: false, reason: 'ORE_MISMATCH' };
+    return { valid: true };
+  }
+  validateInteraction(
+    kind: 'drill' | 'station' | 'junction',
+    position: GridPoint,
+    mineId?: WorldEntityId,
+  ): WorldValidationResult {
+    const index = gridIndex(this.world.grid, position);
+    if (index < 0) return { valid: false, reason: 'OUT_OF_BOUNDS' };
+    if (kind !== 'junction') {
+      const transform: WorldTransform = {
+        position,
+        size:
+          kind === 'station'
+            ? worldContent.stationFootprint
+            : worldContent.drill.footprint,
+        rotation: 0,
+      };
+      const placement = validatePlacement(this.world.grid, transform);
+      if (!placement.valid) return placement;
+      if (kind === 'station') {
+        const hookup = this.validateHookup(transform);
+        if (!hookup.valid) return hookup;
+      }
+    }
+    if (kind === 'drill') {
+      const mine = mineId ? this.mines.get(mineId) : undefined;
+      if (!mine) return { valid: false, reason: 'NOT_CONNECTED' };
+      if (
+        this.world.grid.oreKinds[index] !== mine.oreKind ||
+        this.world.grid.oreRemaining[index] === 0
+      )
+        return { valid: false, reason: 'ORE_MISMATCH' };
+      try {
+        mine.validateDrill(position);
+      } catch {
+        return { valid: false, reason: 'NOT_CONNECTED' };
+      }
+    } else {
+      const node = this.nodeAt(position);
+      if (node && node.kind !== 'endpoint' && node.kind !== kind)
+        return { valid: false, reason: 'OCCUPIED' };
+      if (
+        [...this.railEdges.values()].some(
+          (edge) =>
+            this.railContainsInterior(edge, position) &&
+            this.railEdgeInUse(edge.id),
+        )
+      )
+        return { valid: false, reason: 'RAIL_IN_USE' };
+    }
     return { valid: true };
   }
   createConstructionSite(
@@ -694,7 +957,13 @@ export class WorldRuntime {
       for (const item of instance.contract.billOfMaterials ?? [])
         add(item.resourceId, item.quantity);
       this.factoryInstances.delete(entityId);
-      this.factoryContracts.delete(instance.contract.blueprintHash);
+      if (
+        ![...this.factoryInstances.values()].some(
+          (other) =>
+            other.contract.blueprintHash === instance.contract.blueprintHash,
+        )
+      )
+        this.factoryContracts.delete(instance.contract.blueprintHash);
       this.eventQueue.cancel('FACTORY', entityId);
     } else if (entity.kind === 'storage') {
       const inventory = this.storageInventories.get(entityId);
@@ -719,9 +988,24 @@ export class WorldRuntime {
         (building) => building.kind === 'depot',
       )!.buildCost)
         add(item.resourceId, item.quantity);
-    for (const [id] of [...this.traffic.stations])
-      if (id.includes(`:${entityId}:`) || id.endsWith(`:${entityId}`))
-        this.traffic.stations.delete(id);
+    for (const [id, trafficStation] of [...this.traffic.stations]) {
+      if (!id.includes(':' + entityId + ':') && !id.endsWith(':' + entityId))
+        continue;
+      if (trafficStation.buffer && this.stationHasActiveMission(id)) {
+        // Existing contents were transferred to salvage above. Keep the original
+        // address and berth for already dispatched loads and incoming deliveries.
+        this.traffic.stations.set(id, {
+          ...trafficStation,
+          role: 'provider',
+          target: 0,
+          priority: 1000,
+          buffer: new WorldBuffer(
+            trafficStation.buffer.resourceId,
+            trafficStation.buffer.capacity,
+          ),
+        });
+      } else this.traffic.stations.delete(id);
+    }
     for (const [resourceId, quantity] of recovered) {
       const buffer = new WorldBuffer(resourceId, quantity, quantity);
       this.addTrafficStation({
@@ -782,7 +1066,16 @@ export class WorldRuntime {
       'siteId' | 'stationId' | 'targetKind'
     >,
   ): void {
+    if (this.entities.get(entityId)?.kind !== 'factory')
+      throw new Error('Replacement requires a factory');
     const stationId = this.dismantleEntity(entityId);
+    // Recovery remains at the external station; replacement needs the old
+    // footprint released before authoritative construction validation.
+    this.remove(entityId);
+    const station = this.stationEntity(stationId)!;
+    const { linkedEntityId, ...unlinked } = station;
+    void linkedEntityId;
+    this.entities.set(station.id, unlinked);
     this.createConstructionSite({
       ...target,
       targetKind: 'factory',
@@ -836,20 +1129,26 @@ export class WorldRuntime {
         createdAt: this.logicalTime,
       });
     } else if (target.targetKind === 'depot') {
-      const node =
-        this.stationEntity(target.stationId)?.railNodeId ??
-        this.createRailNode(target.transform.position, 'depot').id;
+      // A depot owns its rail node at its hookup cell outside its footprint;
+      // paid construction delivery still runs through its station.
+      const cell = hookupCell(target.transform);
+      const connected = this.nodeAt(cell) ?? this.createRailNode(cell, 'depot');
+      const own =
+        connected.kind === 'endpoint'
+          ? { ...connected, kind: 'depot' as const }
+          : connected;
+      this.railNodes.set(own.id, own);
       this.place({
         id: siteId,
         kind: 'depot',
-        railNodeId: node,
+        railNodeId: own.id,
         podCapacity: worldContent.depotCapacity,
         transform: target.transform,
         createdAt: this.logicalTime,
       });
       this.addTrafficStation({
         id: `depot:${siteId}`,
-        railNodeId: node,
+        railNodeId: own.id,
         role: 'depot',
         priority: 0,
         target: 0,
@@ -944,6 +1243,13 @@ export class WorldRuntime {
       this.entities.set(station.id, { ...station, linkedEntityId: siteId });
     this.changed();
   }
+  private stationHasActiveMission(stationId: string): boolean {
+    return [...this.traffic.missions.values()].some(
+      (mission) =>
+        mission.status !== 'DELIVERED' &&
+        (mission.requesterId === stationId || mission.providerId === stationId),
+    );
+  }
   private syncEvacuation(): void {
     for (const [id, target] of [...this.constructionTargets]) {
       const site = this.entities.get(id);
@@ -953,7 +1259,10 @@ export class WorldRuntime {
         target.cost.every(
           (item) =>
             (this.traffic.stations.get(this.siteStationId(id, item.resourceId))
-              ?.buffer?.quantity ?? 0) === 0,
+              ?.buffer?.quantity ?? 0) === 0 &&
+            !this.stationHasActiveMission(
+              this.siteStationId(id, item.resourceId),
+            ),
         )
       ) {
         for (const item of target.cost)
@@ -966,33 +1275,56 @@ export class WorldRuntime {
         }
         this.remove(id);
         this.constructionTargets.delete(id);
+      } else {
+        this.entities.set(id, {
+          ...site,
+          delivered: stacks(
+            target.cost.map((item) => ({
+              resourceId: item.resourceId,
+              quantity:
+                this.traffic.stations.get(
+                  this.siteStationId(id, item.resourceId),
+                )?.buffer?.quantity ?? 0,
+            })),
+          ),
+        });
       }
     }
   }
   private syncSalvage(): void {
-    for (const [entityId, entity] of [...this.entities]) {
-      if (entity.kind !== 'factory' || entity.state !== 'DISMANTLING') continue;
-      const salvageComplete = [...this.traffic.stations.values()]
-        .filter((s) => s.id.startsWith(`salvage:${entityId}:`))
-        .every((s) => (s.buffer?.quantity ?? 0) === 0);
-      if (!salvageComplete) continue;
-      for (const [id] of [...this.traffic.stations])
-        if (
-          id.startsWith(`salvage:${entityId}:`) ||
-          id.startsWith(`salvage-fallback:${entityId}:`)
-        )
-          this.traffic.stations.delete(id);
-      const station = [...this.entities.values()]
-        .filter(
-          (c): c is Extract<WorldEntity, { kind: 'station' }> =>
-            c.kind === 'station',
-        )
-        .find((s) => s.linkedEntityId === entityId);
-      this.remove(entityId);
-      if (station !== undefined) {
-        const { linkedEntityId, ...unlinked } = station;
-        void linkedEntityId;
-        this.entities.set(station.id, unlinked);
+    // Replacement and non-factory dismantling release the visual entity before
+    // recovery completes. The existing salvage station IDs retain ownership.
+    const owners = new Set<WorldEntityId>();
+    for (const [id, entity] of this.entities)
+      if (entity.kind === 'factory' && entity.state === 'DISMANTLING')
+        owners.add(id);
+    for (const id of this.traffic.stations.keys())
+      if (id.startsWith('salvage:'))
+        owners.add(asId<WorldEntityId>(id.slice(8, id.lastIndexOf(':'))));
+    for (const entityId of owners) {
+      const owned = [...this.traffic.stations.values()].filter(
+        (s) =>
+          s.id.includes(':' + entityId + ':') || s.id.endsWith(':' + entityId),
+      );
+      const complete = owned.every(
+        (s) =>
+          (s.id.startsWith('salvage-fallback:') ||
+            (s.buffer?.quantity ?? 0) === 0) &&
+          !this.stationHasActiveMission(s.id),
+      );
+      if (!complete) continue;
+      for (const station of owned) this.traffic.stations.delete(station.id);
+      const entity = this.entities.get(entityId);
+      if (entity?.kind === 'factory' && entity.state === 'DISMANTLING') {
+        const station = [...this.entities.values()].find(
+          (s) => s.kind === 'station' && s.linkedEntityId === entityId,
+        );
+        this.remove(entityId);
+        if (station?.kind === 'station') {
+          const { linkedEntityId, ...unlinked } = station;
+          void linkedEntityId;
+          this.entities.set(station.id, unlinked);
+        }
       }
       this.changed();
     }
@@ -1098,9 +1430,28 @@ export class WorldRuntime {
     this.#scheduledMines.delete(mineId);
     const mine = this.mines.get(mineId);
     if (mine === undefined) return;
+    const oreBefore = new Map(
+      [...mine.drills.values()]
+        .filter((drill) => drill.state === 'ACTIVE')
+        .map((drill) => [
+          drill.id,
+          this.world.grid.oreRemaining[
+            gridIndex(this.world.grid, drill.position)
+          ],
+        ]),
+    );
     mine.extract();
     for (const drill of mine.drills.values()) {
       const entity = this.entities.get(drill.id);
+      const index = gridIndex(this.world.grid, drill.position);
+      if (
+        entity?.kind === 'drill' &&
+        (oreBefore.get(drill.id) ?? 0) >
+          (this.world.grid.oreRemaining[index] ?? 0)
+      ) {
+        this.#drillExtractionEvents.add(drill.id);
+        this.#oreChanges.set(index, this.world.grid.oreRemaining[index]!);
+      }
       if (entity?.kind === 'drill' && entity.state !== drill.state)
         this.entities.set(drill.id, { ...entity, state: drill.state });
     }
@@ -1115,6 +1466,13 @@ export class WorldRuntime {
       );
       this.#scheduledMines.add(mineId);
     }
+  }
+  takeDrillExtractionEvents(): readonly WorldEntityId[] {
+    const events = [...this.#drillExtractionEvents].sort((a, b) =>
+      a.localeCompare(b),
+    );
+    this.#drillExtractionEvents.clear();
+    return events;
   }
   private scheduleFactory(entityId: WorldEntityId): void {
     const instance = this.factoryInstances.get(entityId);
@@ -1464,14 +1822,12 @@ export class WorldRuntime {
       this.logicalTime = next;
       if (trafficTime !== undefined && trafficTime === next)
         processed += this.traffic.advanceTo(next, maxEvents - processed);
-      if (processed >= maxEvents) break;
       for (const event of this.eventQueue.popBatch(next)) {
         if (event.kind === 'MINE_EXTRACT')
           this.processMine(asId<WorldEntityId>(event.entityId), next);
         else if (event.kind === 'FACTORY')
           this.processFactory(asId<WorldEntityId>(event.entityId), next);
         processed += 1;
-        if (processed >= maxEvents) break;
       }
       this.syncConstruction();
       this.syncEvacuation();
@@ -1480,6 +1836,7 @@ export class WorldRuntime {
       this.syncSalvage();
       this.syncPodProductions();
       this.dispatch();
+      this.capturePresentation();
     }
     const stillPending =
       (this.eventQueue.nextTime !== undefined &&
@@ -1506,6 +1863,63 @@ export class WorldRuntime {
     return this.advanceTo(target, maxEvents);
   }
 
+  beginPresentation(enabled = true) {
+    this.presentation.begin(this.logicalTime, enabled);
+    this.capturePresentation();
+  }
+  capturePresentation() {
+    if (!this.presentation.recording) return;
+    this.presentation.capture(
+      this.logicalTime,
+      this.presentationPods(),
+      (pod) => this.railNodes.get(pod.nodeId)?.position,
+      (pod) =>
+        pod.motion ? this.railEdges.get(pod.motion.edgeId)?.points : undefined,
+      this.timeScale,
+    );
+  }
+  private presentationPods(): WorldSnapshot['pods'] {
+    return [...this.traffic.pods.values()]
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((pod) => {
+        const from =
+          pod.motion === undefined
+            ? undefined
+            : this.railNodes.get(pod.motion.fromNodeId)?.position;
+        const to =
+          pod.motion === undefined
+            ? undefined
+            : this.railNodes.get(pod.motion.toNodeId)?.position;
+        const edgeId = pod.currentEdgeId;
+        return {
+          id: asId<PodId>(pod.id),
+          capacity: 10 as const,
+          state: pod.state,
+          nodeId: asId<RailNodeId>(pod.nodeId),
+          ...(pod.resourceId === undefined || pod.cargo === 0
+            ? {}
+            : { cargo: { resourceId: pod.resourceId, quantity: pod.cargo } }),
+          ...(pod.missionId === undefined
+            ? {}
+            : { missionId: asId(pod.missionId) }),
+          ...(from === undefined ||
+          to === undefined ||
+          pod.motion === undefined ||
+          edgeId === undefined
+            ? {}
+            : {
+                motion: {
+                  edgeId: asId<RailEdgeId>(edgeId),
+                  from,
+                  to,
+                  startsAt: pod.motion.startsAt,
+                  endsAt: pod.motion.endsAt,
+                },
+              }),
+        };
+      });
+  }
+
   snapshot(): WorldSnapshot {
     const trafficDiagnostics: WorldDiagnostic[] = this.traffic.diagnostics.map(
       (item) => ({
@@ -1522,6 +1936,7 @@ export class WorldRuntime {
       buildings.push({
         entityId,
         kind: 'factory',
+        contract: serializeContract(instance.contract),
         state: instance.state,
         inputs: [...instance.inputs.values()].map((buffer) => ({
           ...buffer.snapshot(),
@@ -1614,9 +2029,15 @@ export class WorldRuntime {
     return {
       schemaVersion: 1,
       worldId: this.world.id,
+      generation: {
+        config: this.world.config,
+        spawn: this.world.spawn,
+      },
       revision: this.revision,
       logicalTime: this.logicalTime,
       grid: this.world.grid,
+      presentationOreChanges: [],
+      drillExtractionIds: [],
       entities: [...this.entities.values()].sort((a, b) =>
         a.id.localeCompare(b.id),
       ),
@@ -1636,42 +2057,8 @@ export class WorldRuntime {
             ? {}
             : { reservedById: asId<PodId>(block.reservedById) }),
         })),
-      pods: [...this.traffic.pods.values()]
-        .sort((a, b) => a.id.localeCompare(b.id))
-        .map((pod) => {
-          const from =
-            pod.motion === undefined
-              ? undefined
-              : nodes.get(pod.motion.fromNodeId)?.position;
-          const to =
-            pod.motion === undefined
-              ? undefined
-              : nodes.get(pod.motion.toNodeId)?.position;
-          return {
-            id: asId<PodId>(pod.id),
-            capacity: 10 as const,
-            state: pod.state,
-            nodeId: asId<RailNodeId>(pod.nodeId),
-            ...(pod.resourceId === undefined || pod.cargo === 0
-              ? {}
-              : { cargo: { resourceId: pod.resourceId, quantity: pod.cargo } }),
-            ...(pod.missionId === undefined
-              ? {}
-              : { missionId: asId(pod.missionId) }),
-            ...(from === undefined ||
-            to === undefined ||
-            pod.motion === undefined
-              ? {}
-              : {
-                  motion: {
-                    from,
-                    to,
-                    startsAt: pod.motion.startsAt,
-                    endsAt: pod.motion.endsAt,
-                  },
-                }),
-          };
-        }),
+      pods: this.presentationPods(),
+      presentation: this.presentation.snapshot(this.logicalTime),
       missions: [...this.traffic.missions.values()]
         .sort((a, b) => a.id.localeCompare(b.id))
         .map((mission) => ({
@@ -1782,7 +2169,7 @@ export class WorldRuntime {
       for (const [id, station] of this.traffic.stations) {
         const hubMatch =
           entityId === asId<WorldEntityId>('world-starter-storage') &&
-          id.startsWith('hub:');
+          (id.startsWith('hub:') || id.startsWith('salvage-fallback:'));
         const ruleMatch = id.startsWith(`rule:${entityId}:`);
         const podFallbackMatch =
           entityId === asId<WorldEntityId>('world-starter-storage') &&

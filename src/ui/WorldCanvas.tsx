@@ -1,728 +1,933 @@
-import { Application, Container, Graphics } from 'pixi.js';
-import { useEffect, useRef } from 'react';
-import type {
-  GridPoint,
-  RailEdgeId,
-  RailNodeId,
-  WorldEntityId,
-} from '../domain';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { GridPoint, RailEdgeId, WorldEntityId } from '../domain';
 import {
-  OreKind,
-  TerrainKind,
   occupiedCells,
+  validateRailPath,
   type WorldSnapshot,
+  type WorldTool,
   type WorldTransform,
 } from '../world';
-import { railNodeConnectionState, railNodeDegrees } from './worldRailVisual';
-import {
-  podPositionAt,
-  smoothVisualPoint,
-  visualLogicalTime,
-  WORLD_RENDER_MAX_FPS,
-  type VisualPoint,
-} from './worldAnimation';
+import { WorldRenderer } from '../rendering/world/WorldRenderer';
+import type { QualityMode } from '../rendering/world/WorldRenderer';
+import { readCamera, type CameraState } from '../rendering/world/CameraState';
 
-const CELL = 8;
-const CHUNK = 32;
 interface Ghost {
+  readonly kind: WorldTool;
   readonly transform: WorldTransform;
   readonly valid: boolean;
+  readonly pending?: boolean;
 }
+
 interface Props {
   readonly snapshot: WorldSnapshot;
+  readonly settingsOpen?: boolean;
+  readonly interactionBlocked?: boolean;
+  readonly cameraFocus?: GridPoint;
   readonly selected?: GridPoint;
+  readonly selectedEntityId?: WorldEntityId;
   readonly ghost?: Ghost;
   readonly railDraft: readonly GridPoint[];
+  readonly activeTool: WorldTool;
+  readonly onCommitRail: () => void;
+  readonly onCancel: () => void;
   readonly hoveredRailEdgeId?: RailEdgeId;
   readonly hoveredDismantleEntityId?: WorldEntityId;
   readonly selectedRailEdgeId?: RailEdgeId;
-  readonly railPlacement: boolean;
   readonly onSelect: (point: GridPoint) => void;
+  readonly onSelectEntity: (entityId?: WorldEntityId) => void;
+  readonly onSelectRailEdge: (edgeId?: RailEdgeId) => void;
+  readonly onSelectPod: (podId?: string) => void;
   readonly onHover: (point?: GridPoint) => void;
-  readonly onRailPreview: (points: readonly GridPoint[]) => void;
-  readonly onRailPlace: (points: readonly [GridPoint, GridPoint]) => void;
-}
-interface Scene {
-  readonly app: Application;
-  readonly camera: Container;
-  readonly terrain: Container;
-  readonly ore: Container;
-  readonly rail: Graphics;
-  readonly entities: Graphics;
-  readonly reservations: Graphics;
-  readonly pods: Graphics;
-  readonly overlay: Graphics;
-  readonly chunks: Container[];
-  worldId?: string;
-  snapshot?: WorldSnapshot;
-  receivedAt: number;
-  oreRemaining: WorldSnapshot['grid']['oreRemaining'] | undefined;
-  railKey: string | undefined;
-  entityKey: string | undefined;
-  reservationKey: string | undefined;
-  nodePositions: ReadonlyMap<RailNodeId, GridPoint>;
-  readonly podPositions: Map<string, VisualPoint>;
 }
 
-const railVisualKey = (snapshot: WorldSnapshot): string =>
-  `${snapshot.railEdges
-    .map(
-      (edge) =>
-        `${edge.id}:${edge.from}:${edge.to}:${edge.points.map((point) => `${point.x},${point.y}`).join(';')}`,
-    )
-    .join('|')}#${snapshot.railNodes
-    .map(
-      (node) => `${node.id}:${node.kind}:${node.position.x},${node.position.y}`,
-    )
-    .join('|')}`;
+interface PointerTrack {
+  readonly pointerId: number;
+  readonly pointerType: string;
+  readonly button: number;
+  readonly cameraGesture: boolean;
+  readonly startX: number;
+  readonly startY: number;
+  lastX: number;
+  lastY: number;
+  dragged: boolean;
+  readonly startPoint?: GridPoint;
+}
+interface PickInfo {
+  readonly kind: 'entity' | 'rail' | 'pod';
+  readonly id: string;
+}
 
-const entityVisualKey = (snapshot: WorldSnapshot): string =>
-  snapshot.entities
-    .map((entity) => {
-      const transform = entity.transform;
-      const state = 'state' in entity ? String(entity.state) : '';
-      const progress =
-        entity.kind === 'construction-site'
-          ? `${entity.required.map((item) => item.quantity).join(',')}/${entity.delivered.map((item) => item.quantity).join(',')}`
-          : '';
-      return `${entity.id}:${entity.kind}:${transform.position.x},${transform.position.y}:${transform.size.width},${transform.size.height}:${transform.rotation}:${state}:${progress}`;
-    })
-    .join('|');
-
-const reservationVisualKey = (snapshot: WorldSnapshot): string =>
-  snapshot.railBlocks
-    .map(
-      (block) =>
-        `${block.id}:${block.occupantId ?? ''}:${block.reservedById ?? ''}`,
-    )
-    .join('|');
-
-const drawScene = (scene: Scene, snapshot: WorldSnapshot): void => {
-  scene.snapshot = snapshot;
-  scene.receivedAt = performance.now();
-  scene.nodePositions = new Map(
-    snapshot.railNodes.map((node) => [node.id, node.position]),
-  );
-  if (scene.worldId !== snapshot.worldId) {
-    scene.worldId = snapshot.worldId;
-    scene.oreRemaining = undefined;
-    scene.railKey = undefined;
-    scene.entityKey = undefined;
-    scene.reservationKey = undefined;
-    scene.podPositions.clear();
-    scene.terrain
-      .removeChildren()
-      .forEach((child) => child.destroy({ children: true }));
-    scene.ore
-      .removeChildren()
-      .forEach((child) => child.destroy({ children: true }));
-    scene.chunks.length = 0;
-    for (let cy = 0; cy < Math.ceil(snapshot.grid.height / CHUNK); cy += 1)
-      for (let cx = 0; cx < Math.ceil(snapshot.grid.width / CHUNK); cx += 1) {
-        const terrain = new Graphics();
-        const chunk = new Container();
-        chunk.label = `${cx}:${cy}`;
-        for (
-          let y = cy * CHUNK;
-          y < Math.min(snapshot.grid.height, (cy + 1) * CHUNK);
-          y += 1
-        )
-          for (
-            let x = cx * CHUNK;
-            x < Math.min(snapshot.grid.width, (cx + 1) * CHUNK);
-            x += 1
-          ) {
-            const index = y * snapshot.grid.width + x;
-            terrain
-              .rect(x * CELL, y * CELL, CELL, CELL)
-              .fill(
-                snapshot.grid.terrain[index] === TerrainKind.OBSTACLE
-                  ? '#14231e'
-                  : (x + y) % 2 === 0
-                    ? '#0b1814'
-                    : '#0c1a15',
-              );
-          }
-        chunk.addChild(terrain);
-        scene.terrain.addChild(chunk);
-        scene.chunks.push(chunk);
-      }
-  }
-  if (scene.oreRemaining !== snapshot.grid.oreRemaining) {
-    scene.oreRemaining = snapshot.grid.oreRemaining;
-    scene.ore
-      .removeChildren()
-      .forEach((child) => child.destroy({ children: true }));
-    for (let cy = 0; cy < Math.ceil(snapshot.grid.height / CHUNK); cy += 1)
-      for (let cx = 0; cx < Math.ceil(snapshot.grid.width / CHUNK); cx += 1) {
-        const ores = new Graphics();
-        for (
-          let y = cy * CHUNK;
-          y < Math.min(snapshot.grid.height, (cy + 1) * CHUNK);
-          y += 1
-        )
-          for (
-            let x = cx * CHUNK;
-            x < Math.min(snapshot.grid.width, (cx + 1) * CHUNK);
-            x += 1
-          ) {
-            const index = y * snapshot.grid.width + x;
-            if (snapshot.grid.oreRemaining[index] === 0) continue;
-            if (snapshot.grid.oreKinds[index] === OreKind.IRON)
-              ores
-                .rect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2)
-                .fill({ color: '#b86e43', alpha: 0.78 });
-            else if (snapshot.grid.oreKinds[index] === OreKind.COPPER)
-              ores
-                .rect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2)
-                .fill({ color: '#5fb5aa', alpha: 0.78 });
-          }
-        scene.ore.addChild(ores);
-      }
-  }
-  const degrees = railNodeDegrees(snapshot.railEdges);
-  const nextRailKey = railVisualKey(snapshot);
-  if (scene.railKey !== nextRailKey) {
-    scene.railKey = nextRailKey;
-    scene.rail.clear();
-    for (const edge of snapshot.railEdges) {
-      const first = edge.points[0];
-      if (first === undefined) continue;
-      const colour = '#63bfa5';
-      scene.rail.moveTo(first.x * CELL + CELL / 2, first.y * CELL + CELL / 2);
-      for (const point of edge.points.slice(1))
-        scene.rail.lineTo(point.x * CELL + CELL / 2, point.y * CELL + CELL / 2);
-      scene.rail.stroke({ color: colour, width: 3 });
-      const end = edge.points.at(-1)!;
-      const prior = edge.points.at(-2) ?? first;
-      const dx = Math.sign(end.x - prior.x);
-      const dy = Math.sign(end.y - prior.y);
-      const ex = end.x * CELL + CELL / 2;
-      const ey = end.y * CELL + CELL / 2;
-      scene.rail
-        .poly([
-          ex,
-          ey,
-          ex - dx * 5 - dy * 3,
-          ey - dy * 5 + dx * 3,
-          ex - dx * 5 + dy * 3,
-          ey - dy * 5 - dx * 3,
-        ])
-        .fill(colour);
-    }
-  }
-  const nextEntityKey = `${entityVisualKey(snapshot)}#${nextRailKey}`;
-  if (scene.entityKey !== nextEntityKey) {
-    scene.entityKey = nextEntityKey;
-    scene.entities.clear();
-    const colours: Record<string, string> = {
-      factory: '#5fae88',
-      mine: '#c97946',
-      drill: '#d39a5f',
-      station: '#8eabc2',
-      storage: '#a58ad0',
-      depot: '#e0bd63',
-      'construction-site': '#d48c53',
+const UI_PREFERENCE_KEY = 'factory-world-ui-v1';
+interface UiPreferences {
+  readonly showGrid: boolean;
+  readonly showOre: boolean;
+  readonly showLogistics: boolean;
+  readonly showMinimap: boolean;
+  readonly quality: QualityMode;
+  readonly reducedMotion: boolean;
+}
+const loadPreferences = (): UiPreferences => {
+  try {
+    const parsed = JSON.parse(
+      localStorage.getItem(UI_PREFERENCE_KEY) ?? 'null',
+    ) as Partial<UiPreferences> | null;
+    return {
+      showGrid: typeof parsed?.showGrid === 'boolean' ? parsed.showGrid : true,
+      showOre: typeof parsed?.showOre === 'boolean' ? parsed.showOre : true,
+      showLogistics:
+        typeof parsed?.showLogistics === 'boolean'
+          ? parsed.showLogistics
+          : true,
+      showMinimap:
+        typeof parsed?.showMinimap === 'boolean' ? parsed.showMinimap : true,
+      quality: ['low', 'standard', 'high', 'auto'].includes(
+        parsed?.quality ?? '',
+      )
+        ? parsed!.quality!
+        : 'standard',
+      reducedMotion:
+        (typeof parsed?.reducedMotion === 'boolean'
+          ? parsed.reducedMotion
+          : undefined) ??
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     };
-    for (const entity of snapshot.entities) {
-      if (entity.kind === 'construction-site') {
-        const cells = occupiedCells(entity.transform);
-        const totalRequired = entity.required.reduce(
-          (sum, item) => sum + item.quantity,
-          0,
-        );
-        const totalDelivered = entity.delivered.reduce(
-          (sum, item) => sum + item.quantity,
-          0,
-        );
-        const progress =
-          totalRequired === 0 ? 1 : Math.min(totalDelivered / totalRequired, 1);
-        const builtCount = Math.floor(progress * cells.length);
-        const builtColor = colours[entity.targetKind] ?? '#6fd0a6';
-        for (let index = 0; index < cells.length; index += 1) {
-          const cell = cells[index]!;
-          const isBuilt = index < builtCount;
-          scene.entities
-            .rect(cell.x * CELL, cell.y * CELL, CELL, CELL)
-            .fill({
-              color: isBuilt ? builtColor : '#d48c53',
-              alpha: isBuilt ? 0.85 : 0.35,
-            })
-            .stroke({ color: '#d9eee5', width: isBuilt ? 1 : 0.5 });
-        }
-      } else {
-        const width =
-          (entity.transform.rotation % 2 === 0
-            ? entity.transform.size.width
-            : entity.transform.size.height) * CELL;
-        const height =
-          (entity.transform.rotation % 2 === 0
-            ? entity.transform.size.height
-            : entity.transform.size.width) * CELL;
-        const dismantling =
-          entity.kind === 'factory' &&
-          'state' in entity &&
-          entity.state === 'DISMANTLING';
-        scene.entities
-          .rect(
-            entity.transform.position.x * CELL,
-            entity.transform.position.y * CELL,
-            width,
-            height,
-          )
-          .fill({
-            color: dismantling
-              ? '#d46c53'
-              : (colours[entity.kind] ?? '#6fd0a6'),
-            alpha: dismantling
-              ? 0.6
-              : entity.kind === 'drill' && entity.state === 'GHOST'
-                ? 0.45
-                : 0.85,
-          })
-          .stroke({
-            color: dismantling ? '#ff817c' : '#d9eee5',
-            width: dismantling ? 2 : 1,
-          });
-      }
-    }
-    for (const node of snapshot.railNodes) {
-      const connected = railNodeConnectionState(node, degrees) === 'connected';
-      if (node.kind === 'endpoint' && connected) continue;
-      const x = node.position.x * CELL + CELL / 2;
-      const y = node.position.y * CELL + CELL / 2;
-      const colour = connected ? '#91e0bb' : '#ff817c';
-      const radius =
-        node.kind === 'station' || node.kind === 'depot' ? 3.5 : 2.5;
-      scene.entities
-        .circle(x, y, radius)
-        .fill('#07100d')
-        .stroke({ color: colour, width: 1.5 });
-      if (node.kind === 'station' || node.kind === 'depot')
-        scene.entities.circle(x, y, 1.25).fill(colour);
-    }
-  }
-  const nextReservationKey = reservationVisualKey(snapshot);
-  if (scene.reservationKey !== nextReservationKey) {
-    scene.reservationKey = nextReservationKey;
-    scene.reservations.clear();
-    for (const block of snapshot.railBlocks)
-      if (block.occupantId !== undefined || block.reservedById !== undefined) {
-        const edge = snapshot.railEdges.find(
-          (item) => item.id === block.edgeId,
-        );
-        const a = edge?.points[0];
-        const b = edge?.points.at(-1);
-        if (a !== undefined && b !== undefined)
-          scene.reservations
-            .circle(
-              ((a.x + b.x + 1) * CELL) / 2,
-              ((a.y + b.y + 1) * CELL) / 2,
-              3,
-            )
-            .fill(block.occupantId === undefined ? '#f4d35e' : '#ef6f6c');
-      }
+  } catch {
+    return {
+      showGrid: true,
+      showOre: true,
+      showLogistics: true,
+      showMinimap: true,
+      quality: 'standard',
+      reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)')
+        .matches,
+    };
   }
 };
 
 export const WorldCanvas = ({
   snapshot,
+  settingsOpen = false,
+  interactionBlocked = false,
+  cameraFocus,
   selected,
+  selectedEntityId,
   ghost,
   railDraft,
+  activeTool,
+  onCommitRail,
+  onCancel,
   hoveredRailEdgeId,
   hoveredDismantleEntityId,
   selectedRailEdgeId,
-  railPlacement,
   onSelect,
+  onSelectEntity,
+  onSelectRailEdge,
+  onSelectPod,
   onHover,
-  onRailPreview,
-  onRailPlace,
 }: Props) => {
   const hostRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<Scene | undefined>(undefined);
-  const snapshotRef = useRef(snapshot);
-  const selectRef = useRef(onSelect);
-  const hoverRef = useRef(onHover);
-  const railPlacementRef = useRef(railPlacement);
-  const railPreviewRef = useRef(onRailPreview);
-  const railPlaceRef = useRef(onRailPlace);
+  const rendererRef = useRef<WorldRenderer | undefined>(undefined);
+  const keyboardModeRef = useRef(false);
+  const latestRef = useRef({
+    snapshot,
+    onSelect,
+    onSelectEntity,
+    onSelectRailEdge,
+    onSelectPod,
+    onHover,
+    activeTool,
+    railDraft,
+  });
+  const [preferences, setPreferences] = useState(loadPreferences);
+  const [renderError, setRenderError] = useState<string>();
+  const [assetError, setAssetError] = useState<string>();
+  const [rendererGeneration, setRendererGeneration] = useState(0);
+  const [touchPoint, setTouchPoint] = useState<GridPoint>();
+  const [touchPick, setTouchPick] = useState<PickInfo>();
+  const [pointerGrid, setPointerGrid] = useState<GridPoint>();
+  const [keyboardMode, setKeyboardMode] = useState(false);
+  const [cursor, setCursor] = useState<GridPoint>(snapshot.generation.spawn);
+  const cursorRef = useRef(cursor);
+  const [spaceDown, setSpaceDown] = useState(false);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const track = useRef<PointerTrack | undefined>(undefined);
+  const pinch = useRef<
+    { distance: number; midX: number; midY: number } | undefined
+  >(undefined);
+
   useEffect(() => {
-    snapshotRef.current = snapshot;
-  }, [snapshot]);
+    latestRef.current = {
+      snapshot,
+      onSelect,
+      onSelectEntity,
+      onSelectRailEdge,
+      onSelectPod,
+      onHover,
+      activeTool,
+      railDraft,
+    };
+    keyboardModeRef.current = keyboardMode;
+    cursorRef.current = cursor;
+  }, [
+    activeTool,
+    cursor,
+    keyboardMode,
+    onHover,
+    onSelect,
+    onSelectEntity,
+    onSelectPod,
+    onSelectRailEdge,
+    railDraft,
+    snapshot,
+  ]);
+
   useEffect(() => {
-    selectRef.current = onSelect;
-    hoverRef.current = onHover;
-    railPlacementRef.current = railPlacement;
-    railPreviewRef.current = onRailPreview;
-    railPlaceRef.current = onRailPlace;
-  }, [onHover, onRailPlace, onRailPreview, onSelect, railPlacement]);
+    track.current = undefined;
+    pointers.current.clear();
+    pinch.current = undefined;
+  }, [activeTool, interactionBlocked]);
+
+  const [gestureContext, setGestureContext] = useState({
+    tool: activeTool,
+    blocked: interactionBlocked,
+  });
+  if (
+    gestureContext.tool !== activeTool ||
+    gestureContext.blocked !== interactionBlocked
+  ) {
+    setGestureContext({ tool: activeTool, blocked: interactionBlocked });
+    setTouchPoint(undefined);
+    setTouchPick(undefined);
+    setPointerGrid(undefined);
+  }
+
   useEffect(() => {
     const host = hostRef.current;
     if (host === null) return undefined;
-    let disposed = false;
-    let interaction: 'pan' | 'rail' | undefined;
-    let railStart: GridPoint | undefined;
-    let spacePressed = false;
-    let downX = 0;
-    let downY = 0;
-    let lastX = 0;
-    let lastY = 0;
-    const initialise = async () => {
-      const app = new Application();
-      await app.init({
-        resizeTo: host,
-        preference: 'webgl',
-        antialias: false,
-        background: '#07100d',
-        autoDensity: true,
-        resolution: Math.min(devicePixelRatio, 2),
+    let renderer: WorldRenderer;
+    let cameraTimer: ReturnType<typeof setTimeout> | undefined;
+    let cameraState = readCamera(snapshot.worldId);
+    const saveCamera = () => {
+      if (cameraState) {
+        try {
+          localStorage.setItem(
+            `factory-world-camera-v1:${snapshot.worldId}`,
+            JSON.stringify(cameraState),
+          );
+        } catch {
+          /* camera preferences are optional */
+        }
+      }
+    };
+    // React effect cleanup never runs during navigation; flush the latest
+    // camera on pagehide so a reload inside the debounce window persists it.
+    window.addEventListener('pagehide', saveCamera);
+    const onCameraChange = (state: CameraState) => {
+      cameraState = state;
+      clearTimeout(cameraTimer);
+      cameraTimer = setTimeout(saveCamera, 200);
+    };
+    const restoredCamera = cameraState;
+    try {
+      renderer = new WorldRenderer(host, snapshot, {
+        onSelect: (point) => latestRef.current.onSelect(point),
+        onSelectEntity: (id) => latestRef.current.onSelectEntity(id),
+        onHover: (point) => latestRef.current.onHover(point),
+        onReady: () => {
+          setRenderError(undefined);
+          setAssetError(undefined);
+        },
+        onAssetError: setAssetError,
+        onCameraChange,
       });
-      app.ticker.maxFPS = WORLD_RENDER_MAX_FPS;
-      if (disposed) {
-        app.destroy(true);
+      if (restoredCamera) renderer.restoreCamera(restoredCamera);
+      rendererRef.current = renderer;
+      renderer.setOverlays(
+        preferences.showGrid,
+        preferences.showOre,
+        preferences.showLogistics,
+      );
+      renderer.setQuality(preferences.quality);
+      renderer.reducedMotion = preferences.reducedMotion;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'WebGL 2 is unavailable.';
+      const errorFrame = requestAnimationFrame(() =>
+        setRenderError(errorMessage),
+      );
+      return () => cancelAnimationFrame(errorFrame);
+    }
+    const canvas = renderer.renderer.domElement;
+    let spaceHeld = false;
+    const getPoint = (event: PointerEvent) =>
+      renderer.pointAt(event.clientX, event.clientY);
+    let previousHover: GridPoint | undefined;
+    const updateHover = (event: PointerEvent) => {
+      const point = getPoint(event);
+      if (previousHover?.x === point?.x && previousHover?.y === point?.y)
+        return;
+      previousHover = point;
+      setPointerGrid(point);
+      latestRef.current.onHover(point);
+      if (keyboardModeRef.current && point !== undefined) setCursor(point);
+    };
+    const beginPinch = () => {
+      const contacts = [...pointers.current.values()];
+      if (contacts.length < 2) return;
+      track.current = undefined;
+      setTouchPoint(undefined);
+      setTouchPick(undefined);
+      const [a, b] = contacts;
+      pinch.current = {
+        distance: Math.hypot(a!.x - b!.x, a!.y - b!.y),
+        midX: (a!.x + b!.x) / 2,
+        midY: (a!.y + b!.y) / 2,
+      };
+    };
+    const pointerDown = (event: PointerEvent) => {
+      if (event.pointerType === 'mouse' && event.button === 2)
+        event.preventDefault();
+      pointers.current.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+      if (pointers.current.size > 1) {
+        beginPinch();
         return;
       }
-      host.replaceChildren(app.canvas);
-      app.canvas.setAttribute('aria-label', 'Procedural world map');
-      app.canvas.setAttribute('role', 'application');
-      app.canvas.tabIndex = 0;
-      const camera = new Container();
-      const terrain = new Container();
-      const ore = new Container();
-      const rail = new Graphics();
-      const entities = new Graphics();
-      const reservations = new Graphics();
-      const pods = new Graphics();
-      const overlay = new Graphics();
-      camera.addChild(
-        terrain,
-        ore,
-        rail,
-        entities,
-        reservations,
-        pods,
-        overlay,
-      );
-      app.stage.addChild(camera);
-      const initial = snapshotRef.current;
-      const scene: Scene = {
-        app,
-        camera,
-        terrain,
-        ore,
-        rail,
-        entities,
-        reservations,
-        pods,
-        overlay,
-        chunks: [],
-        receivedAt: performance.now(),
-        oreRemaining: undefined,
-        railKey: undefined,
-        entityKey: undefined,
-        reservationKey: undefined,
-        nodePositions: new Map(),
-        podPositions: new Map(),
+      const startPoint = getPoint(event);
+      track.current = {
+        pointerId: event.pointerId,
+        pointerType: event.pointerType,
+        button: event.button,
+        cameraGesture: event.button !== 0 || spaceHeld,
+        startX: event.clientX,
+        startY: event.clientY,
+        lastX: event.clientX,
+        lastY: event.clientY,
+        dragged: false,
+        ...(startPoint === undefined ? {} : { startPoint }),
       };
-      sceneRef.current = scene;
-      drawScene(scene, initial);
-      const fit = () => {
-        const scale =
-          Math.min(
-            host.clientWidth / (initial.grid.width * CELL),
-            host.clientHeight / (initial.grid.height * CELL),
-          ) * 0.92;
-        camera.scale.set(scale);
-        camera.position.set(
-          (host.clientWidth - initial.grid.width * CELL * scale) / 2,
-          (host.clientHeight - initial.grid.height * CELL * scale) / 2,
-        );
-      };
-      fit();
-      const updateCulling = () => {
-        const scale = camera.scale.x;
-        for (const chunk of scene.chunks) {
-          const [cx, cy] = chunk.label.split(':').map(Number);
-          const left = camera.x + cx! * CHUNK * CELL * scale;
-          const top = camera.y + cy! * CHUNK * CELL * scale;
-          const size = CHUNK * CELL * scale;
-          chunk.visible =
-            left < host.clientWidth &&
-            top < host.clientHeight &&
-            left + size > 0 &&
-            top + size > 0;
+      canvas.setPointerCapture(event.pointerId);
+      canvas.focus({ preventScroll: true });
+    };
+    const pointerMove = (event: PointerEvent) => {
+      if (pointers.current.has(event.pointerId))
+        pointers.current.set(event.pointerId, {
+          x: event.clientX,
+          y: event.clientY,
+        });
+      if (pointers.current.size >= 2) {
+        const contacts = [...pointers.current.values()];
+        const [a, b] = contacts;
+        const previous = pinch.current;
+        if (a !== undefined && b !== undefined && previous !== undefined) {
+          const distance = Math.hypot(a.x - b.x, a.y - b.y);
+          const midX = (a.x + b.x) / 2;
+          const midY = (a.y + b.y) / 2;
+          renderer.panPixels(midX - previous.midX, midY - previous.midY);
+          if (distance > 1 && previous.distance > 1)
+            renderer.zoomAt(midX, midY, previous.distance / distance);
+          pinch.current = { distance, midX, midY };
         }
-      };
-      const pointFrom = (clientX: number, clientY: number): GridPoint => ({
-        x: Math.floor(
-          (clientX - host.getBoundingClientRect().left - camera.x) /
-            camera.scale.x /
-            CELL,
-        ),
-        y: Math.floor(
-          (clientY - host.getBoundingClientRect().top - camera.y) /
-            camera.scale.y /
-            CELL,
-        ),
-      });
-      const inside = (point: GridPoint) =>
-        point.x >= 0 &&
-        point.y >= 0 &&
-        point.x < (scene.snapshot?.grid.width ?? 0) &&
-        point.y < (scene.snapshot?.grid.height ?? 0);
-      const down = (event: PointerEvent) => {
-        const point = pointFrom(event.clientX, event.clientY);
-        if (
-          railPlacementRef.current &&
-          event.button === 0 &&
-          !spacePressed &&
-          inside(point)
+        return;
+      }
+      updateHover(event);
+      const active = track.current;
+      if (active === undefined || active.pointerId !== event.pointerId) return;
+      const dx = event.clientX - active.lastX;
+      const dy = event.clientY - active.lastY;
+      const distance =
+        Math.abs(event.clientX - active.startX) +
+        Math.abs(event.clientY - active.startY);
+      if (distance >= 5) active.dragged = true;
+      if (active.pointerType !== 'touch' && active.dragged) {
+        if (active.button === 2) renderer.orbitPixels(dx, dy);
+        else if (active.button === 1 || (active.button === 0 && spaceHeld))
+          renderer.panPixels(dx, dy);
+        else if (
+          active.button === 0 &&
+          latestRef.current.activeTool === 'rail'
         ) {
-          interaction = 'rail';
-          railStart = point;
-          railPreviewRef.current([point]);
-        } else interaction = 'pan';
-        downX = lastX = event.clientX;
-        downY = lastY = event.clientY;
-        app.canvas.setPointerCapture(event.pointerId);
-      };
-      const move = (event: PointerEvent) => {
-        const point = pointFrom(event.clientX, event.clientY);
-        hoverRef.current(inside(point) ? point : undefined);
-        if (interaction === 'rail' && railStart !== undefined) {
-          if (!inside(point)) return;
-          const dx = Math.abs(point.x - railStart.x);
-          const dy = Math.abs(point.y - railStart.y);
-          const snapped =
-            dx >= dy
-              ? { x: point.x, y: railStart.y }
-              : { x: railStart.x, y: point.y };
-          railPreviewRef.current([railStart, snapped]);
-          return;
+          // The endpoint preview follows the pointer; committing remains on release.
         }
-        if (interaction !== 'pan') return;
-        camera.x += event.clientX - lastX;
-        camera.y += event.clientY - lastY;
-        lastX = event.clientX;
-        lastY = event.clientY;
-        updateCulling();
-      };
-      const up = (event: PointerEvent) => {
-        if (interaction === 'rail' && railStart !== undefined) {
-          const point = pointFrom(event.clientX, event.clientY);
-          if (inside(point)) {
-            const dx = Math.abs(point.x - railStart.x);
-            const dy = Math.abs(point.y - railStart.y);
-            const snapped =
-              dx >= dy
-                ? { x: point.x, y: railStart.y }
-                : { x: railStart.x, y: point.y };
-            if (snapped.x !== railStart.x || snapped.y !== railStart.y)
-              railPlaceRef.current([railStart, snapped]);
-          }
-          railPreviewRef.current([]);
-          interaction = undefined;
-          railStart = undefined;
-          return;
-        }
-        const moved =
-          Math.abs(event.clientX - downX) + Math.abs(event.clientY - downY);
-        interaction = undefined;
-        if (moved < 3) {
-          const point = pointFrom(event.clientX, event.clientY);
-          if (inside(point)) selectRef.current(point);
-        }
-      };
-      const wheel = (event: WheelEvent) => {
-        event.preventDefault();
-        const before = pointFrom(event.clientX, event.clientY);
-        const scale = Math.max(
-          0.2,
-          Math.min(5, camera.scale.x * (event.deltaY < 0 ? 1.15 : 0.87)),
-        );
-        camera.scale.set(scale);
-        const rect = host.getBoundingClientRect();
-        camera.x = event.clientX - rect.left - before.x * CELL * scale;
-        camera.y = event.clientY - rect.top - before.y * CELL * scale;
-        updateCulling();
-      };
-      const key = (event: KeyboardEvent) => {
-        if (event.key === ' ') spacePressed = event.type === 'keydown';
-        const amount = event.shiftKey ? 80 : 24;
-        if (event.key === 'ArrowLeft') camera.x += amount;
-        else if (event.key === 'ArrowRight') camera.x -= amount;
-        else if (event.key === 'ArrowUp') camera.y += amount;
-        else if (event.key === 'ArrowDown') camera.y -= amount;
-        else if (event.key === '+' || event.key === '=')
-          camera.scale.set(Math.min(5, camera.scale.x * 1.15));
-        else if (event.key === '-')
-          camera.scale.set(Math.max(0.2, camera.scale.x * 0.87));
-        else return;
-        event.preventDefault();
-        updateCulling();
-      };
-      const keyUp = (event: KeyboardEvent) => {
-        if (event.key === ' ') spacePressed = false;
-      };
-      const cancel = () => {
-        interaction = undefined;
-        railStart = undefined;
-        railPreviewRef.current([]);
-      };
-      const contextMenu = (event: MouseEvent) => event.preventDefault();
-      app.canvas.addEventListener('pointerdown', down);
-      app.canvas.addEventListener('pointermove', move);
-      app.canvas.addEventListener('pointerleave', () =>
-        hoverRef.current(undefined),
-      );
-      app.canvas.addEventListener('pointerup', up);
-      app.canvas.addEventListener('pointercancel', cancel);
-      app.canvas.addEventListener('wheel', wheel, { passive: false });
-      app.canvas.addEventListener('keydown', key);
-      app.canvas.addEventListener('keyup', keyUp);
-      app.canvas.addEventListener('contextmenu', contextMenu);
-      updateCulling();
-      app.ticker.add((ticker) => {
-        const current = scene.snapshot;
-        if (current === undefined) return;
-        scene.pods.clear();
-        const logicalNow = visualLogicalTime(
-          current,
-          scene.receivedAt,
-          performance.now(),
-        );
-        const activePodIds = new Set<string>();
-        for (const pod of current.pods) {
-          activePodIds.add(pod.id);
-          const target = podPositionAt(pod, scene.nodePositions, logicalNow);
-          if (target !== undefined) {
-            const point = smoothVisualPoint(
-              scene.podPositions.get(pod.id),
-              target,
-              ticker.deltaMS,
-            );
-            scene.podPositions.set(pod.id, point);
-            scene.pods
-              .circle(point.x * CELL + CELL / 2, point.y * CELL + CELL / 2, 3)
-              .fill(
-                pod.state === 'DESTINATION_BLOCKED' ||
-                  pod.state === 'GRIDLOCKED'
-                  ? '#ef6f6c'
-                  : '#f4d35e',
-              );
-          }
-        }
-        for (const podId of scene.podPositions.keys())
-          if (!activePodIds.has(podId)) scene.podPositions.delete(podId);
-      });
+      }
+      active.lastX = event.clientX;
+      active.lastY = event.clientY;
     };
-    void initialise();
-    return () => {
-      disposed = true;
-      const app = sceneRef.current?.app;
-      sceneRef.current = undefined;
-      app?.destroy(true, { children: true });
-    };
-  }, []);
-  useEffect(() => {
-    if (sceneRef.current !== undefined) drawScene(sceneRef.current, snapshot);
-  }, [snapshot]);
-  useEffect(() => {
-    const overlay = sceneRef.current?.overlay;
-    if (overlay === undefined) return;
-    overlay.clear();
-    if (selected !== undefined)
-      overlay
-        .rect(selected.x * CELL, selected.y * CELL, CELL, CELL)
-        .stroke({ color: '#ffffff', width: 1.5 });
-    if (railDraft.length > 0) {
-      overlay.moveTo(
-        railDraft[0]!.x * CELL + CELL / 2,
-        railDraft[0]!.y * CELL + CELL / 2,
-      );
-      for (const point of railDraft.slice(1))
-        overlay.lineTo(point.x * CELL + CELL / 2, point.y * CELL + CELL / 2);
-      overlay.stroke({ color: '#f4d35e', width: 2 });
-      const end = railDraft.at(-1);
-      const start = railDraft[0];
-      if (start !== undefined && end !== undefined && railDraft.length > 1) {
-        const dx = Math.sign(end.x - start.x);
-        const dy = Math.sign(end.y - start.y);
-        const ex = end.x * CELL + CELL / 2;
-        const ey = end.y * CELL + CELL / 2;
-        overlay
-          .poly([
-            ex,
-            ey,
-            ex - dx * 5 - dy * 3,
-            ey - dy * 5 + dx * 3,
-            ex - dx * 5 + dy * 3,
-            ey - dy * 5 - dx * 3,
-          ])
-          .fill('#f4d35e');
+    const pointerUp = (event: PointerEvent) => {
+      const active = track.current;
+      pointers.current.delete(event.pointerId);
+      if (pointers.current.size < 2) pinch.current = undefined;
+      if (active === undefined || active.pointerId !== event.pointerId) return;
+      track.current = undefined;
+      const rect = canvas.getBoundingClientRect();
+      if (
+        event.clientX < rect.left ||
+        event.clientX >= rect.right ||
+        event.clientY < rect.top ||
+        event.clientY >= rect.bottom ||
+        active.cameraGesture
+      )
+        return;
+      const point = getPoint(event);
+      if (active.pointerType === 'touch') {
+        if (
+          !active.dragged &&
+          pointers.current.size === 0 &&
+          point !== undefined
+        ) {
+          setTouchPoint(point);
+          setTouchPick(renderer.pick(event.clientX, event.clientY));
+          setCursor(point);
+        }
+        return;
       }
-    }
-    if (hoveredRailEdgeId !== undefined) {
-      const edge = snapshotRef.current.railEdges.find(
-        (candidate) => candidate.id === hoveredRailEdgeId,
-      );
-      const first = edge?.points[0];
-      if (edge !== undefined && first !== undefined) {
-        overlay.moveTo(first.x * CELL + CELL / 2, first.y * CELL + CELL / 2);
-        for (const point of edge.points.slice(1))
-          overlay.lineTo(point.x * CELL + CELL / 2, point.y * CELL + CELL / 2);
-        overlay.stroke({ color: '#ff625c', width: 5, alpha: 0.8 });
-      }
-    }
-    if (selectedRailEdgeId !== undefined) {
-      const edge = snapshotRef.current.railEdges.find(
-        (candidate) => candidate.id === selectedRailEdgeId,
-      );
-      const first = edge?.points[0];
-      if (edge !== undefined && first !== undefined) {
-        overlay.moveTo(first.x * CELL + CELL / 2, first.y * CELL + CELL / 2);
-        for (const point of edge.points.slice(1))
-          overlay.lineTo(point.x * CELL + CELL / 2, point.y * CELL + CELL / 2);
-        overlay.stroke({ color: '#ffffff', width: 3, alpha: 0.9 });
-      }
-    }
-    if (hoveredDismantleEntityId !== undefined) {
-      const entity = snapshotRef.current.entities.find(
-        (e) => e.id === hoveredDismantleEntityId,
-      );
-      if (entity !== undefined) {
-        const width =
-          (entity.transform.rotation % 2 === 0
-            ? entity.transform.size.width
-            : entity.transform.size.height) * CELL;
-        const height =
-          (entity.transform.rotation % 2 === 0
-            ? entity.transform.size.height
-            : entity.transform.size.width) * CELL;
-        overlay
-          .rect(
-            entity.transform.position.x * CELL,
-            entity.transform.position.y * CELL,
-            width,
-            height,
+      if (active.button !== 0 || point === undefined) return;
+      if (active.dragged) {
+        if (latestRef.current.activeTool === 'rail') {
+          if (
+            latestRef.current.railDraft.length === 0 &&
+            active.startPoint !== undefined
           )
-          .stroke({ color: '#ff625c', width: 3, alpha: 0.9 });
+            latestRef.current.onSelect(active.startPoint);
+          latestRef.current.onSelect(point);
+        }
+        return;
       }
+      const pick = renderer.pick(event.clientX, event.clientY);
+      if (latestRef.current.activeTool === 'select') {
+        if (pick?.kind === 'entity')
+          latestRef.current.onSelectEntity(pick.id as WorldEntityId);
+        else latestRef.current.onSelectEntity(undefined);
+        if (pick?.kind === 'rail')
+          latestRef.current.onSelectRailEdge(pick.id as RailEdgeId);
+        else latestRef.current.onSelectRailEdge(undefined);
+        if (pick?.kind === 'pod') latestRef.current.onSelectPod(pick.id);
+        else latestRef.current.onSelectPod(undefined);
+      }
+      if (latestRef.current.activeTool !== 'select' || !pick)
+        latestRef.current.onSelect(point);
+    };
+    const pointerCancel = (event: PointerEvent) => {
+      pointers.current.delete(event.pointerId);
+      track.current = undefined;
+      pinch.current = undefined;
+      setTouchPoint(undefined);
+      setTouchPick(undefined);
+      setPointerGrid(undefined);
+      latestRef.current.onHover(undefined);
+    };
+    const wheel = (event: WheelEvent) => {
+      event.preventDefault();
+      renderer.zoomAt(
+        event.clientX,
+        event.clientY,
+        Math.exp(event.deltaY * 0.001),
+      );
+    };
+    const contextMenu = (event: MouseEvent) => event.preventDefault();
+    const keyDown = (event: KeyboardEvent) => {
+      if (
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        (event.repeat && ['q', 'e', 'enter'].includes(event.key.toLowerCase()))
+      )
+        return;
+      if (event.code === 'Space') {
+        event.preventDefault();
+        spaceHeld = true;
+        setSpaceDown(true);
+      }
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLSelectElement ||
+        event.target instanceof HTMLTextAreaElement
+      )
+        return;
+      if (event.key === 'Home') {
+        event.preventDefault();
+        renderer.setHome();
+      } else if (event.key.toLowerCase() === 'q') {
+        event.preventDefault();
+        renderer.rotateCamera(-1);
+      } else if (event.key.toLowerCase() === 'e') {
+        event.preventDefault();
+        renderer.rotateCamera(1);
+      } else if (event.key === 'Escape') {
+        setKeyboardMode(false);
+        latestRef.current.onHover(undefined);
+      } else if (event.key === '+' || event.key === '=') {
+        event.preventDefault();
+        renderer.zoom(0.82);
+      } else if (event.key === '-') {
+        event.preventDefault();
+        renderer.zoom(1.22);
+      } else if (event.key.startsWith('Arrow') && keyboardModeRef.current) {
+        event.preventDefault();
+        setCursor((current) => ({
+          x: Math.max(
+            0,
+            Math.min(
+              snapshot.grid.width - 1,
+              current.x +
+                (event.key === 'ArrowLeft'
+                  ? -1
+                  : event.key === 'ArrowRight'
+                    ? 1
+                    : 0),
+            ),
+          ),
+          y: Math.max(
+            0,
+            Math.min(
+              snapshot.grid.height - 1,
+              current.y +
+                (event.key === 'ArrowUp'
+                  ? -1
+                  : event.key === 'ArrowDown'
+                    ? 1
+                    : 0),
+            ),
+          ),
+        }));
+      } else if (event.key.startsWith('Arrow')) {
+        event.preventDefault();
+        const amount = event.shiftKey ? 80 : 36;
+        renderer.panPixels(
+          event.key === 'ArrowLeft'
+            ? -amount
+            : event.key === 'ArrowRight'
+              ? amount
+              : 0,
+          event.key === 'ArrowUp'
+            ? -amount
+            : event.key === 'ArrowDown'
+              ? amount
+              : 0,
+        );
+      } else if (keyboardModeRef.current && event.key === 'Enter') {
+        event.preventDefault();
+        latestRef.current.onSelect(cursorRef.current);
+      }
+    };
+    const keyUp = (event: KeyboardEvent) => {
+      if (event.code === 'Space') {
+        event.preventDefault();
+        spaceHeld = false;
+        setSpaceDown(false);
+      }
+    };
+    const blur = () => {
+      track.current = undefined;
+      pointers.current.clear();
+      pinch.current = undefined;
+      setTouchPoint(undefined);
+      setTouchPick(undefined);
+      setPointerGrid(undefined);
+      spaceHeld = false;
+      setSpaceDown(false);
+    };
+    const lostCapture = (event: PointerEvent) => {
+      pointers.current.delete(event.pointerId);
+      track.current = undefined;
+      if (pointers.current.size < 2) pinch.current = undefined;
+    };
+    const contextLost = (event: Event) => {
+      event.preventDefault();
+      setRenderError(
+        'The graphics context was lost. The world session is still running.',
+      );
+    };
+    const contextRestored = () => {
+      setRenderError('Rebuilding the 3D view from the accepted world state…');
+      setRendererGeneration((value) => value + 1);
+    };
+    canvas.addEventListener('pointerdown', pointerDown);
+    canvas.addEventListener('pointermove', pointerMove);
+    canvas.addEventListener('pointerup', pointerUp);
+    canvas.addEventListener('pointercancel', pointerCancel);
+    canvas.addEventListener('lostpointercapture', lostCapture);
+    canvas.addEventListener('wheel', wheel, { passive: false });
+    canvas.addEventListener('contextmenu', contextMenu);
+    canvas.addEventListener('keydown', keyDown);
+    canvas.addEventListener('webglcontextlost', contextLost);
+    canvas.addEventListener('webglcontextrestored', contextRestored);
+    window.addEventListener('keyup', keyUp);
+    window.addEventListener('blur', blur);
+    return () => {
+      canvas.removeEventListener('pointerdown', pointerDown);
+      canvas.removeEventListener('pointermove', pointerMove);
+      canvas.removeEventListener('pointerup', pointerUp);
+      canvas.removeEventListener('pointercancel', pointerCancel);
+      canvas.removeEventListener('lostpointercapture', lostCapture);
+      canvas.removeEventListener('wheel', wheel);
+      canvas.removeEventListener('contextmenu', contextMenu);
+      canvas.removeEventListener('keydown', keyDown);
+      canvas.removeEventListener('webglcontextlost', contextLost);
+      canvas.removeEventListener('webglcontextrestored', contextRestored);
+      window.removeEventListener('keyup', keyUp);
+      window.removeEventListener('blur', blur);
+      rendererRef.current = undefined;
+      window.removeEventListener('pagehide', saveCamera);
+      clearTimeout(cameraTimer);
+      saveCamera();
+      renderer.dispose();
+    };
+    // The renderer is a single lifetime owner; callbacks read through latestRef.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rendererGeneration]);
+
+  useEffect(() => {
+    if (keyboardMode) {
+      rendererRef.current?.ensureVisible(cursor);
+      latestRef.current.onHover(cursor);
     }
-    if (ghost !== undefined)
-      for (const cell of occupiedCells(ghost.transform))
-        overlay
-          .rect(cell.x * CELL, cell.y * CELL, CELL, CELL)
-          .fill({ color: ghost.valid ? '#5fae88' : '#ef6f6c', alpha: 0.28 })
-          .stroke({ color: ghost.valid ? '#91e0bb' : '#ff9693', width: 1 });
+  }, [keyboardMode, cursor]);
+
+  useEffect(() => {
+    if (cameraFocus !== undefined) rendererRef.current?.focus(cameraFocus);
+  }, [cameraFocus]);
+
+  useEffect(() => {
+    rendererRef.current?.setSnapshot(snapshot);
+  }, [snapshot]);
+  const previewPoint = keyboardMode ? cursor : pointerGrid;
+  const lastRailPoint = railDraft.at(-1);
+  const railPreview = useMemo(() => {
+    if (activeTool !== 'rail' || !lastRailPoint || !previewPoint)
+      return undefined;
+    return Math.abs(previewPoint.x - lastRailPoint.x) >=
+      Math.abs(previewPoint.y - lastRailPoint.y)
+      ? { x: previewPoint.x, y: lastRailPoint.y }
+      : { x: lastRailPoint.x, y: previewPoint.y };
+  }, [activeTool, lastRailPoint, previewPoint]);
+  const railFeedback =
+    activeTool === 'rail' && railDraft.length > 0
+      ? validateRailPath(
+          snapshot.grid,
+          railPreview ? [...railDraft, railPreview] : railDraft,
+        )
+      : undefined;
+  useEffect(() => {
+    rendererRef.current?.setTransient({
+      ...(ghost === undefined ? {} : { ghost }),
+      ...(selected === undefined ? {} : { selected }),
+      ...(selectedEntityId === undefined ? {} : { selectedEntityId }),
+      railDraft,
+      ...(railPreview === undefined ? {} : { railPreview }),
+      ...(keyboardMode ? { keyboardCursor: cursor } : {}),
+      ...(hoveredRailEdgeId === undefined ? {} : { hoveredRailEdgeId }),
+      ...(hoveredDismantleEntityId === undefined
+        ? {}
+        : { hoveredDismantleEntityId }),
+      ...(selectedRailEdgeId === undefined ? {} : { selectedRailEdgeId }),
+      activeTool,
+    });
   }, [
+    activeTool,
+    cursor,
     ghost,
     hoveredDismantleEntityId,
     hoveredRailEdgeId,
+    keyboardMode,
+    pointerGrid,
     railDraft,
+    railPreview,
     selected,
+    selectedEntityId,
     selectedRailEdgeId,
   ]);
-  return <div className="world-pixi-canvas" ref={hostRef} />;
+  useEffect(() => {
+    rendererRef.current?.setOverlays(
+      preferences.showGrid,
+      preferences.showOre,
+      preferences.showLogistics,
+    );
+    rendererRef.current?.setQuality(preferences.quality);
+    if (rendererRef.current)
+      rendererRef.current.reducedMotion = preferences.reducedMotion;
+    try {
+      localStorage.setItem(UI_PREFERENCE_KEY, JSON.stringify(preferences));
+    } catch {
+      /* keep in-memory preferences */
+    }
+  }, [preferences]);
+  useEffect(() => {
+    const canvas =
+      hostRef.current?.parentElement?.querySelector<HTMLCanvasElement>(
+        '.world-minimap-canvas',
+      ) ?? undefined;
+    rendererRef.current?.setMinimap(canvas);
+    return () => rendererRef.current?.setMinimap(undefined);
+  }, [preferences.showMinimap, renderError]);
+
+  const confirmTouch = () => {
+    if (touchPoint === undefined) return;
+    if (activeTool === 'select') {
+      if (touchPick?.kind === 'entity')
+        onSelectEntity(touchPick.id as WorldEntityId);
+      else if (touchPick?.kind === 'rail')
+        onSelectRailEdge(touchPick.id as RailEdgeId);
+      else if (touchPick?.kind === 'pod') onSelectPod(touchPick.id);
+      else {
+        const entity = snapshot.entities.find((candidate) =>
+          occupiedCells(candidate.transform).some(
+            (cell) => cell.x === touchPoint.x && cell.y === touchPoint.y,
+          ),
+        );
+        onSelectEntity(entity?.id);
+        onSelectRailEdge(undefined);
+        onSelectPod(undefined);
+      }
+    }
+    if (activeTool !== 'select' || !touchPick) onSelect(touchPoint);
+    setTouchPoint(undefined);
+    setTouchPick(undefined);
+  };
+  const togglePreference = (key: keyof UiPreferences) =>
+    setPreferences((current) => ({ ...current, [key]: !current[key] }));
+
+  return (
+    <div className={`world-viewport${spaceDown ? ' is-panning' : ''}`}>
+      <div className="world-three-host" ref={hostRef} />
+      <span className="world-catchup-indicator">
+        Synchronising traffic display…
+      </span>
+      {assetError !== undefined && (
+        <div className="world-asset-error" role="alert">
+          <span>
+            Some models are unavailable. Correct-footprint fallbacks are shown.{' '}
+            {assetError}
+          </span>
+          <button onClick={() => setRendererGeneration((value) => value + 1)}>
+            Retry models
+          </button>
+        </div>
+      )}
+      {renderError !== undefined && (
+        <div className="world-webgl-fallback" role="alert">
+          <strong>3D world view unavailable</strong>
+          <span>{renderError}</span>
+          <p>
+            World controls, buildings, diagnostics, and saving remain available
+            in the inspector.
+          </p>
+          <button onClick={() => setRendererGeneration((value) => value + 1)}>
+            Retry 3D view
+          </button>
+        </div>
+      )}
+      <div
+        className="world-view-controls"
+        aria-label="Camera controls"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <button
+          aria-label="Rotate camera left"
+          onClick={() => rendererRef.current?.rotateCamera(-1)}
+        >
+          ↶
+        </button>
+        <button
+          aria-label="Rotate camera right"
+          onClick={() => rendererRef.current?.rotateCamera(1)}
+        >
+          ↷
+        </button>
+        <button
+          aria-label="Toggle top view"
+          onClick={() => rendererRef.current?.setTopView()}
+        >
+          Top
+        </button>
+        <button
+          aria-label="Zoom in"
+          onClick={() => rendererRef.current?.zoom(0.8)}
+        >
+          +
+        </button>
+        <button
+          aria-label="Zoom out"
+          onClick={() => rendererRef.current?.zoom(1.25)}
+        >
+          −
+        </button>
+        <button
+          aria-label="Home camera"
+          onClick={() => rendererRef.current?.setHome()}
+        >
+          ⌂
+        </button>
+      </div>
+      <div
+        className="world-overlay-controls"
+        aria-label="World overlays"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <button
+          aria-pressed={preferences.showGrid}
+          onClick={() => togglePreference('showGrid')}
+        >
+          Grid
+        </button>
+        <button
+          aria-pressed={preferences.showOre}
+          onClick={() => togglePreference('showOre')}
+        >
+          Ore
+        </button>
+        <button
+          aria-pressed={preferences.showLogistics}
+          onClick={() => togglePreference('showLogistics')}
+        >
+          Traffic
+        </button>
+      </div>
+      {settingsOpen && (
+        <div
+          className="world-render-settings"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <label>
+            Graphics quality
+            <select
+              value={preferences.quality}
+              onChange={(event) =>
+                setPreferences((current) => ({
+                  ...current,
+                  quality: event.target.value as QualityMode,
+                }))
+              }
+            >
+              <option value="low">Low · 1×</option>
+              <option value="standard">Standard · 1.5×</option>
+              <option value="high">High · 2×</option>
+              <option value="auto">Automatic</option>
+            </select>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={preferences.reducedMotion}
+              onChange={(event) =>
+                setPreferences((current) => ({
+                  ...current,
+                  reducedMotion: event.target.checked,
+                }))
+              }
+            />{' '}
+            Reduced motion
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={preferences.showMinimap}
+              onChange={(event) =>
+                setPreferences((current) => ({
+                  ...current,
+                  showMinimap: event.target.checked,
+                }))
+              }
+            />{' '}
+            Show minimap
+          </label>
+        </div>
+      )}
+      {preferences.showMinimap && (
+        <div
+          className="world-minimap"
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <canvas
+            className="world-minimap-canvas"
+            width={180}
+            height={126}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                rendererRef.current?.setHome();
+              }
+            }}
+            aria-label="Minimap. Click to focus camera."
+            onClick={(event) =>
+              rendererRef.current?.focusMinimap(event.clientX, event.clientY)
+            }
+          />
+          <span>World map</span>
+        </div>
+      )}
+      {railFeedback?.reason &&
+        railDraft.length > 0 &&
+        !railFeedback.reason.includes('two distinct') && (
+          <div className="world-placement-feedback" role="status">
+            {railFeedback.reason}
+          </div>
+        )}
+      {keyboardMode && (
+        <div className="world-keyboard-cursor" aria-live="polite">
+          Cursor {cursor.x}, {cursor.y}
+          <button onClick={() => onSelect(cursor)}>
+            {activeTool === 'rail' && railDraft.length > 1
+              ? 'Add rail point'
+              : 'Confirm step'}
+          </button>
+          {activeTool === 'rail' && railDraft.length > 1 && (
+            <button onClick={onCommitRail}>Finish rail</button>
+          )}
+          <button
+            onClick={() => {
+              setKeyboardMode(false);
+              onCancel();
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+      {touchPoint !== undefined && (
+        <div
+          className="world-touch-confirm"
+          role="group"
+          aria-label="Confirm touch action"
+        >
+          <span>
+            Tile {touchPoint.x}, {touchPoint.y}
+          </span>
+          <button onClick={confirmTouch}>Confirm</button>
+          {activeTool === 'rail' && railDraft.length > 1 && (
+            <button onClick={onCommitRail}>Finish rail</button>
+          )}
+          <button
+            onClick={() => {
+              setTouchPoint(undefined);
+              setTouchPick(undefined);
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+      <button
+        className="world-keyboard-toggle"
+        aria-pressed={keyboardMode}
+        onClick={() => {
+          setKeyboardMode((current) => !current);
+          rendererRef.current?.renderer.domElement.focus({
+            preventScroll: true,
+          });
+        }}
+      >
+        Keyboard placement
+      </button>
+      <span className="sr-only" aria-live="polite">
+        {renderError === undefined
+          ? ''
+          : '3D view unavailable. Use the accessible entity list.'}
+      </span>
+    </div>
+  );
 };

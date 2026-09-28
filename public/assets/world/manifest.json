@@ -1,0 +1,2618 @@
+{
+  "schemaVersion": 1,
+  "packVersion": "1.0.0",
+  "blenderVersion": "4.5.0",
+  "units": "one tile = one metre",
+  "up": "+Y",
+  "front": "+Z",
+  "assets": [
+    {
+      "id": "factory",
+      "footprint": [
+        4,
+        4
+      ],
+      "budget": 3000,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/factory.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {
+        "socket_loading": [
+          0,
+          0.15,
+          1.9
+        ],
+        "anchor_status": [
+          0,
+          2.95,
+          0
+        ]
+      },
+      "animationParts": [
+        "fan"
+      ],
+      "lods": [
+        {
+          "url": "models/factory-lod0.017dc93df82b.glb",
+          "sha256": "017dc93df82b91c09f71ea6747417d29aaf9a7180e435f0dbb5386df6b76548b",
+          "triangles": 892,
+          "bytes": 76604,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -1.92,
+              0.0,
+              -1.92
+            ],
+            "max": [
+              1.92,
+              2.92,
+              1.92
+            ]
+          }
+        },
+        {
+          "url": "models/factory-lod1.8edbe0c2f0f6.glb",
+          "sha256": "8edbe0c2f0f6d3c90d3cd462e1105a6f95ba3662cb5c267c112e6b2161a8355a",
+          "triangles": 92,
+          "bytes": 8364,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -1.92,
+              0.0,
+              -1.92
+            ],
+            "max": [
+              1.92,
+              2.78,
+              1.92
+            ]
+          }
+        },
+        {
+          "url": "models/factory-lod2.9a046106d9a4.glb",
+          "sha256": "9a046106d9a4713452ecd69fa65cf7157b4f574c9510864e3c301fcb67b4080b",
+          "triangles": 36,
+          "bytes": 4132,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -1.92,
+              0.0,
+              -1.92
+            ],
+            "max": [
+              1.92,
+              2.18,
+              1.92
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -1.92,
+          0.0,
+          -1.92
+        ],
+        "max": [
+          1.92,
+          2.92,
+          1.92
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -1.92,
+          0.0,
+          -1.92
+        ],
+        "max": [
+          1.92,
+          2.92,
+          1.92
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/factory.0cd78879a186.png",
+        "sha256": "0cd78879a1860b6e04ba25e5024a27401b6eb113189c48acc3947591ebd74ead",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "factory-wall-bay",
+      "footprint": [
+        1,
+        0.18
+      ],
+      "budget": 150,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/factory-wall-bay.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {},
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/factory-wall-bay-lod0.b7806b5610eb.glb",
+          "sha256": "b7806b5610ebbd8c49ccdb5224e3564314f8c3d2fd9fd9e9c9551935e4763ae7",
+          "triangles": 100,
+          "bytes": 9564,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.49,
+              0.0,
+              -0.08
+            ],
+            "max": [
+              0.49,
+              1.3,
+              0.09
+            ]
+          }
+        },
+        {
+          "url": "models/factory-wall-bay-lod1.c786eec9410a.glb",
+          "sha256": "c786eec9410a0d643ef92c3073d82775871f62ba7ea08ffb3837783aae2c8a67",
+          "triangles": 24,
+          "bytes": 3052,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.49,
+              0.0,
+              -0.08
+            ],
+            "max": [
+              0.49,
+              1.3,
+              0.08
+            ]
+          }
+        },
+        {
+          "url": "models/factory-wall-bay-lod2.9c4ead017992.glb",
+          "sha256": "9c4ead017992dfd8a6139af41254f5764e59e5a01f232431a303cfa5f3441d31",
+          "triangles": 12,
+          "bytes": 2112,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.49,
+              0.0,
+              -0.07
+            ],
+            "max": [
+              0.49,
+              1.3,
+              0.07
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.49,
+          0.0,
+          -0.08
+        ],
+        "max": [
+          0.49,
+          1.3,
+          0.09
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.49,
+          0.0,
+          -0.08
+        ],
+        "max": [
+          0.49,
+          1.3,
+          0.09
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/factory-wall-bay.157be66b2ee7.png",
+        "sha256": "157be66b2ee758e666b67b36d708bc650d396e01f5e2ba49fd3ee9ec779c1067",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "factory-corner",
+      "footprint": [
+        0.22,
+        0.22
+      ],
+      "budget": 150,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/factory-corner.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {},
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/factory-corner-lod0.61e188a4719a.glb",
+          "sha256": "61e188a4719a786fc51df3892eb84e62d24d9a6f2e4024f65f23f4d7da3bcfcd",
+          "triangles": 88,
+          "bytes": 8628,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.105,
+              0.0,
+              -0.105
+            ],
+            "max": [
+              0.105,
+              1.4,
+              0.105
+            ]
+          }
+        },
+        {
+          "url": "models/factory-corner-lod1.635bd6eeb638.glb",
+          "sha256": "635bd6eeb638b442c297a7b5d01fdef1006dbe338d9c6cba9dd3b64f3c6f73a5",
+          "triangles": 12,
+          "bytes": 2112,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.1,
+              0.0,
+              -0.1
+            ],
+            "max": [
+              0.1,
+              1.4,
+              0.1
+            ]
+          }
+        },
+        {
+          "url": "models/factory-corner-lod2.635bd6eeb638.glb",
+          "sha256": "635bd6eeb638b442c297a7b5d01fdef1006dbe338d9c6cba9dd3b64f3c6f73a5",
+          "triangles": 12,
+          "bytes": 2112,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.1,
+              0.0,
+              -0.1
+            ],
+            "max": [
+              0.1,
+              1.4,
+              0.1
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.105,
+          0.0,
+          -0.105
+        ],
+        "max": [
+          0.105,
+          1.4,
+          0.105
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.105,
+          0.0,
+          -0.105
+        ],
+        "max": [
+          0.105,
+          1.4,
+          0.105
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/factory-corner.7d49c026ee22.png",
+        "sha256": "7d49c026ee2235634ce70aee7afa8ed658ae42610348764211d750cebc7524b5",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "factory-roof-bay",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 150,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/factory-roof-bay.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {},
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/factory-roof-bay-lod0.d0d20ee718b5.glb",
+          "sha256": "d0d20ee718b5c1e16000652bb7933724c2212c07701fe2bda5d58ecacd388e24",
+          "triangles": 88,
+          "bytes": 8628,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.49,
+              0.0,
+              -0.49
+            ],
+            "max": [
+              0.49,
+              0.22,
+              0.49
+            ]
+          }
+        },
+        {
+          "url": "models/factory-roof-bay-lod1.32e997b902de.glb",
+          "sha256": "32e997b902de0e417870ad1a49169d8f091882ebfb336c8816657dabb651d9d9",
+          "triangles": 12,
+          "bytes": 2112,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.49,
+              0.0,
+              -0.49
+            ],
+            "max": [
+              0.49,
+              0.16,
+              0.49
+            ]
+          }
+        },
+        {
+          "url": "models/factory-roof-bay-lod2.32e997b902de.glb",
+          "sha256": "32e997b902de0e417870ad1a49169d8f091882ebfb336c8816657dabb651d9d9",
+          "triangles": 12,
+          "bytes": 2112,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.49,
+              0.0,
+              -0.49
+            ],
+            "max": [
+              0.49,
+              0.16,
+              0.49
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.49,
+          0.0,
+          -0.49
+        ],
+        "max": [
+          0.49,
+          0.22,
+          0.49
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.49,
+          0.0,
+          -0.49
+        ],
+        "max": [
+          0.49,
+          0.22,
+          0.49
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/factory-roof-bay.ec04a214c401.png",
+        "sha256": "ec04a214c401a10d09b7114b01c3343657b2c6c4ab6e2635bfec5c8f953a2908",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "mine",
+      "footprint": [
+        4,
+        4
+      ],
+      "budget": 2000,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/mine.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {
+        "socket_loading": [
+          0.45,
+          0.1,
+          1.85
+        ]
+      },
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/mine-lod0.00713751a3a9.glb",
+          "sha256": "00713751a3a9fb31f835d22b0c269cc348f6f9f68269da232d79707fa368b6f0",
+          "triangles": 440,
+          "bytes": 38496,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -1.92,
+              0.0,
+              -1.92
+            ],
+            "max": [
+              1.92,
+              3.4,
+              1.92
+            ]
+          }
+        },
+        {
+          "url": "models/mine-lod1.8d1b0153ac22.glb",
+          "sha256": "8d1b0153ac22da261aa9815785ebdb436598f66de737c1241f9a4d59d8e42711",
+          "triangles": 84,
+          "bytes": 7836,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -1.92,
+              0.0,
+              -1.92
+            ],
+            "max": [
+              1.92,
+              3.4,
+              1.92
+            ]
+          }
+        },
+        {
+          "url": "models/mine-lod2.1a361f86d1f9.glb",
+          "sha256": "1a361f86d1f9cf4f4f6e42fd40c54436f86b9fb46b6ff43c8988009d630d1106",
+          "triangles": 60,
+          "bytes": 5964,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -1.92,
+              0.0,
+              -1.92
+            ],
+            "max": [
+              1.92,
+              3.4,
+              1.92
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -1.92,
+          0.0,
+          -1.92
+        ],
+        "max": [
+          1.92,
+          3.4,
+          1.92
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -1.92,
+          0.0,
+          -1.92
+        ],
+        "max": [
+          1.92,
+          3.4,
+          1.92
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/mine.326bf3a22c76.png",
+        "sha256": "326bf3a22c768a9b0166827f5f1dd6fd31faba186fae5fe85b603e319988e4a6",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "drill",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 800,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/drill.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {},
+      "animationParts": [
+        "drill_head"
+      ],
+      "lods": [
+        {
+          "url": "models/drill-lod0.79b6925e27c3.glb",
+          "sha256": "79b6925e27c3b959077e62bbbfdd0aeec068f80bb823eefb3323ea05c6ea67a7",
+          "triangles": 292,
+          "bytes": 26248,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.45,
+              0.0,
+              -0.45
+            ],
+            "max": [
+              0.45,
+              1.855,
+              0.45
+            ]
+          }
+        },
+        {
+          "url": "models/drill-lod1.da7c806e6deb.glb",
+          "sha256": "da7c806e6deb7fca5eb14a4de81bfe07011772b764bcad941b6c00696171e3cb",
+          "triangles": 80,
+          "bytes": 8108,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.45,
+              0.0,
+              -0.45
+            ],
+            "max": [
+              0.45,
+              1.855,
+              0.45
+            ]
+          }
+        },
+        {
+          "url": "models/drill-lod2.dc4992b96676.glb",
+          "sha256": "dc4992b9667656076748f43730aa172bc1c8518f1908e704180c4c89afa6e0fa",
+          "triangles": 48,
+          "bytes": 4928,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.45,
+              0.0,
+              -0.45
+            ],
+            "max": [
+              0.45,
+              1.855,
+              0.45
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.45,
+          0.0,
+          -0.45
+        ],
+        "max": [
+          0.45,
+          1.855,
+          0.45
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.45,
+          0.0,
+          -0.45
+        ],
+        "max": [
+          0.45,
+          1.855,
+          0.45
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/drill.bc9367d6ef43.png",
+        "sha256": "bc9367d6ef4397b819d88dd9140b596c2c380ba5fe04aef8ad9f620b594288e2",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "storage",
+      "footprint": [
+        4,
+        4
+      ],
+      "budget": 1800,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/storage.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {
+        "socket_loading": [
+          -0.65,
+          0.1,
+          1.8
+        ]
+      },
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/storage-lod0.732b2a7ec78a.glb",
+          "sha256": "732b2a7ec78a3ef12bed9173538e297db0b5ebf6eb4bf080ead690b0c053c3bc",
+          "triangles": 440,
+          "bytes": 38496,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -1.92,
+              0.0,
+              -1.92
+            ],
+            "max": [
+              1.92,
+              2.17,
+              1.92
+            ]
+          }
+        },
+        {
+          "url": "models/storage-lod1.ebea55d73aa6.glb",
+          "sha256": "ebea55d73aa6cb62d2130f7ce7c6239fcc17133294b27d8d8f98d2d14cd73425",
+          "triangles": 84,
+          "bytes": 7840,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -1.92,
+              0.0,
+              -1.92
+            ],
+            "max": [
+              1.92,
+              2.17,
+              1.92
+            ]
+          }
+        },
+        {
+          "url": "models/storage-lod2.a8e0f3f8163b.glb",
+          "sha256": "a8e0f3f8163b0f07addcc077aa71808865d2b96a1c0bee54adbc09ebebfeb679",
+          "triangles": 36,
+          "bytes": 4088,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -1.92,
+              0.0,
+              -1.92
+            ],
+            "max": [
+              1.92,
+              2.17,
+              1.92
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -1.92,
+          0.0,
+          -1.92
+        ],
+        "max": [
+          1.92,
+          2.17,
+          1.92
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -1.92,
+          0.0,
+          -1.92
+        ],
+        "max": [
+          1.92,
+          2.17,
+          1.92
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/storage.ebeec57ceeee.png",
+        "sha256": "ebeec57ceeee6ffbb5d147ae0fc0ca9abdbd490050a7ac82fe3e65ba3e7e351a",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "station",
+      "footprint": [
+        2,
+        2
+      ],
+      "budget": 1200,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/station.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {
+        "socket_loading": [
+          -0.5,
+          0.15,
+          -0.5
+        ]
+      },
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/station-lod0.035f183b8187.glb",
+          "sha256": "035f183b818775a66cc73ea6a6758e8c40f5006b15e0f7bf33e7df388dccf8be",
+          "triangles": 308,
+          "bytes": 27300,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.96,
+              0.0,
+              -0.96
+            ],
+            "max": [
+              0.96,
+              1.88,
+              0.96
+            ]
+          }
+        },
+        {
+          "url": "models/station-lod1.454e6d345b99.glb",
+          "sha256": "454e6d345b9955d1d13b313f9e3dbc162e00b21961af82d4c54f4320bbe1968d",
+          "triangles": 60,
+          "bytes": 5936,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.96,
+              0.0,
+              -0.96
+            ],
+            "max": [
+              0.96,
+              1.88,
+              0.96
+            ]
+          }
+        },
+        {
+          "url": "models/station-lod2.454e6d345b99.glb",
+          "sha256": "454e6d345b9955d1d13b313f9e3dbc162e00b21961af82d4c54f4320bbe1968d",
+          "triangles": 60,
+          "bytes": 5936,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.96,
+              0.0,
+              -0.96
+            ],
+            "max": [
+              0.96,
+              1.88,
+              0.96
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.96,
+          0.0,
+          -0.96
+        ],
+        "max": [
+          0.96,
+          1.88,
+          0.96
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.96,
+          0.0,
+          -0.96
+        ],
+        "max": [
+          0.96,
+          1.88,
+          0.96
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/station.c18c21bc6c39.png",
+        "sha256": "c18c21bc6c3975b490089000f79fd57d11c14fe6cc5d56ad1b05e74fc3835794",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "depot",
+      "footprint": [
+        4,
+        4
+      ],
+      "budget": 2000,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/depot.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {
+        "socket_loading": [
+          0,
+          0.1,
+          1.85
+        ]
+      },
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/depot-lod0.a66b0d31500f.glb",
+          "sha256": "a66b0d31500ffeb5423f33d8b83a3a1ce969cdd867de6f5d4c46589d37546628",
+          "triangles": 484,
+          "bytes": 42200,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -1.92,
+              0.0,
+              -1.92
+            ],
+            "max": [
+              1.92,
+              2.32,
+              1.92
+            ]
+          }
+        },
+        {
+          "url": "models/depot-lod1.53adcbc557f3.glb",
+          "sha256": "53adcbc557f3bc59c49276c25559b6dc5f5ff526a25e954bb0040097f7831f2c",
+          "triangles": 84,
+          "bytes": 7820,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -1.92,
+              0.0,
+              -1.92
+            ],
+            "max": [
+              1.92,
+              2.32,
+              1.92
+            ]
+          }
+        },
+        {
+          "url": "models/depot-lod2.02a3539140b2.glb",
+          "sha256": "02a3539140b20c119519fb29bbf12c15e47790f09be63fa37651b958e3fa5df6",
+          "triangles": 36,
+          "bytes": 4068,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -1.92,
+              0.0,
+              -1.92
+            ],
+            "max": [
+              1.92,
+              2.14,
+              1.92
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -1.92,
+          0.0,
+          -1.92
+        ],
+        "max": [
+          1.92,
+          2.32,
+          1.92
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -1.92,
+          0.0,
+          -1.92
+        ],
+        "max": [
+          1.92,
+          2.32,
+          1.92
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/depot.5c9a6040f2c2.png",
+        "sha256": "5c9a6040f2c2c597c93fa1289274275d685343f171355e48a28706785c112f9c",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "pod",
+      "footprint": [
+        0.7,
+        0.95
+      ],
+      "budget": 500,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/pod.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {},
+      "animationParts": [
+        "cargo"
+      ],
+      "lods": [
+        {
+          "url": "models/pod-lod0.dba8bfea79e8.glb",
+          "sha256": "dba8bfea79e8254818b9ec22eb4e60077a068b2cf8b601df54e3ce8f2964dadd",
+          "triangles": 264,
+          "bytes": 24416,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.32,
+              -0.0,
+              -0.445
+            ],
+            "max": [
+              0.32,
+              0.6,
+              0.445
+            ]
+          }
+        },
+        {
+          "url": "models/pod-lod1.38c9966014da.glb",
+          "sha256": "38c9966014dadd513fc2ffd733421140630648f9dfa5b976fc2b862219e9f283",
+          "triangles": 48,
+          "bytes": 5824,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.32,
+              0.0,
+              -0.445
+            ],
+            "max": [
+              0.32,
+              0.6,
+              0.445
+            ]
+          }
+        },
+        {
+          "url": "models/pod-lod2.86517e273999.glb",
+          "sha256": "86517e2739992b2e259d49eef6a7269188cda4fc1d383e4d8ce2ee7941f77ea1",
+          "triangles": 24,
+          "bytes": 3108,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.32,
+              0.0,
+              -0.445
+            ],
+            "max": [
+              0.32,
+              0.475,
+              0.445
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.32,
+          -0.0,
+          -0.445
+        ],
+        "max": [
+          0.32,
+          0.6,
+          0.445
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.32,
+          -0.0,
+          -0.445
+        ],
+        "max": [
+          0.32,
+          0.6,
+          0.445
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/pod.ed7968f5ead6.png",
+        "sha256": "ed7968f5ead6af8f606ee432d55c2bb34b7782924cf447993ebaede2f52b3627",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "rail-straight",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 160,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/rail-straight.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {},
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/rail-straight-lod0.a0579c35c14e.glb",
+          "sha256": "a0579c35c14e6cf688df41947f63eec4fcf22c5e5a0458ba2a6606611029dcda",
+          "triangles": 48,
+          "bytes": 4960,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.33,
+              -0.0,
+              -0.5
+            ],
+            "max": [
+              0.33,
+              0.14,
+              0.5
+            ]
+          }
+        },
+        {
+          "url": "models/rail-straight-lod1.ca295e13fc21.glb",
+          "sha256": "ca295e13fc213874617344e1b717501932e07740a9132d7a11293f8ca21a965b",
+          "triangles": 24,
+          "bytes": 3080,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.2625,
+              0.0,
+              -0.5
+            ],
+            "max": [
+              0.2625,
+              0.12,
+              0.5
+            ]
+          }
+        },
+        {
+          "url": "models/rail-straight-lod2.ca295e13fc21.glb",
+          "sha256": "ca295e13fc213874617344e1b717501932e07740a9132d7a11293f8ca21a965b",
+          "triangles": 24,
+          "bytes": 3080,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.2625,
+              0.0,
+              -0.5
+            ],
+            "max": [
+              0.2625,
+              0.12,
+              0.5
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.33,
+          -0.0,
+          -0.5
+        ],
+        "max": [
+          0.33,
+          0.14,
+          0.5
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.33,
+          -0.0,
+          -0.5
+        ],
+        "max": [
+          0.33,
+          0.14,
+          0.5
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/rail-straight.7388d64a1e6b.png",
+        "sha256": "7388d64a1e6bf5a9bdd19175105849cc5ba58cf6edea1deeb16bfef69d77b394",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "rail-corner",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 160,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/rail-corner.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {},
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/rail-corner-lod0.fecf5f633016.glb",
+          "sha256": "fecf5f633016fc7e6d2648c9f56674f06da11fbf6745f3f61be86092e4119852",
+          "triangles": 60,
+          "bytes": 5836,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.35,
+              0.0,
+              -0.5
+            ],
+            "max": [
+              0.5,
+              0.15,
+              0.35
+            ]
+          }
+        },
+        {
+          "url": "models/rail-corner-lod1.214dc8281d82.glb",
+          "sha256": "214dc8281d82b15e55904fded699cb607adb1d513e59862808643ac7172bd7bc",
+          "triangles": 48,
+          "bytes": 4960,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.2625,
+              0.0,
+              -0.5
+            ],
+            "max": [
+              0.5,
+              0.12,
+              0.2625
+            ]
+          }
+        },
+        {
+          "url": "models/rail-corner-lod2.214dc8281d82.glb",
+          "sha256": "214dc8281d82b15e55904fded699cb607adb1d513e59862808643ac7172bd7bc",
+          "triangles": 48,
+          "bytes": 4960,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.2625,
+              0.0,
+              -0.5
+            ],
+            "max": [
+              0.5,
+              0.12,
+              0.2625
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.35,
+          0.0,
+          -0.5
+        ],
+        "max": [
+          0.5,
+          0.15,
+          0.35
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.35,
+          0.0,
+          -0.5
+        ],
+        "max": [
+          0.5,
+          0.15,
+          0.35
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/rail-corner.824973bd0d52.png",
+        "sha256": "824973bd0d52baaabe5401771a204e788879a6b3bd14b7905aea6ddb22c831ce",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "rail-endpoint",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 160,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/rail-endpoint.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {},
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/rail-endpoint-lod0.591ef458454a.glb",
+          "sha256": "591ef458454a4cd61b0eab3380d1bd302127c8370191ddadce3965829579bd84",
+          "triangles": 56,
+          "bytes": 5844,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.33,
+              0.0,
+              -0.08
+            ],
+            "max": [
+              0.33,
+              0.29,
+              0.08
+            ]
+          }
+        },
+        {
+          "url": "models/rail-endpoint-lod1.cb54471e3bce.glb",
+          "sha256": "cb54471e3bce6b0e42a52ed21ab2c917ef17a3d11272a0a514bffcb0926d08ce",
+          "triangles": 12,
+          "bytes": 2112,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.33,
+              0.0,
+              -0.08
+            ],
+            "max": [
+              0.33,
+              0.24,
+              0.08
+            ]
+          }
+        },
+        {
+          "url": "models/rail-endpoint-lod2.cb54471e3bce.glb",
+          "sha256": "cb54471e3bce6b0e42a52ed21ab2c917ef17a3d11272a0a514bffcb0926d08ce",
+          "triangles": 12,
+          "bytes": 2112,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.33,
+              0.0,
+              -0.08
+            ],
+            "max": [
+              0.33,
+              0.24,
+              0.08
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.33,
+          0.0,
+          -0.08
+        ],
+        "max": [
+          0.33,
+          0.29,
+          0.08
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.33,
+          0.0,
+          -0.08
+        ],
+        "max": [
+          0.33,
+          0.29,
+          0.08
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/rail-endpoint.365373643354.png",
+        "sha256": "36537364335492151d21afa353e48bcfd00696be34c57f136e4499696616be56",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "rail-junction",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 160,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/rail-junction.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {},
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/rail-junction-lod0.2731fd269202.glb",
+          "sha256": "2731fd269202ceaef7a92e9ae179822123d5e3f6f5d108712ef6c1a35f813835",
+          "triangles": 52,
+          "bytes": 4952,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.4,
+              0.0,
+              -0.4
+            ],
+            "max": [
+              0.4,
+              0.2075,
+              0.4
+            ]
+          }
+        },
+        {
+          "url": "models/rail-junction-lod1.8a7f3b02d5ba.glb",
+          "sha256": "8a7f3b02d5ba4de063c1fb0e546385ca770a54850aebd23488b6c3e6249ffa9b",
+          "triangles": 20,
+          "bytes": 2596,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.34641,
+              0.0,
+              -0.4
+            ],
+            "max": [
+              0.34641,
+              0.18,
+              0.4
+            ]
+          }
+        },
+        {
+          "url": "models/rail-junction-lod2.8a7f3b02d5ba.glb",
+          "sha256": "8a7f3b02d5ba4de063c1fb0e546385ca770a54850aebd23488b6c3e6249ffa9b",
+          "triangles": 20,
+          "bytes": 2596,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.34641,
+              0.0,
+              -0.4
+            ],
+            "max": [
+              0.34641,
+              0.18,
+              0.4
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.4,
+          0.0,
+          -0.4
+        ],
+        "max": [
+          0.4,
+          0.2075,
+          0.4
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.4,
+          0.0,
+          -0.4
+        ],
+        "max": [
+          0.4,
+          0.2075,
+          0.4
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/rail-junction.02ba8f336b11.png",
+        "sha256": "02ba8f336b11999fb20a401ffafda8934c2c8b4058271a28986862fb2681eed4",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "rail-arrow",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 160,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/rail-arrow.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {},
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/rail-arrow-lod0.dabf80826fb3.glb",
+          "sha256": "dabf80826fb380a6f019f300c74414e90b10c92bcb66551db5b1310b55666fc1",
+          "triangles": 36,
+          "bytes": 4048,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.22149,
+              -0.0,
+              -0.34
+            ],
+            "max": [
+              0.22149,
+              0.035,
+              0.265663
+            ]
+          }
+        },
+        {
+          "url": "models/rail-arrow-lod1.dabf80826fb3.glb",
+          "sha256": "dabf80826fb380a6f019f300c74414e90b10c92bcb66551db5b1310b55666fc1",
+          "triangles": 36,
+          "bytes": 4048,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.22149,
+              -0.0,
+              -0.34
+            ],
+            "max": [
+              0.22149,
+              0.035,
+              0.265663
+            ]
+          }
+        },
+        {
+          "url": "models/rail-arrow-lod2.dabf80826fb3.glb",
+          "sha256": "dabf80826fb380a6f019f300c74414e90b10c92bcb66551db5b1310b55666fc1",
+          "triangles": 36,
+          "bytes": 4048,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.22149,
+              -0.0,
+              -0.34
+            ],
+            "max": [
+              0.22149,
+              0.035,
+              0.265663
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.22149,
+          -0.0,
+          -0.34
+        ],
+        "max": [
+          0.22149,
+          0.035,
+          0.265663
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.22149,
+          -0.0,
+          -0.34
+        ],
+        "max": [
+          0.22149,
+          0.035,
+          0.265663
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/rail-arrow.f6fd6d3a9fbe.png",
+        "sha256": "f6fd6d3a9fbe18ba62f2ebee0e437452be93619e58e8c7f1e47692f98f571b43",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "construction",
+      "footprint": [
+        4,
+        4
+      ],
+      "budget": 800,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/construction.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {},
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/construction-lod0.84d9ae71bdef.glb",
+          "sha256": "84d9ae71bdef41e2794626f551725c9246330ce9e31cf7946ff85185732a255f",
+          "triangles": 204,
+          "bytes": 17964,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -1.93,
+              0.0,
+              -1.93
+            ],
+            "max": [
+              1.93,
+              1.48,
+              1.93
+            ]
+          }
+        },
+        {
+          "url": "models/construction-lod1.2e031f16fec1.glb",
+          "sha256": "2e031f16fec1c7216f73adb457a98e12e6bd89cc95a427427f97bb4c5eacf68f",
+          "triangles": 60,
+          "bytes": 5864,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -1.93,
+              0.0,
+              -1.93
+            ],
+            "max": [
+              1.93,
+              1.48,
+              1.93
+            ]
+          }
+        },
+        {
+          "url": "models/construction-lod2.9dc964c44953.glb",
+          "sha256": "9dc964c44953b1b981db82b08190d93fe4340ecbab8d61a119a7b8dac93e1f38",
+          "triangles": 12,
+          "bytes": 2108,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -1.93,
+              0.0,
+              -1.93
+            ],
+            "max": [
+              1.93,
+              0.16,
+              1.93
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -1.93,
+          0.0,
+          -1.93
+        ],
+        "max": [
+          1.93,
+          1.48,
+          1.93
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -1.93,
+          0.0,
+          -1.93
+        ],
+        "max": [
+          1.93,
+          1.48,
+          1.93
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/construction.73854b2ec6a3.png",
+        "sha256": "73854b2ec6a36d4baf19374d6ac83529aa8a3bd49dd23110277fdf6362ed8996",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "terrain-rock",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 250,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/terrain-rock.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {},
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/terrain-rock-lod0.989897d0cdb7.glb",
+          "sha256": "989897d0cdb7b4b6cd9fb6d5b5894fe30d6097e72dafd85b04cc91a4b2078c53",
+          "triangles": 40,
+          "bytes": 5748,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.393547,
+              0.0,
+              -0.348762
+            ],
+            "max": [
+              0.419941,
+              0.76,
+              0.350128
+            ]
+          }
+        },
+        {
+          "url": "models/terrain-rock-lod1.93a6ed154f51.glb",
+          "sha256": "93a6ed154f51b35b570cc9b331c3d5af79c069de6a5a069181af566eadf82c1a",
+          "triangles": 20,
+          "bytes": 3460,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.393547,
+              0.0,
+              -0.348762
+            ],
+            "max": [
+              0.393547,
+              0.76,
+              0.348762
+            ]
+          }
+        },
+        {
+          "url": "models/terrain-rock-lod2.93a6ed154f51.glb",
+          "sha256": "93a6ed154f51b35b570cc9b331c3d5af79c069de6a5a069181af566eadf82c1a",
+          "triangles": 20,
+          "bytes": 3460,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.393547,
+              0.0,
+              -0.348762
+            ],
+            "max": [
+              0.393547,
+              0.76,
+              0.348762
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.393547,
+          0.0,
+          -0.348762
+        ],
+        "max": [
+          0.419941,
+          0.76,
+          0.350128
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.393547,
+          0.0,
+          -0.348762
+        ],
+        "max": [
+          0.419941,
+          0.76,
+          0.350128
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/terrain-rock.daace5279262.png",
+        "sha256": "daace527926267308cc32aca41552727e99fe24f797e4f58c1a8e16a15de6403",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "terrain-tree",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 250,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/terrain-tree.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {},
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/terrain-tree-lod0.9191094b3542.glb",
+          "sha256": "9191094b3542fc49197d4da1e444955e0e37e9bc2449a3a2673e1469bfcc8eff",
+          "triangles": 84,
+          "bytes": 9464,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.339881,
+              0.0,
+              -0.323243
+            ],
+            "max": [
+              0.339881,
+              1.515,
+              0.323243
+            ]
+          }
+        },
+        {
+          "url": "models/terrain-tree-lod1.cff2a2541a0b.glb",
+          "sha256": "cff2a2541a0b287a236dda314ed52d47d5a8fd5673362c7a2e75537756a0a3da",
+          "triangles": 32,
+          "bytes": 4396,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.339881,
+              0.0,
+              -0.323243
+            ],
+            "max": [
+              0.339881,
+              1.23,
+              0.323243
+            ]
+          }
+        },
+        {
+          "url": "models/terrain-tree-lod2.79a6a2f0be48.glb",
+          "sha256": "79a6a2f0be48437c255239c19f75e729da02f863a09fd9a614ae6c668efceee2",
+          "triangles": 20,
+          "bytes": 3520,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.339881,
+              -0.0,
+              -0.323243
+            ],
+            "max": [
+              0.339881,
+              0.9,
+              0.323243
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.339881,
+          0.0,
+          -0.323243
+        ],
+        "max": [
+          0.339881,
+          1.515,
+          0.323243
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.339881,
+          0.0,
+          -0.323243
+        ],
+        "max": [
+          0.339881,
+          1.515,
+          0.323243
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/terrain-tree.3608c377393b.png",
+        "sha256": "3608c377393b3406f16eef38c396eef49d143d554adebc09f626218789337f25",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "terrain-surface",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 40,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/terrain-surface.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {},
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/terrain-surface-lod0.5549a4805194.glb",
+          "sha256": "5549a48051943fcea56e50188b89a49fb178d1a3e54e8b4eaf5bb85e5d133b30",
+          "triangles": 12,
+          "bytes": 2048,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.5,
+              -0.18,
+              -0.5
+            ],
+            "max": [
+              0.5,
+              0.0,
+              0.5
+            ]
+          }
+        },
+        {
+          "url": "models/terrain-surface-lod1.5549a4805194.glb",
+          "sha256": "5549a48051943fcea56e50188b89a49fb178d1a3e54e8b4eaf5bb85e5d133b30",
+          "triangles": 12,
+          "bytes": 2048,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.5,
+              -0.18,
+              -0.5
+            ],
+            "max": [
+              0.5,
+              0.0,
+              0.5
+            ]
+          }
+        },
+        {
+          "url": "models/terrain-surface-lod2.5549a4805194.glb",
+          "sha256": "5549a48051943fcea56e50188b89a49fb178d1a3e54e8b4eaf5bb85e5d133b30",
+          "triangles": 12,
+          "bytes": 2048,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.5,
+              -0.18,
+              -0.5
+            ],
+            "max": [
+              0.5,
+              0.0,
+              0.5
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.5,
+          -0.18,
+          -0.5
+        ],
+        "max": [
+          0.5,
+          0.0,
+          0.5
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.5,
+          -0.18,
+          -0.5
+        ],
+        "max": [
+          0.5,
+          0.0,
+          0.5
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/terrain-surface.87aa73c7ae0d.png",
+        "sha256": "87aa73c7ae0df40d85e6cf2389c3395d8ad54cdb983ff0061907280e5a0cc074",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "ore-iron",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 200,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/ore-iron.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {},
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/ore-iron-lod0.2deda2da1c58.glb",
+          "sha256": "2deda2da1c58c510e67443454349c3a9369fc56abece7faa205860132839e74f",
+          "triangles": 80,
+          "bytes": 10332,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.398019,
+              -0.0,
+              -0.374282
+            ],
+            "max": [
+              0.398019,
+              0.47,
+              0.374836
+            ]
+          }
+        },
+        {
+          "url": "models/ore-iron-lod1.ece79193cdc0.glb",
+          "sha256": "ece79193cdc05a11e43d258db3887579e66553b4dede05c0e8f66e2dd6facd79",
+          "triangles": 20,
+          "bytes": 3464,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.322301,
+              0.0,
+              -0.282888
+            ],
+            "max": [
+              0.062301,
+              0.47,
+              0.082888
+            ]
+          }
+        },
+        {
+          "url": "models/ore-iron-lod2.ece79193cdc0.glb",
+          "sha256": "ece79193cdc05a11e43d258db3887579e66553b4dede05c0e8f66e2dd6facd79",
+          "triangles": 20,
+          "bytes": 3464,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.322301,
+              0.0,
+              -0.282888
+            ],
+            "max": [
+              0.062301,
+              0.47,
+              0.082888
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.398019,
+          -0.0,
+          -0.374282
+        ],
+        "max": [
+          0.398019,
+          0.47,
+          0.374836
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.398019,
+          -0.0,
+          -0.374282
+        ],
+        "max": [
+          0.398019,
+          0.47,
+          0.374836
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/ore-iron.49e186e61406.png",
+        "sha256": "49e186e6140688f1343757fa0b9c8ea938536b0095f5333a38f5b3290c954326",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "ore-copper",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 200,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/ore-copper.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {},
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/ore-copper-lod0.dc20675ec14a.glb",
+          "sha256": "dc20675ec14aaf13b71097a5b5bf97732a1b4ce00e50a2338378869a68dca476",
+          "triangles": 80,
+          "bytes": 10332,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.398019,
+              -0.0,
+              -0.374282
+            ],
+            "max": [
+              0.398019,
+              0.47,
+              0.374836
+            ]
+          }
+        },
+        {
+          "url": "models/ore-copper-lod1.685b41481c77.glb",
+          "sha256": "685b41481c77fb5de80c354e485c75d2c6cbcfa03da5a13d06838313b5ac70c5",
+          "triangles": 20,
+          "bytes": 3464,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.322301,
+              0.0,
+              -0.282888
+            ],
+            "max": [
+              0.062301,
+              0.47,
+              0.082888
+            ]
+          }
+        },
+        {
+          "url": "models/ore-copper-lod2.685b41481c77.glb",
+          "sha256": "685b41481c77fb5de80c354e485c75d2c6cbcfa03da5a13d06838313b5ac70c5",
+          "triangles": 20,
+          "bytes": 3464,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.322301,
+              0.0,
+              -0.282888
+            ],
+            "max": [
+              0.062301,
+              0.47,
+              0.082888
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.398019,
+          -0.0,
+          -0.374282
+        ],
+        "max": [
+          0.398019,
+          0.47,
+          0.374836
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.398019,
+          -0.0,
+          -0.374282
+        ],
+        "max": [
+          0.398019,
+          0.47,
+          0.374836
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/ore-copper.bb454e010983.png",
+        "sha256": "bb454e0109831b83f7369a8647d3034c9c4b9563f8a7cf8f4c51b1be752f6cf5",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "hookup-crane",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 1200,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/hookup-crane.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {
+        "socket_hook": [
+          0,
+          0.78,
+          0
+        ]
+      },
+      "animationParts": [
+        "trolley"
+      ],
+      "lods": [
+        {
+          "url": "models/hookup-crane-lod0.0795b19b9be5.glb",
+          "sha256": "0795b19b9be5e7a6527b718f4d44f9670e21e64b0c8072ba46f7d80e7f4b2bf3",
+          "triangles": 204,
+          "bytes": 18856,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.23,
+              -0.0,
+              -0.5
+            ],
+            "max": [
+              0.23,
+              1.35,
+              0.36
+            ]
+          }
+        },
+        {
+          "url": "models/hookup-crane-lod1.492770426b96.glb",
+          "sha256": "492770426b9628f3855cf60128399f19171c617cfd851a1d7cbc36b91faab912",
+          "triangles": 60,
+          "bytes": 6736,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.1,
+              0.0,
+              -0.46
+            ],
+            "max": [
+              0.1,
+              1.35,
+              0.36
+            ]
+          }
+        },
+        {
+          "url": "models/hookup-crane-lod2.d38bfd345320.glb",
+          "sha256": "d38bfd3453205b2df64f647ad0646140eabd5eb98968f531e23691d1ed26f47d",
+          "triangles": 24,
+          "bytes": 3116,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.08,
+              0.0,
+              -0.46
+            ],
+            "max": [
+              0.08,
+              1.35,
+              0.36
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.23,
+          -0.0,
+          -0.5
+        ],
+        "max": [
+          0.23,
+          1.35,
+          0.36
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.23,
+          -0.0,
+          -0.5
+        ],
+        "max": [
+          0.23,
+          1.35,
+          0.36
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/hookup-crane.4114e0f33b69.png",
+        "sha256": "4114e0f33b6954ca5b1f5da097fa4b50456ff2528d9890ccbbd537c0ea3145c5",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    },
+    {
+      "id": "hookup-marker",
+      "footprint": [
+        1,
+        1
+      ],
+      "budget": 160,
+      "policy": "fixed",
+      "version": 1,
+      "pivot": [
+        0,
+        0,
+        0
+      ],
+      "front": "+Z",
+      "source": "assets/world/source/hookup-marker.blend",
+      "recipe": "assets/world/recipes/pack-v1.json",
+      "provenance": "assets/world/provenance.json",
+      "sockets": {
+        "socket_stop": [
+          0,
+          0.03,
+          0
+        ]
+      },
+      "animationParts": [],
+      "lods": [
+        {
+          "url": "models/hookup-marker-lod0.67294392fe62.glb",
+          "sha256": "67294392fe621ee73f5bb569ec00d889a6508a56732b2d1d97db1d9da0bb40fd",
+          "triangles": 24,
+          "bytes": 3120,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.45,
+              0.0,
+              -0.45
+            ],
+            "max": [
+              0.45,
+              0.058,
+              0.45
+            ]
+          }
+        },
+        {
+          "url": "models/hookup-marker-lod1.7f8021b5d5b1.glb",
+          "sha256": "7f8021b5d5b16c93e2fe2b308a46d754c298516b749853607b5d78723f46aa41",
+          "triangles": 12,
+          "bytes": 2180,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.45,
+              0.0,
+              -0.45
+            ],
+            "max": [
+              0.45,
+              0.05,
+              0.45
+            ]
+          }
+        },
+        {
+          "url": "models/hookup-marker-lod2.7f8021b5d5b1.glb",
+          "sha256": "7f8021b5d5b16c93e2fe2b308a46d754c298516b749853607b5d78723f46aa41",
+          "triangles": 12,
+          "bytes": 2180,
+          "materials": 1,
+          "bounds": {
+            "min": [
+              -0.45,
+              0.0,
+              -0.45
+            ],
+            "max": [
+              0.45,
+              0.05,
+              0.45
+            ]
+          }
+        }
+      ],
+      "bounds": {
+        "min": [
+          -0.45,
+          0.0,
+          -0.45
+        ],
+        "max": [
+          0.45,
+          0.058,
+          0.45
+        ]
+      },
+      "animationBounds": {
+        "min": [
+          -0.45,
+          0.0,
+          -0.45
+        ],
+        "max": [
+          0.45,
+          0.058,
+          0.45
+        ]
+      },
+      "thumbnail": {
+        "url": "thumbnails/hookup-marker.1c38a969ccc0.png",
+        "sha256": "1c38a969ccc0ec2ddcef19d7f8adfa595d28ad844e9477e2bbc5bf2c7950dcfa",
+        "width": 256,
+        "height": 256,
+        "scale": 6.3
+      }
+    }
+  ]
+}

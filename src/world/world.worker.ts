@@ -1,62 +1,70 @@
 /// <reference lib="webworker" />
-import { asId, gridSize, worldContent } from '../domain';
+import { asId, gridSize, worldContent, stringifyExact } from '../domain';
 import type { StationId, WorldEntityId } from '../domain';
 import { WorldBuffer } from '../simulation';
-import type { WorldCommand, WorldDelta, WorldWorkerResponse } from './protocol';
+import type { WorldCommand, WorldWorkerResponse } from './protocol';
 import { WORLD_PROTOCOL_VERSION } from './protocol';
 import {
   deserializeWorldRuntime,
   serializeWorldRuntime,
 } from './serialization';
 import { WorldRuntime } from './runtime';
-import type { WorldSnapshot } from './model';
+import { buildWorldDelta } from './delta';
 
 let runtime: WorldRuntime | undefined;
-const respond = (response: WorldWorkerResponse): void =>
-  self.postMessage(response);
-const deltaBetween = (
-  before: WorldSnapshot,
-  after: WorldSnapshot,
-): WorldDelta => {
-  const removed = before.entities
-    .filter((entity) => !after.entities.some((next) => next.id === entity.id))
-    .map((entity) => entity.id);
-  const oreChanges: { index: number; remaining: number }[] = [];
-  for (let index = 0; index < after.grid.oreRemaining.length; index += 1)
-    if (after.grid.oreRemaining[index] !== before.grid.oreRemaining[index])
-      oreChanges.push({ index, remaining: after.grid.oreRemaining[index]! });
-  return {
-    baseRevision: before.revision,
-    revision: after.revision,
-    logicalTime: after.logicalTime,
-    entities: after.entities,
-    removedEntityIds: removed,
-    railNodes: after.railNodes,
-    railEdges: after.railEdges,
-    railBlocks: after.railBlocks,
-    pods: after.pods,
-    missions: after.missions,
-    stations: after.stations,
-    buildings: after.buildings,
-    diagnostics: after.diagnostics,
-    oreChanges,
-    paused: after.paused,
-    timeScale: after.timeScale,
-    scheduledEvents: after.scheduledEvents,
-    ...(after.pendingAdvanceTarget === undefined
-      ? {}
-      : { pendingAdvanceTarget: after.pendingAdvanceTarget }),
-  };
+const CHECKPOINT_COMMANDS = new Set([
+  'PLACE_RAIL_PATH',
+  'REMOVE_RAIL_EDGE',
+  'PLACE_CONTROL_NODE',
+  'CREATE_SITE',
+  'PLACE_DRILL',
+  'CONFIGURE_STATION',
+  'CANCEL_CONSTRUCTION',
+  'DISMANTLE_ENTITY',
+  'REPLACE_FACTORY',
+  'PLACE_ENTITY',
+  'REMOVE_ENTITY',
+  'ADD_RAIL_NODE',
+  'ADD_RAIL_EDGE',
+  'ADD_TRAFFIC_STATION',
+  'ADD_POD',
+  'DISPATCH',
+  'WAKE_DESTINATION',
+]);
+let metricsEnabled = false,
+  commandStarted = 0,
+  deltaMs = 0,
+  previousPostMessageMs = 0;
+const respond = (response: WorldWorkerResponse): void => {
+  const start = performance.now();
+  self.postMessage(
+    metricsEnabled
+      ? {
+          ...response,
+          metrics: {
+            workerMs: start - commandStarted,
+            deltaMs,
+            previousPostMessageMs,
+          },
+        }
+      : response,
+  );
+  previousPostMessageMs = performance.now() - start;
 };
 self.onmessage = (event: MessageEvent<WorldCommand>) => {
   const command = event.data;
+  metricsEnabled = command.metrics === true;
+  commandStarted = performance.now();
+  deltaMs = 0;
+  let rollbackState: ReturnType<typeof serializeWorldRuntime> | undefined;
   try {
     if (command.protocolVersion !== WORLD_PROTOCOL_VERSION)
       throw new Error('Unsupported world worker protocol');
     if (command.type === 'GENERATE') {
       runtime = WorldRuntime.generate(command.config);
+      runtime.takeGridChanges();
       respond({
-        protocolVersion: 2,
+        protocolVersion: WORLD_PROTOCOL_VERSION,
         requestId: command.requestId,
         type: 'READY',
         snapshot: runtime.snapshot(),
@@ -65,8 +73,9 @@ self.onmessage = (event: MessageEvent<WorldCommand>) => {
     }
     if (command.type === 'LOAD') {
       runtime = deserializeWorldRuntime(command.state);
+      runtime.takeGridChanges();
       respond({
-        protocolVersion: 2,
+        protocolVersion: WORLD_PROTOCOL_VERSION,
         requestId: command.requestId,
         type: 'READY',
         snapshot: runtime.snapshot(),
@@ -76,18 +85,29 @@ self.onmessage = (event: MessageEvent<WorldCommand>) => {
     if (runtime === undefined)
       throw new Error('World worker is not initialised');
     if (command.type === 'SAVE') {
+      const state = serializeWorldRuntime(runtime);
+      if (command.serialized) {
+        respond({
+          protocolVersion: WORLD_PROTOCOL_VERSION,
+          requestId: command.requestId,
+          type: 'SAVE_PAYLOAD',
+          revision: runtime.revision,
+          payload: stringifyExact(state),
+        });
+        return;
+      }
       respond({
-        protocolVersion: 2,
+        protocolVersion: WORLD_PROTOCOL_VERSION,
         requestId: command.requestId,
         type: 'SAVE_RESULT',
         revision: runtime.revision,
-        state: serializeWorldRuntime(runtime),
+        state,
       });
       return;
     }
     if (command.type === 'SNAPSHOT') {
       respond({
-        protocolVersion: 2,
+        protocolVersion: WORLD_PROTOCOL_VERSION,
         requestId: command.requestId,
         type: 'READY',
         snapshot: runtime.snapshot(),
@@ -99,18 +119,27 @@ self.onmessage = (event: MessageEvent<WorldCommand>) => {
         `Stale world command: expected revision ${runtime.revision}`,
       );
     if (command.type === 'VALIDATE_GHOST') {
-      const validation = runtime.validateGhost(
-        command.targetKind,
-        {
-          position: command.position,
-          size: gridSize(command.size.width, command.size.height),
-          rotation: command.rotation,
-        },
-        command.stationId,
-        command.resourceId,
-      );
+      const validation =
+        command.targetKind === 'drill' ||
+        command.targetKind === 'station' ||
+        command.targetKind === 'junction'
+          ? runtime.validateInteraction(
+              command.targetKind,
+              command.position,
+              command.mineId,
+            )
+          : runtime.validateGhost(
+              command.targetKind,
+              {
+                position: command.position,
+                size: gridSize(command.size.width, command.size.height),
+                rotation: command.rotation,
+              },
+              command.stationId,
+              command.resourceId,
+            );
       respond({
-        protocolVersion: 2,
+        protocolVersion: WORLD_PROTOCOL_VERSION,
         requestId: command.requestId,
         type: 'VALIDATION',
         revision: runtime.revision,
@@ -118,7 +147,16 @@ self.onmessage = (event: MessageEvent<WorldCommand>) => {
       });
       return;
     }
-    const before = runtime.snapshot();
+    if (CHECKPOINT_COMMANDS.has(command.type))
+      rollbackState = serializeWorldRuntime(runtime);
+    runtime.beginPresentation(
+      !(
+        (command.type === 'ADVANCE' || command.type === 'CONTINUE_ADVANCE') &&
+        command.recordPresentation === false
+      ),
+    );
+    const baseRevision = runtime.revision;
+    const beforeEntityIds = new Set(runtime.entities.keys());
     let exhausted = false;
     if (command.type === 'PLACE_RAIL_PATH')
       runtime.placeRailPath(command.points);
@@ -239,16 +277,33 @@ self.onmessage = (event: MessageEvent<WorldCommand>) => {
     else if (command.type === 'DISPATCH') runtime.dispatch();
     else if (command.type === 'WAKE_DESTINATION')
       runtime.wakeDestination(command.stationId);
-    const delta = deltaBetween(before, runtime.snapshot());
+    runtime.capturePresentation();
+    const presentation = runtime.presentation.finish(runtime.logicalTime);
+    const deltaStarted = performance.now();
+    const delta = buildWorldDelta(
+      baseRevision,
+      beforeEntityIds,
+      { ...runtime.snapshot(), presentation },
+      runtime.takeDrillExtractionEvents(),
+      runtime.takeGridChanges(),
+    );
+    deltaMs = performance.now() - deltaStarted;
     respond({
-      protocolVersion: 2,
+      protocolVersion: WORLD_PROTOCOL_VERSION,
       requestId: command.requestId,
       type: exhausted ? 'ADVANCE_PAUSED' : 'DELTA',
       delta,
     });
   } catch (error) {
+    if (rollbackState !== undefined) {
+      runtime = deserializeWorldRuntime(rollbackState);
+      runtime.takeGridChanges();
+    } else if (runtime !== undefined) {
+      // Force client reconciliation after a partially executed multi-event advance.
+      runtime.revision += 1;
+    }
     respond({
-      protocolVersion: 2,
+      protocolVersion: WORLD_PROTOCOL_VERSION,
       requestId: command.requestId,
       type: 'ERROR',
       error: error instanceof Error ? error.message : 'World worker failed',

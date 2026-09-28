@@ -1,0 +1,10 @@
+{
+  "dismantledDuringTransit": true,
+  "exactRecoveryAfterReload": true,
+  "replacement": true,
+  "stationPreserved": true,
+  "inFlightCargo": 10,
+  "cancelledDuringTransit": true,
+  "checkpointRestored": true,
+  "evacuationCompleted": true
+}

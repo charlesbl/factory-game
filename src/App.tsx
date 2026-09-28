@@ -64,6 +64,7 @@ import {
 } from './ui/FactoryGraphEditor';
 import { FactoryLibraryView } from './ui/FactoryLibraryView';
 import { WorldView } from './ui/WorldView';
+import { WorldSession } from './application/world/WorldSession';
 import { CompilationClient } from './workers';
 
 const idFactory = createIdFactory(100);
@@ -101,6 +102,12 @@ const App = () => {
   >('compiling');
   const [diagnosticsVisible, setDiagnosticsVisible] = useState(true);
   const [view, setView] = useState<'factory' | 'world' | 'library'>('factory');
+  const [worldStarted, setWorldStarted] = useState(false);
+  const [worldSession] = useState(() => new WorldSession());
+  useEffect(
+    () => (worldStarted ? worldSession.retain() : undefined),
+    [worldStarted, worldSession],
+  );
   const [definitions, setDefinitions] = useState<readonly FactoryDefinition[]>(
     () => [
       {
@@ -1082,6 +1089,7 @@ const App = () => {
       }
     }
     setView(next);
+    if (next === 'world') setWorldStarted(true);
   };
 
   return (
@@ -1113,7 +1121,7 @@ const App = () => {
             {view === 'factory'
               ? `rev ${blueprint.revision}`
               : view === 'world'
-                ? '1 active site'
+                ? 'World workspace'
                 : `${versions.length} versions`}
           </em>
         </div>
@@ -1293,6 +1301,28 @@ const App = () => {
           </>
         )}
       </section>
+      <div
+        className={`world-session-layer${view === 'world' ? '' : ' is-hidden'}`}
+      >
+        {worldStarted && (
+          <WorldView
+            hidden={view !== 'world'}
+            session={worldSession}
+            blueprint={blueprint}
+            factories={definitions}
+            activeFactoryId={activeFactoryId}
+            factoryName={activeDefinition?.name ?? 'Factory'}
+            contract={contract}
+            compileState={compileState}
+            onSelectFactory={(id) => void openFactory(id, 'world')}
+            onOpenFactory={(id) =>
+              id === undefined
+                ? changeView('factory')
+                : void openFactory(id, 'factory')
+            }
+          />
+        )}
+      </div>
       {view === 'factory' && activeDefinition !== undefined ? (
         <div className="workspace">
           <aside className="catalogue panel">
@@ -1694,18 +1724,7 @@ const App = () => {
             </section>
           </aside>
         </div>
-      ) : view === 'world' && activeDefinition !== undefined ? (
-        <WorldView
-          blueprint={blueprint}
-          factories={definitions}
-          activeFactoryId={activeFactoryId}
-          factoryName={activeDefinition.name}
-          contract={contract}
-          compileState={compileState}
-          onSelectFactory={(id) => void openFactory(id, 'world')}
-          onOpenFactory={() => changeView('factory')}
-        />
-      ) : (
+      ) : view === 'library' ? (
         <FactoryLibraryView
           definitions={definitions}
           drafts={drafts}
@@ -1721,7 +1740,7 @@ const App = () => {
           onDeleteFactory={(id) => void removeFactory(id)}
           onDeleteVersion={(version) => void removeVersion(version)}
         />
-      )}
+      ) : null}
     </main>
   );
 };

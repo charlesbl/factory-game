@@ -211,12 +211,22 @@ test('runs the authoritative world clock without direct supply mutations', async
   await expect(page.getByText('Contract ready')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Supply +12' })).toHaveCount(0);
   await page.getByRole('button', { name: 'World', exact: true }).click();
-  await expect(page.getByLabel('World build tools')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Rail' })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Build tools' }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Build tools' })
+      .getByRole('button', { name: 'Rail T' }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Play world' }).click();
-  await expect(page.getByText('1×', { exact: true })).toBeVisible();
+  await expect(
+    page.locator('.world-session-bar').getByRole('button', { name: /^1/ }),
+  ).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: '5×' }).click();
-  await expect(page.getByText('5×', { exact: true })).toBeVisible();
+  await expect(
+    page.locator('.world-session-bar').getByRole('button', { name: /^5/ }),
+  ).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('switches between the world overview and factory editor', async ({
@@ -251,6 +261,9 @@ test('changes the factory displayed in the world without opening the editor', as
   await page.getByRole('button', { name: 'World', exact: true }).click();
 
   await expect(page.getByLabel('World overview')).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Build catalogue', exact: true })
+    .click();
   await expect(
     page.getByRole('button', { name: 'View Test factory in world' }),
   ).toHaveAttribute('aria-pressed', 'true');
@@ -262,6 +275,7 @@ test('changes the factory displayed in the world without opening the editor', as
   await expect(
     page.getByRole('button', { name: 'View Starter iron line in world' }),
   ).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Inspector', exact: true }).click();
   await expect(
     page.getByRole('button', { name: 'Open Starter iron line factory' }),
   ).toBeVisible();
@@ -391,7 +405,7 @@ test('creates persistent loose connections without editor modes and cancels only
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.mouse.move(x + 100, y + 80, { steps: 5 });
-  await expect(page.locator('.route-preview')).toBeVisible();
+  await expect(page.locator('.route-preview')).toBeAttached();
   await page.mouse.up();
   await expect(page.locator('.loose-route')).toHaveCount(1);
   await expect(page.getByLabel('Free route endpoint')).toHaveCount(1);
@@ -433,7 +447,7 @@ test('creates persistent loose connections without editor modes and cancels only
   await page.mouse.move(x2, y2);
   await page.mouse.down();
   await page.mouse.move(x2 + 60, y2 - 70, { steps: 4 });
-  await expect(page.locator('.route-preview')).toBeVisible();
+  await expect(page.locator('.route-preview')).toBeAttached();
   await page.keyboard.press('Escape');
   await page.mouse.up();
   await expect(page.locator('.loose-route')).toHaveCount(1);

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "packVersion": "1.0.0",
+  "toolchain": {
+    "geometry": "Blender 4.5.0",
+    "buildHash": "8cb6b388974a",
+    "export": "glTF 2.0 binary, Y-up, applied transforms, vertex colours, no cameras/lights/animations/compression",
+    "recipe": "assets/world/recipes/pack-v1.json"
+  },
+  "references": [
+    {
+      "id": "world-v1",
+      "file": "assets/world/concepts/world-v1.png",
+      "prompt": "assets/world/prompts/world-v1.txt",
+      "tool": "built-in image_gen",
+      "generationId": "01a0df8e-c6c7-7f60-b2ca-1496798bb348",
+      "date": "2026-09-27",
+      "origin": "Generated for this repository; no third-party reference artwork supplied.",
+      "modifications": "Style reference only. Production geometry and HUD resolve mismatches as documented in art-direction.md."
+    },
+    {
+      "id": "factory-v1",
+      "file": "assets/world/concepts/factory-v1.png",
+      "prompt": "assets/world/prompts/factory-v1.txt",
+      "tool": "built-in image_gen",
+      "generationId": "01a0df8e-c6c7-7f60-b2ca-1496798bb348",
+      "date": "2026-09-27",
+      "origin": "Generated for this repository; no third-party reference artwork supplied.",
+      "modifications": "Style reference only. Production geometry and HUD resolve mismatches as documented in art-direction.md."
+    },
+    {
+      "id": "drill-v1",
+      "file": "assets/world/concepts/drill-v1.png",
+      "prompt": "assets/world/prompts/drill-v1.txt",
+      "tool": "built-in image_gen",
+      "generationId": "01a0df8e-c6c7-7f60-b2ca-1496798bb348",
+      "date": "2026-09-27",
+      "origin": "Generated for this repository; no third-party reference artwork supplied.",
+      "modifications": "Style reference only. Production geometry and HUD resolve mismatches as documented in art-direction.md."
+    },
+    {
+      "id": "pod-v1",
+      "file": "assets/world/concepts/pod-v1.png",
+      "prompt": "assets/world/prompts/pod-v1.txt",
+      "tool": "built-in image_gen",
+      "generationId": "01a0df8e-c6c7-7f60-b2ca-1496798bb348",
+      "date": "2026-09-27",
+      "origin": "Generated for this repository; no third-party reference artwork supplied.",
+      "modifications": "Style reference only. Production geometry and HUD resolve mismatches as documented in art-direction.md."
+    },
+    {
+      "id": "hud-v1",
+      "file": "assets/world/concepts/hud-v1.png",
+      "prompt": "assets/world/prompts/hud-v1.txt",
+      "tool": "built-in image_gen",
+      "generationId": "01a0df8e-c6c7-7f60-b2ca-1496798bb348",
+      "date": "2026-09-27",
+      "origin": "Generated for this repository; no third-party reference artwork supplied.",
+      "modifications": "Style reference only. Production geometry and HUD resolve mismatches as documented in art-direction.md."
+    }
+  ],
+  "geometry": {
+    "origin": "Original procedural geometry defined in checked-in recipes and build scripts.",
+    "authoredInputs": [
+      {
+        "id": "hookup-crane",
+        "file": "assets/world/source/hookup-crane.blend",
+        "tool": "Blender 4.5.0 via scripts/assets/build_world_assets.py",
+        "date": "2026-09-28",
+        "origin": "Original geometry generated from the hookup-crane entry in assets/world/recipes/pack-v1.json; the .blend is the editable source written by the build.",
+        "modifications": "None; regenerated from the recipe on every build."
+      },
+      {
+        "id": "hookup-marker",
+        "file": "assets/world/source/hookup-marker.blend",
+        "tool": "Blender 4.5.0 via scripts/assets/build_world_assets.py",
+        "date": "2026-09-28",
+        "origin": "Original geometry generated from the hookup-marker entry in assets/world/recipes/pack-v1.json; the .blend is the editable source written by the build.",
+        "modifications": "None; regenerated from the recipe on every build."
+      }
+    ],
+    "manualModifications": [],
+    "rights": "Created for the project. No external model or texture assets included."
+  }
+}

@@ -1,0 +1,596 @@
+{
+  "rotations": [
+    {
+      "rotation": 0,
+      "footprint": [
+        1,
+        1
+      ],
+      "socket": [
+        20.5,
+        0.35,
+        20.95
+      ],
+      "expected": {
+        "minX": 20,
+        "maxX": 21,
+        "minZ": 20,
+        "maxZ": 21
+      },
+      "bounds": {
+        "min": [
+          20.020000010728836,
+          0,
+          20.020000010728836
+        ],
+        "max": [
+          20.979999989271164,
+          1.810000017285347,
+          20.979999989271164
+        ]
+      },
+      "parts": 12,
+      "pick": {
+        "kind": "entity",
+        "id": "review-factory"
+      }
+    },
+    {
+      "rotation": 1,
+      "footprint": [
+        1,
+        1
+      ],
+      "socket": [
+        20.05,
+        0.35,
+        20.5
+      ],
+      "expected": {
+        "minX": 20,
+        "maxX": 21,
+        "minZ": 20,
+        "maxZ": 21
+      },
+      "bounds": {
+        "min": [
+          20.020000010728836,
+          0,
+          20.020000010728836
+        ],
+        "max": [
+          20.979999989271164,
+          1.810000017285347,
+          20.979999989271164
+        ]
+      },
+      "parts": 12,
+      "pick": {
+        "kind": "entity",
+        "id": "review-factory"
+      }
+    },
+    {
+      "rotation": 2,
+      "footprint": [
+        1,
+        1
+      ],
+      "socket": [
+        20.5,
+        0.35,
+        20.05
+      ],
+      "expected": {
+        "minX": 20,
+        "maxX": 21,
+        "minZ": 20,
+        "maxZ": 21
+      },
+      "bounds": {
+        "min": [
+          20.020000010728836,
+          0,
+          20.020000010728836
+        ],
+        "max": [
+          20.979999989271164,
+          1.810000017285347,
+          20.979999989271164
+        ]
+      },
+      "parts": 12,
+      "pick": {
+        "kind": "entity",
+        "id": "review-factory"
+      }
+    },
+    {
+      "rotation": 3,
+      "footprint": [
+        1,
+        1
+      ],
+      "socket": [
+        20.95,
+        0.35,
+        20.5
+      ],
+      "expected": {
+        "minX": 20,
+        "maxX": 21,
+        "minZ": 20,
+        "maxZ": 21
+      },
+      "bounds": {
+        "min": [
+          20.020000010728836,
+          0,
+          20.020000010728836
+        ],
+        "max": [
+          20.979999989271164,
+          1.810000017285347,
+          20.979999989271164
+        ]
+      },
+      "parts": 12,
+      "pick": {
+        "kind": "entity",
+        "id": "review-factory"
+      }
+    },
+    {
+      "rotation": 0,
+      "footprint": [
+        4,
+        2
+      ],
+      "socket": [
+        22,
+        0.35,
+        21.9
+      ],
+      "expected": {
+        "minX": 20,
+        "maxX": 24,
+        "minZ": 20,
+        "maxZ": 22
+      },
+      "bounds": {
+        "min": [
+          20.080000042915344,
+          0,
+          20.03000083565712
+        ],
+        "max": [
+          23.919999957084656,
+          1.810000017285347,
+          21.96999916434288
+        ]
+      },
+      "parts": 14,
+      "pick": {
+        "kind": "entity",
+        "id": "review-factory"
+      }
+    },
+    {
+      "rotation": 1,
+      "footprint": [
+        4,
+        2
+      ],
+      "socket": [
+        20.1,
+        0.35,
+        22
+      ],
+      "expected": {
+        "minX": 20,
+        "maxX": 22,
+        "minZ": 20,
+        "maxZ": 24
+      },
+      "bounds": {
+        "min": [
+          20.03000083565712,
+          0,
+          20.080000042915344
+        ],
+        "max": [
+          21.96999916434288,
+          1.810000017285347,
+          23.919999957084656
+        ]
+      },
+      "parts": 14,
+      "pick": {
+        "kind": "entity",
+        "id": "review-factory"
+      }
+    },
+    {
+      "rotation": 2,
+      "footprint": [
+        4,
+        2
+      ],
+      "socket": [
+        22,
+        0.35,
+        20.1
+      ],
+      "expected": {
+        "minX": 20,
+        "maxX": 24,
+        "minZ": 20,
+        "maxZ": 22
+      },
+      "bounds": {
+        "min": [
+          20.080000042915344,
+          0,
+          20.03000083565712
+        ],
+        "max": [
+          23.919999957084656,
+          1.810000017285347,
+          21.96999916434288
+        ]
+      },
+      "parts": 14,
+      "pick": {
+        "kind": "entity",
+        "id": "review-factory"
+      }
+    },
+    {
+      "rotation": 3,
+      "footprint": [
+        4,
+        2
+      ],
+      "socket": [
+        21.9,
+        0.35,
+        22
+      ],
+      "expected": {
+        "minX": 20,
+        "maxX": 22,
+        "minZ": 20,
+        "maxZ": 24
+      },
+      "bounds": {
+        "min": [
+          20.03000083565712,
+          0,
+          20.080000042915344
+        ],
+        "max": [
+          21.96999916434288,
+          1.810000017285347,
+          23.919999957084656
+        ]
+      },
+      "parts": 14,
+      "pick": {
+        "kind": "entity",
+        "id": "review-factory"
+      }
+    },
+    {
+      "rotation": 0,
+      "footprint": [
+        2,
+        25
+      ],
+      "socket": [
+        21,
+        0.35,
+        43.75
+      ],
+      "expected": {
+        "minX": 20,
+        "maxX": 22,
+        "minZ": 20,
+        "maxZ": 45
+      },
+      "bounds": {
+        "min": [
+          20.03000083565712,
+          0,
+          20.471538305282593
+        ],
+        "max": [
+          21.96999916434288,
+          1.810000017285347,
+          44.528459787368774
+        ]
+      },
+      "parts": 36,
+      "pick": {
+        "kind": "entity",
+        "id": "review-factory"
+      }
+    },
+    {
+      "rotation": 1,
+      "footprint": [
+        2,
+        25
+      ],
+      "socket": [
+        21.25,
+        0.35,
+        21.000000000000004
+      ],
+      "expected": {
+        "minX": 20,
+        "maxX": 45,
+        "minZ": 20,
+        "maxZ": 22
+      },
+      "bounds": {
+        "min": [
+          20.471538305282593,
+          0,
+          20.03000083565712
+        ],
+        "max": [
+          44.528459787368774,
+          1.810000017285347,
+          21.96999916434288
+        ]
+      },
+      "parts": 36,
+      "pick": {
+        "kind": "entity",
+        "id": "review-factory"
+      }
+    },
+    {
+      "rotation": 2,
+      "footprint": [
+        2,
+        25
+      ],
+      "socket": [
+        21,
+        0.35,
+        21.25
+      ],
+      "expected": {
+        "minX": 20,
+        "maxX": 22,
+        "minZ": 20,
+        "maxZ": 45
+      },
+      "bounds": {
+        "min": [
+          20.03000083565712,
+          0,
+          20.471538305282593
+        ],
+        "max": [
+          21.96999916434288,
+          1.810000017285347,
+          44.528459787368774
+        ]
+      },
+      "parts": 36,
+      "pick": {
+        "kind": "entity",
+        "id": "review-factory"
+      }
+    },
+    {
+      "rotation": 3,
+      "footprint": [
+        2,
+        25
+      ],
+      "socket": [
+        43.75,
+        0.35,
+        20.999999999999996
+      ],
+      "expected": {
+        "minX": 20,
+        "maxX": 45,
+        "minZ": 20,
+        "maxZ": 22
+      },
+      "bounds": {
+        "min": [
+          20.471538305282593,
+          0,
+          20.03000083565712
+        ],
+        "max": [
+          44.528459787368774,
+          1.810000017285347,
+          21.96999916434288
+        ]
+      },
+      "parts": 36,
+      "pick": {
+        "kind": "entity",
+        "id": "review-factory"
+      }
+    },
+    {
+      "rotation": 0,
+      "footprint": [
+        25,
+        2
+      ],
+      "socket": [
+        32.5,
+        0.35,
+        21.9
+      ],
+      "expected": {
+        "minX": 20,
+        "maxX": 45,
+        "minZ": 20,
+        "maxZ": 22
+      },
+      "bounds": {
+        "min": [
+          20.471538305282593,
+          0,
+          20.03000083565712
+        ],
+        "max": [
+          44.528459787368774,
+          1.810000017285347,
+          21.96999916434288
+        ]
+      },
+      "parts": 36,
+      "pick": {
+        "kind": "entity",
+        "id": "review-factory"
+      }
+    },
+    {
+      "rotation": 1,
+      "footprint": [
+        25,
+        2
+      ],
+      "socket": [
+        20.1,
+        0.35,
+        32.5
+      ],
+      "expected": {
+        "minX": 20,
+        "maxX": 22,
+        "minZ": 20,
+        "maxZ": 45
+      },
+      "bounds": {
+        "min": [
+          20.03000083565712,
+          0,
+          20.471538305282593
+        ],
+        "max": [
+          21.96999916434288,
+          1.810000017285347,
+          44.528459787368774
+        ]
+      },
+      "parts": 36,
+      "pick": {
+        "kind": "entity",
+        "id": "review-factory"
+      }
+    },
+    {
+      "rotation": 2,
+      "footprint": [
+        25,
+        2
+      ],
+      "socket": [
+        32.5,
+        0.35,
+        20.1
+      ],
+      "expected": {
+        "minX": 20,
+        "maxX": 45,
+        "minZ": 20,
+        "maxZ": 22
+      },
+      "bounds": {
+        "min": [
+          20.471538305282593,
+          0,
+          20.03000083565712
+        ],
+        "max": [
+          44.528459787368774,
+          1.810000017285347,
+          21.96999916434288
+        ]
+      },
+      "parts": 36,
+      "pick": {
+        "kind": "entity",
+        "id": "review-factory"
+      }
+    },
+    {
+      "rotation": 3,
+      "footprint": [
+        25,
+        2
+      ],
+      "socket": [
+        21.9,
+        0.35,
+        32.5
+      ],
+      "expected": {
+        "minX": 20,
+        "maxX": 22,
+        "minZ": 20,
+        "maxZ": 45
+      },
+      "bounds": {
+        "min": [
+          20.03000083565712,
+          0,
+          20.471538305282593
+        ],
+        "max": [
+          21.96999916434288,
+          1.810000017285347,
+          44.528459787368774
+        ]
+      },
+      "parts": 36,
+      "pick": {
+        "kind": "entity",
+        "id": "review-factory"
+      }
+    }
+  ],
+  "drawingRatio": 2,
+  "reloads": [
+    {
+      "geometries": 27,
+      "textures": 3,
+      "objects": 16
+    },
+    {
+      "geometries": 27,
+      "textures": 3,
+      "objects": 16
+    },
+    {
+      "geometries": 27,
+      "textures": 3,
+      "objects": 16
+    },
+    {
+      "geometries": 27,
+      "textures": 3,
+      "objects": 16
+    },
+    {
+      "geometries": 27,
+      "textures": 3,
+      "objects": 16
+    }
+  ],
+  "unchangedTopology": true,
+  "outsideHitRejected": true,
+  "hiddenResume": true,
+  "lateLoadDisposed": true
+}
