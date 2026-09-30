@@ -5,8 +5,11 @@ import type {
   WorldWorkerResponse,
 } from './protocol';
 import { WORLD_PROTOCOL_VERSION } from './protocol';
+import { worldProfiler } from '../profiling/worldProfiler';
 import type {
   WorldGenerationConfig,
+  WorldRailEdge,
+  WorldRailNode,
   WorldSnapshot,
   WorldValidationResult,
 } from './model';
@@ -19,6 +22,10 @@ export interface WorldClientResult {
   readonly validation?: WorldValidationResult;
   readonly validationRevision?: number;
   readonly exhaustedBudget?: boolean;
+  readonly commandFailures?: readonly {
+    readonly targetId: string;
+    readonly message: string;
+  }[];
 }
 export class WorldCommandError extends Error {
   constructor(
@@ -37,6 +44,7 @@ export class WorldClient {
       commandType: WorldCommandInput['type'];
       startedAt: number;
       postMs: number;
+      metrics: boolean;
       resolve: (value: WorldClientResult) => void;
       reject: (reason: Error) => void;
     }
@@ -112,7 +120,12 @@ export class WorldClient {
     return this.#workerError;
   }
   private enqueue(command: WorldCommandInput): Promise<WorldClientResult> {
-    const run = () => this.send(command);
+    const queuedAt = worldProfiler.enabled ? performance.now() : undefined;
+    const run = () => {
+      if (queuedAt !== undefined)
+        worldProfiler.recordWorkerQueue(performance.now() - queuedAt);
+      return this.send(command);
+    };
     const result = this.#tail.then(run, run);
     this.#tail = result.catch(() => undefined);
     return result;
@@ -126,11 +139,13 @@ export class WorldClient {
     const revisioned = !['GENERATE', 'LOAD', 'SAVE', 'SNAPSHOT'].includes(
       command.type,
     );
+    const metrics = this.#metrics || worldProfiler.enabled;
     return new Promise((resolve, reject) => {
       this.#pending.set(requestId, {
         commandType: command.type,
         startedAt: performance.now(),
         postMs: 0,
+        metrics,
         resolve,
         reject,
       });
@@ -141,7 +156,7 @@ export class WorldClient {
           ...(revisioned
             ? { expectedRevision: this.#snapshot?.revision ?? 0 }
             : {}),
-          ...(this.#metrics ? { metrics: true } : {}),
+          ...(metrics ? { metrics: true } : {}),
           protocolVersion: WORLD_PROTOCOL_VERSION,
           requestId,
         } as WorldCommand);
@@ -170,15 +185,34 @@ export class WorldClient {
     const pending = this.#pending.get(response.requestId);
     if (pending === undefined) return;
     this.#pending.delete(response.requestId);
-    if (this.#metrics)
-      performance.measure('world:rpc', {
-        start: pending.startedAt,
-        detail: {
-          command: pending.commandType,
-          postMs: pending.postMs,
-          ...response.metrics,
-        },
+    if (pending.metrics) {
+      const rpcMs = performance.now() - pending.startedAt;
+      if (this.#metrics && !worldProfiler.enabled)
+        performance.measure('world:rpc', {
+          start: pending.startedAt,
+          detail: {
+            command: pending.commandType,
+            postMs: pending.postMs,
+            ...response.metrics,
+          },
+        });
+      worldProfiler.recordWorker({
+        rpcMs,
+        ...(response.metrics === undefined
+          ? {}
+          : {
+              processingMs: response.metrics.workerMs,
+              deltaMs: response.metrics.deltaMs,
+            }),
+        postMessageMs: pending.postMs,
+        ...(response.metrics === undefined
+          ? {}
+          : {
+              previousWorkerPostMessageMs:
+                response.metrics.previousPostMessageMs,
+            }),
       });
+    }
     if (response.type === 'WORLD_ERROR') {
       this.#workerError = new Error(response.message);
       pending.reject(this.#workerError);
@@ -240,7 +274,12 @@ export class WorldClient {
       return;
     }
     if (response.delta.revision <= this.#snapshot.revision) {
-      pending.resolve({ snapshot: this.#snapshot });
+      pending.resolve({
+        snapshot: this.#snapshot,
+        ...(response.type === 'DELTA' && response.commandFailures !== undefined
+          ? { commandFailures: response.commandFailures }
+          : {}),
+      });
       return;
     }
     if (
@@ -258,11 +297,16 @@ export class WorldClient {
     }
     const applyStarted = performance.now();
     this.#snapshot = applyWorldDelta(this.#snapshot, response.delta);
-    if (this.#metrics)
+    const applyMs = performance.now() - applyStarted;
+    if (pending.metrics) worldProfiler.recordDeltaApply(applyMs);
+    if (this.#metrics && !worldProfiler.enabled)
       performance.measure('world:delta-apply', { start: applyStarted });
     pending.resolve({
       snapshot: this.#snapshot,
       exhaustedBudget: response.type === 'ADVANCE_PAUSED',
+      ...(response.type === 'DELTA' && response.commandFailures !== undefined
+        ? { commandFailures: response.commandFailures }
+        : {}),
     });
   }
 }
@@ -301,8 +345,8 @@ export const applyWorldDelta = (
     entities: delta.entities.filter(
       (entity) => !delta.removedEntityIds.includes(entity.id),
     ),
-    railNodes: delta.railNodes,
-    railEdges: delta.railEdges,
+    railNodes: shareUnchangedRailNodes(snapshot.railNodes, delta.railNodes),
+    railEdges: shareUnchangedRailEdges(snapshot.railEdges, delta.railEdges),
     railBlocks: delta.railBlocks,
     pods: delta.pods,
     missions: delta.missions,
@@ -317,3 +361,45 @@ export const applyWorldDelta = (
       : { pendingAdvanceTarget: delta.pendingAdvanceTarget }),
   };
 };
+
+// Worker messages clone object identities. Preserve unchanged topology so a
+// clock/traffic update does not rebuild render signatures and picking indexes.
+const shareUnchangedRailNodes = (
+  previous: readonly WorldRailNode[],
+  next: readonly WorldRailNode[],
+) =>
+  previous.length === next.length &&
+  next.every((node, index) => {
+    const before = previous[index]!;
+    return (
+      node.id === before.id &&
+      node.kind === before.kind &&
+      node.position.x === before.position.x &&
+      node.position.y === before.position.y
+    );
+  })
+    ? previous
+    : next;
+
+const shareUnchangedRailEdges = (
+  previous: readonly WorldRailEdge[],
+  next: readonly WorldRailEdge[],
+) =>
+  previous.length === next.length &&
+  next.every((edge, index) => {
+    const before = previous[index]!;
+    return (
+      edge.id === before.id &&
+      edge.from === before.from &&
+      edge.to === before.to &&
+      edge.length === before.length &&
+      edge.points.length === before.points.length &&
+      edge.points.every(
+        (point, pointIndex) =>
+          point.x === before.points[pointIndex]!.x &&
+          point.y === before.points[pointIndex]!.y,
+      )
+    );
+  })
+    ? previous
+    : next;

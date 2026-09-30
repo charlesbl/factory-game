@@ -1,3 +1,4 @@
+import { hookupCell } from '../world';
 import { asId, formatRate, resourceById, worldContent } from '../domain';
 import type { ResourceId } from '../domain';
 import type {
@@ -7,15 +8,16 @@ import type {
   WorldSnapshot,
   WorldStationSnapshot,
 } from '../world';
-import { hookupCell } from '../world';
 import { railNodeConnectionState, railNodeDegrees } from './worldRailVisual';
 
 interface Props {
   readonly entity: WorldEntity;
-  readonly snapshot: WorldSnapshot;
+  readonly getSnapshot: () => WorldSnapshot;
+  readonly displayName?: string;
   readonly busy?: boolean;
   readonly onQueuePod: () => void;
   readonly onCancelPod: () => void;
+  readonly onRemoveRule?: (resourceId: ResourceId) => void;
 }
 
 const resourceName = (id: ResourceId): string =>
@@ -25,7 +27,13 @@ const percent = (quantity: number, capacity: number): number =>
 const stateClass = (state: string): string =>
   ['RUNNING', 'ACTIVE', 'READY'].includes(state)
     ? 'good'
-    : ['OUTPUT_BLOCKED', 'INVALID', 'EXHAUSTED', 'EVACUATING'].includes(state)
+    : [
+          'OUTPUT_BLOCKED',
+          'INVALID',
+          'EXHAUSTED',
+          'EVACUATING',
+          'DISMANTLING',
+        ].includes(state)
       ? 'bad'
       : 'waiting';
 const stateLabel = (state: string): string =>
@@ -95,7 +103,7 @@ const FactoryState = ({
       </b>
     </div>
     <div className="world-buffer-group">
-      <h4>Placed factory design rates</h4>
+      <h4>Production rates</h4>
       {[...state.contract.inputRates, ...state.contract.outputRates].length ===
       0 ? (
         <p className="world-empty-state">No external contract rates</p>
@@ -123,11 +131,6 @@ const FactoryState = ({
         </ul>
       )}
     </div>
-    {state.nextEventAt !== undefined && (
-      <p className="world-runtime-note">
-        Next transition at {(Number(state.nextEventAt) / 1_000_000).toFixed(2)}s
-      </p>
-    )}
     <div className="world-buffer-group">
       <h4>Input buffers</h4>
       {state.inputs.length === 0 ? (
@@ -199,7 +202,7 @@ const MineState = ({
         <dd>{state.drills.active}</dd>
       </div>
       <div>
-        <dt>Ghost drills</dt>
+        <dt>Drills under construction</dt>
         <dd>{state.drills.ghost}</dd>
       </div>
       <div>
@@ -214,8 +217,10 @@ const MineState = ({
 
 const Logistics = ({
   stations,
+  onRemoveRule,
 }: {
   readonly stations: readonly WorldStationSnapshot[];
+  readonly onRemoveRule?: ((resourceId: ResourceId) => void) | undefined;
 }) =>
   stations.length === 0 ? null : (
     <div className="world-logistics-state">
@@ -228,8 +233,24 @@ const Logistics = ({
                 ? 'Pod berth'
                 : resourceName(station.resourceId)}
             </span>
-            <b>{station.role}</b>
+            <b>
+              {station.role === 'requester'
+                ? 'Request'
+                : station.role === 'provider'
+                  ? 'Passive provider'
+                  : station.role === 'active-provider'
+                    ? 'Active provider'
+                    : 'Depot'}
+            </b>
           </div>
+          {station.role === 'requester' &&
+            station.id.startsWith('rule:') &&
+            station.resourceId !== undefined &&
+            onRemoveRule && (
+              <button onClick={() => onRemoveRule(station.resourceId!)}>
+                Delete request
+              </button>
+            )}
           {station.quantity !== undefined && station.capacity !== undefined && (
             <>
               <small>
@@ -246,18 +267,22 @@ const Logistics = ({
 
 export const WorldBuildingInspector = ({
   entity,
-  snapshot,
+  getSnapshot,
+  displayName,
   busy = false,
   onQueuePod,
   onCancelPod,
+  onRemoveRule,
 }: Props) => {
+  const snapshot = getSnapshot();
   const state = snapshot.buildings.find((item) => item.entityId === entity.id);
+  const stationOwnerId = entity.kind === 'drill' ? entity.mineId : entity.id;
   const linkedStation =
     entity.kind === 'station'
       ? entity
       : snapshot.entities.find(
           (item) =>
-            item.kind === 'station' && item.linkedEntityId === entity.id,
+            item.kind === 'station' && item.linkedEntityId === stationOwnerId,
         );
   const stations =
     linkedStation?.kind === 'station'
@@ -265,18 +290,19 @@ export const WorldBuildingInspector = ({
           (item) => item.railNodeId === linkedStation.railNodeId,
         )
       : [];
-  const entityState = 'state' in entity ? entity.state : undefined;
+  const entityState =
+    entity.kind === 'factory'
+      ? entity.state
+      : (entity.kind === 'mine' ||
+            entity.kind === 'storage' ||
+            entity.kind === 'depot') &&
+          entity.dismantling === true
+        ? 'DISMANTLING'
+        : undefined;
   return (
     <>
-      <details className="world-developer-details">
-        <summary>Developer details</summary>
-        <code>{entity.id}</code>
-        {entity.kind === 'factory' && (
-          <span>Factory definition: {entity.factoryId}</span>
-        )}
-      </details>
       <div className="world-building-identity">
-        <p>{entity.kind.replaceAll('-', ' ')}</p>
+        <p>{displayName ?? entity.kind.replaceAll('-', ' ')}</p>
         {entityState !== undefined && (
           <span className={`badge ${stateClass(entityState)}`}>
             {stateLabel(entityState)}
@@ -285,26 +311,26 @@ export const WorldBuildingInspector = ({
       </div>
       <dl className="world-building-counts">
         <div>
-          <dt>Position</dt>
-          <dd>
-            {entity.transform.position.x}, {entity.transform.position.y}
-          </dd>
-        </div>
-        <div>
           <dt>Footprint</dt>
           <dd>
             {entity.transform.size.width} × {entity.transform.size.height}
           </dd>
         </div>
-        {(entity.kind === 'station' || entity.kind === 'depot') && (
+        {(entity.kind === 'station' ||
+          entity.kind === 'depot' ||
+          (entity.kind === 'construction-site' &&
+            entity.targetKind === 'depot')) && (
           <div>
             <dt>Rail hookup</dt>
             <dd>
               {(() => {
-                const node = snapshot.railNodes.find(
-                  (candidate) => candidate.id === entity.railNodeId,
+                const hook = hookupCell(entity.transform);
+                const node = snapshot.railNodes.find((candidate) =>
+                  entity.kind === 'construction-site'
+                    ? candidate.position.x === hook.x &&
+                      candidate.position.y === hook.y
+                    : candidate.id === entity.railNodeId,
                 );
-                const cell = node?.position ?? hookupCell(entity.transform);
                 const connection =
                   node === undefined
                     ? 'disconnected'
@@ -312,7 +338,9 @@ export const WorldBuildingInspector = ({
                         node,
                         railNodeDegrees(snapshot.railEdges),
                       );
-                return `${cell.x}, ${cell.y} · ${connection === 'connected' ? 'connected' : 'not connected'}`;
+                return connection === 'connected'
+                  ? 'Connected to rail'
+                  : 'Not connected to rail';
               })()}
             </dd>
           </div>
@@ -431,16 +459,14 @@ export const WorldBuildingInspector = ({
             <dd>{resourceName(entity.resourceId)}</dd>
           </div>
           <div>
-            <dt>Mine</dt>
+            <dt>Connected mine</dt>
             <dd>
-              {(() => {
-                const mine = snapshot.entities.find(
-                  (candidate) => candidate.id === entity.mineId,
-                );
-                return mine?.kind === 'mine'
-                  ? `Mine at ${mine.transform.position.x}, ${mine.transform.position.y}`
-                  : 'Mine unavailable';
-              })()}
+              {snapshot.entities.some(
+                (candidate) =>
+                  candidate.id === entity.mineId && candidate.kind === 'mine',
+              )
+                ? 'Connected'
+                : 'Unavailable'}
             </dd>
           </div>
           <div>
@@ -488,7 +514,10 @@ export const WorldBuildingInspector = ({
           })()}
         </dl>
       )}
-      <Logistics stations={stations} />
+      <Logistics
+        stations={stations.filter((station) => station.role !== 'storage')}
+        onRemoveRule={onRemoveRule}
+      />
     </>
   );
 };

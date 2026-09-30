@@ -73,6 +73,9 @@ export interface SerializedTrafficStation {
   readonly minBatch: number;
   readonly maxBatch: number;
   readonly requestCreatedAt?: SimTime;
+  readonly storageId?: string;
+  readonly storageFreeSpace?: number;
+  readonly stockMaximum?: number;
   readonly berthVehicleId?: string;
   readonly depotCapacity?: number;
   readonly reservedDepotSlots?: number;
@@ -94,23 +97,65 @@ export interface SerializedPodTrafficState {
 const compareTime = (a: SimTime, b: SimTime): number =>
   a < b ? -1 : a > b ? 1 : 0;
 
+interface TrafficReservations {
+  readonly byRequester: Map<string, number>;
+  readonly byStorage: Map<string, number>;
+  readonly byStorageResource: Map<string, Map<ResourceId, number>>;
+  readonly byBuffer: Map<WorldBuffer, number>;
+}
+
+interface PodRouteChoice {
+  readonly pod: TrafficPod;
+  readonly route: RailRoute;
+}
+
+interface PodRouteCursor {
+  readonly choices: readonly PodRouteChoice[];
+  index: number;
+}
+
+const increment = <K>(map: Map<K, number>, key: K, quantity: number): void => {
+  map.set(key, (map.get(key) ?? 0) + quantity);
+};
+
+const incrementStorageResource = (
+  map: Map<string, Map<ResourceId, number>>,
+  storageId: string,
+  resourceId: ResourceId,
+  quantity: number,
+): void => {
+  let byResource = map.get(storageId);
+  if (byResource === undefined) {
+    byResource = new Map();
+    map.set(storageId, byResource);
+  }
+  increment(byResource, resourceId, quantity);
+};
+
 export class PodTrafficSystem {
   readonly stations = new Map<string, Station>();
   readonly pods = new Map<string, TrafficPod>();
   readonly missions = new Map<string, TrafficMission>();
+  readonly #activeMissionIdsByStation = new Map<string, Set<string>>();
   readonly diagnostics: { code: 'GRIDLOCK'; podIds: readonly string[] }[] = [];
   readonly #events: TrafficEvent[] = [];
+  readonly #deferredDepotPods = new Set<string>();
   #sequence = 0;
   #missionSequence = 0;
+  #deferAutomaticDispatch = false;
   constructor(readonly rails: RailNetwork) {}
   get nextEventTime(): SimTime | undefined {
-    this.#events.sort(
-      (a, b) =>
-        compareTime(a.time, b.time) ||
-        a.podId.localeCompare(b.podId) ||
-        a.sequence - b.sequence,
-    );
     return this.#events[0]?.time;
+  }
+  get missionSequence(): number {
+    return this.#missionSequence;
+  }
+
+  /** Keep delivery receipts only while their owner may need to reclaim salvage. */
+  pruneDeliveredMissions(retain: (mission: TrafficMission) => boolean): void {
+    for (const mission of this.missions.values())
+      if (mission.status === 'DELIVERED' && !retain(mission))
+        this.removeMission(mission.id);
   }
 
   serialize(): SerializedPodTrafficState {
@@ -125,11 +170,20 @@ export class PodTrafficSystem {
           role: station.role,
           priority: station.priority,
           target: station.target,
+          ...(station.stockMaximum === undefined
+            ? {}
+            : { stockMaximum: station.stockMaximum }),
           minBatch: station.minBatch,
           maxBatch: station.maxBatch,
           ...(station.requestCreatedAt === undefined
             ? {}
             : { requestCreatedAt: station.requestCreatedAt }),
+          ...(station.storageId === undefined
+            ? {}
+            : { storageId: station.storageId }),
+          ...(station.storageFreeSpace === undefined
+            ? {}
+            : { storageFreeSpace: station.storageFreeSpace }),
           ...(station.berthVehicleId === undefined
             ? {}
             : { berthVehicleId: station.berthVehicleId }),
@@ -200,11 +254,20 @@ export class PodTrafficSystem {
         role: station.role,
         priority: station.priority,
         target: station.target,
+        ...(station.stockMaximum === undefined
+          ? {}
+          : { stockMaximum: station.stockMaximum }),
         minBatch: station.minBatch,
         maxBatch: station.maxBatch,
         ...(station.requestCreatedAt === undefined
           ? {}
           : { requestCreatedAt: station.requestCreatedAt }),
+        ...(station.storageId === undefined
+          ? {}
+          : { storageId: station.storageId }),
+        ...(station.storageFreeSpace === undefined
+          ? {}
+          : { storageFreeSpace: station.storageFreeSpace }),
         ...(station.berthVehicleId === undefined
           ? {}
           : { berthVehicleId: station.berthVehicleId }),
@@ -225,9 +288,9 @@ export class PodTrafficSystem {
             }),
       });
     for (const pod of state.pods) system.pods.set(pod.id, { ...pod });
-    for (const mission of state.missions)
-      system.missions.set(mission.id, { ...mission });
+    for (const mission of state.missions) system.addMission({ ...mission });
     system.#events.push(...state.events.map((event) => ({ ...event })));
+    system.#heapifyEvents();
     return system;
   }
 
@@ -235,6 +298,41 @@ export class PodTrafficSystem {
     if (this.stations.has(station.id))
       throw new Error('Duplicate traffic station');
     this.stations.set(station.id, station);
+  }
+  /** O(1) lookup for whether a station participates in outstanding missions. */
+  hasActiveMission(stationId: string): boolean {
+    return (this.#activeMissionIdsByStation.get(stationId)?.size ?? 0) > 0;
+  }
+  /** Redirects active mission endpoints while preserving routes and pod state. */
+  redirectMissions(
+    oldStationIds: readonly string[],
+    newStationId: string,
+  ): number {
+    const oldIds = new Set(oldStationIds);
+    oldIds.delete(newStationId);
+    if (oldIds.size === 0) return 0;
+    let redirected = 0;
+    for (const mission of this.missions.values()) {
+      if (
+        mission.status === 'DELIVERED' ||
+        (!oldIds.has(mission.providerId) && !oldIds.has(mission.requesterId))
+      )
+        continue;
+      const next = {
+        ...mission,
+        providerId: oldIds.has(mission.providerId)
+          ? newStationId
+          : mission.providerId,
+        requesterId: oldIds.has(mission.requesterId)
+          ? newStationId
+          : mission.requesterId,
+      };
+      this.unindexActiveMission(mission);
+      this.missions.set(mission.id, next);
+      this.indexActiveMission(next);
+      redirected += 1;
+    }
+    return redirected;
   }
   addPod(
     pod: Omit<
@@ -254,12 +352,167 @@ export class PodTrafficSystem {
     });
   }
 
+  /**
+   * Permanently discards outstanding missions whose source or destination is
+   * one of the supplied stations. Carried cargo is discarded with the mission.
+   * The returned IDs are the missions removed. Completed missions are kept.
+   * Call before deleting those stations, then dispatch again after station
+   * removal so newly available pods and storage capacity can be reassigned.
+   */
+  abandonMissionsForStations(
+    stationIds: readonly string[],
+    time: SimTime,
+  ): readonly string[] {
+    const selectedStations = new Set(stationIds);
+    if (selectedStations.size === 0) return [];
+
+    const abandoned = [...this.missions.values()].filter(
+      (mission) =>
+        mission.status !== 'DELIVERED' &&
+        (selectedStations.has(mission.providerId) ||
+          selectedStations.has(mission.requesterId)),
+    );
+    if (abandoned.length === 0) return [];
+    const abandonedIds = new Set(abandoned.map((mission) => mission.id));
+    const podIds = new Set(abandoned.map((mission) => mission.podId));
+
+    for (const mission of abandoned) this.removeMission(mission.id);
+
+    // A valid traffic state assigns only one active mission to a pod. Keep a
+    // pod untouched if corrupt/legacy state also assigns it to an unrelated
+    // active mission.
+    const podsWithRetainedMissions = new Set(
+      [...this.missions.values()]
+        .filter((mission) => mission.status !== 'DELIVERED')
+        .map((mission) => mission.podId),
+    );
+    const releasedPodIds = new Set(
+      [...podIds].filter((podId) => {
+        const missionId = this.pods.get(podId)?.missionId;
+        return (
+          !podsWithRetainedMissions.has(podId) &&
+          (missionId === undefined || abandonedIds.has(missionId))
+        );
+      }),
+    );
+
+    for (const podId of releasedPodIds) {
+      for (const block of this.rails.blocks.values()) {
+        if (block.occupantId === podId) this.rails.leave(block.edgeId, podId);
+        this.rails.releaseReservation(block.edgeId, podId);
+      }
+      for (const station of this.stations.values())
+        if (station.berthVehicleId === podId) delete station.berthVehicleId;
+
+      const pod = this.pods.get(podId);
+      if (pod === undefined) continue;
+      if (pod.reservedDepotId !== undefined) {
+        const depot = this.stations.get(pod.reservedDepotId);
+        if (depot !== undefined)
+          depot.reservedDepotSlots = Math.max(
+            0,
+            (depot.reservedDepotSlots ?? 1) - 1,
+          );
+      }
+      pod.state = 'IDLE';
+      pod.cargo = 0;
+      delete pod.resourceId;
+      delete pod.missionId;
+      delete pod.route;
+      delete pod.currentEdgeId;
+      delete pod.motion;
+      delete pod.resumeState;
+      delete pod.reservedDepotId;
+
+      const nextStation = [...this.stations.values()]
+        .filter((station) => !selectedStations.has(station.id))
+        .flatMap((station) => {
+          const route = this.rails.route(pod.nodeId, station.railNodeId);
+          return route === undefined
+            ? []
+            : [{ station, distance: route.distance }];
+        })
+        .sort(
+          (a, b) =>
+            a.distance - b.distance || a.station.id.localeCompare(b.station.id),
+        )[0]?.station;
+      if (nextStation !== undefined) pod.stationId = nextStation.id;
+    }
+
+    let retainedEvents = 0;
+    for (let index = 0; index < this.#events.length; index += 1) {
+      const event = this.#events[index]!;
+      if (releasedPodIds.has(event.podId)) continue;
+      this.#events[retainedEvents] = event;
+      retainedEvents += 1;
+    }
+    if (retainedEvents < this.#events.length) {
+      this.#events.length = retainedEvents;
+      this.#heapifyEvents();
+    }
+
+    this.wakeWaiting(time);
+    this.detectGridlock();
+    return [...abandonedIds].sort();
+  }
+
   dispatch(time: SimTime): readonly TrafficMission[] {
     const created: TrafficMission[] = [];
+    let remainingIdlePods = [...this.pods.values()].filter(
+      (pod) => pod.state === 'IDLE',
+    ).length;
+    if (remainingIdlePods === 0) {
+      if (!this.#deferAutomaticDispatch) this.routeDeferredDepotPods(time);
+      return created;
+    }
+    const reservations = this.createReservations();
+    const podRouteCursors = new Map<string, PodRouteCursor>();
+    const nextIdlePodRoute = (
+      provider: Station,
+      minBatch: number,
+    ): PodRouteChoice | undefined => {
+      if (POD_CAPACITY < minBatch) return undefined;
+      let cursor = podRouteCursors.get(provider.id);
+      if (cursor === undefined) {
+        const choices = [...this.pods.values()]
+          .filter((pod) => pod.state === 'IDLE')
+          .flatMap((pod) => {
+            const route = this.rails.route(pod.nodeId, provider.railNodeId);
+            return route === undefined ? [] : [{ pod, route }];
+          })
+          .sort(
+            (a, b) =>
+              a.route.distance - b.route.distance ||
+              a.pod.id.localeCompare(b.pod.id),
+          );
+        cursor = { choices, index: 0 };
+        podRouteCursors.set(provider.id, cursor);
+      }
+      while (cursor.index < cursor.choices.length) {
+        const choice = cursor.choices[cursor.index]!;
+        cursor.index += 1;
+        if (choice.pod.state === 'IDLE') return choice;
+      }
+      return undefined;
+    };
+    const providersByResource = new Map<ResourceId, Station[]>();
+    for (const station of this.stations.values()) {
+      if (
+        (station.role !== 'provider' &&
+          station.role !== 'active-provider' &&
+          station.role !== 'storage') ||
+        station.buffer === undefined
+      )
+        continue;
+      const sameResource = providersByResource.get(station.buffer.resourceId);
+      if (sameResource === undefined)
+        providersByResource.set(station.buffer.resourceId, [station]);
+      else sameResource.push(station);
+    }
     const requesters = [...this.stations.values()]
       .filter(
         (station) =>
-          station.role === 'requester' &&
+          (station.role === 'requester' || station.role === 'storage') &&
           station.buffer !== undefined &&
           station.buffer.quantity < station.target,
       )
@@ -270,21 +523,24 @@ export class PodTrafficSystem {
           a.id.localeCompare(b.id),
       );
     for (const requester of requesters) {
+      if (remainingIdlePods === 0) break;
       const target = requester.buffer!;
-      const inbound = [...this.missions.values()]
-        .filter(
-          (mission) =>
-            mission.requesterId === requester.id &&
-            mission.status !== 'DELIVERED',
-        )
-        .reduce((total, mission) => total + mission.quantity, 0);
-      const wanted = requester.target - target.quantity - inbound;
-      const providerCandidates = [...this.stations.values()]
+      const inbound = reservations.byRequester.get(requester.id) ?? 0;
+      let wanted = requester.target - target.quantity - inbound;
+      const providerCandidates = (
+        providersByResource.get(target.resourceId) ?? []
+      )
         .filter(
           (station) =>
-            station.role === 'provider' &&
+            (station.storageId === undefined ||
+              station.storageId !== requester.storageId) &&
+            !(
+              station.role === 'storage' &&
+              requester.role === 'storage' &&
+              station.buffer!.quantity <= station.target
+            ) &&
             station.buffer !== target &&
-            station.buffer?.resourceId === target.resourceId &&
+            station.buffer !== undefined &&
             station.buffer.quantity >= requester.minBatch,
         )
         .flatMap((station) => {
@@ -300,79 +556,236 @@ export class PodTrafficSystem {
             a.route.distance - b.route.distance ||
             a.station.id.localeCompare(b.station.id),
         );
-      const providerCandidate = providerCandidates[0];
-      if (providerCandidate?.station.buffer === undefined) continue;
-      const podCandidate = [...this.pods.values()]
-        .filter(
-          (pod) => pod.state === 'IDLE' && pod.capacity >= requester.minBatch,
+      let providerIndex = 0;
+      while (wanted >= requester.minBatch && remainingIdlePods > 0) {
+        const destinationCapacity = this.destinationCapacity(
+          requester,
+          reservations,
+        );
+        if (
+          Math.min(wanted, requester.maxBatch, destinationCapacity) <
+          requester.minBatch
         )
-        .flatMap((pod) => {
-          const route = this.rails.route(
-            pod.nodeId,
-            providerCandidate.station.railNodeId,
+          break;
+        let selection:
+          | {
+              provider: Station;
+              deliveryRoute: RailRoute;
+              pod: TrafficPod;
+              approachRoute: RailRoute;
+            }
+          | undefined;
+        while (providerIndex < providerCandidates.length) {
+          const candidate = providerCandidates[providerIndex]!;
+          if (
+            candidate.station.buffer === undefined ||
+            candidate.station.buffer.quantity < requester.minBatch
+          ) {
+            providerIndex += 1;
+            continue;
+          }
+          const podCandidate = nextIdlePodRoute(
+            candidate.station,
+            requester.minBatch,
           );
-          return route === undefined ? [] : [{ pod, route }];
-        })
-        .sort(
-          (a, b) =>
-            a.route.distance - b.route.distance ||
-            a.pod.id.localeCompare(b.pod.id),
-        )[0];
-      if (podCandidate === undefined) continue;
-      const quantity = Math.min(
-        wanted,
-        requester.maxBatch,
-        providerCandidate.station.buffer.quantity,
-        podCandidate.pod.capacity,
-      );
-      if (quantity < requester.minBatch) continue;
-      providerCandidate.station.buffer.remove(quantity);
-      const mission: TrafficMission = {
-        id: `mission-${++this.#missionSequence}`,
-        providerId: providerCandidate.station.id,
-        requesterId: requester.id,
-        podId: podCandidate.pod.id,
-        resourceId: target.resourceId,
-        quantity,
-        createdAt: time,
-        approachRoute: podCandidate.route,
-        deliveryRoute: providerCandidate.route,
-        status: 'TO_PROVIDER',
-      };
-      this.missions.set(mission.id, mission);
-      created.push(mission);
-      const pod = podCandidate.pod;
-      pod.missionId = mission.id;
-      pod.resourceId = target.resourceId;
-      pod.cargo = quantity;
-      this.beginRoute(pod, podCandidate.route, 'TO_PROVIDER', time);
+          if (podCandidate === undefined) {
+            providerIndex += 1;
+            continue;
+          }
+          selection = {
+            provider: candidate.station,
+            deliveryRoute: candidate.route,
+            pod: podCandidate.pod,
+            approachRoute: podCandidate.route,
+          };
+          break;
+        }
+        if (selection === undefined || selection.provider.buffer === undefined)
+          break;
+        const quantity = Math.min(
+          wanted,
+          requester.maxBatch,
+          requester.role === 'storage' && selection.provider.role === 'storage'
+            ? Math.max(
+                0,
+                selection.provider.buffer.quantity - selection.provider.target,
+              )
+            : selection.provider.buffer.quantity,
+          selection.pod.capacity,
+          destinationCapacity,
+        );
+        if (quantity < requester.minBatch) break;
+        selection.provider.buffer.remove(quantity);
+        const mission: TrafficMission = {
+          id: `mission-${++this.#missionSequence}`,
+          providerId: selection.provider.id,
+          requesterId: requester.id,
+          podId: selection.pod.id,
+          resourceId: target.resourceId,
+          quantity,
+          createdAt: time,
+          approachRoute: selection.approachRoute,
+          deliveryRoute: selection.deliveryRoute,
+          status: 'TO_PROVIDER',
+        };
+        this.addMission(mission);
+        this.reserveDestination(
+          reservations,
+          requester,
+          target.resourceId,
+          quantity,
+        );
+        created.push(mission);
+        const pod = selection.pod;
+        pod.missionId = mission.id;
+        pod.resourceId = target.resourceId;
+        pod.cargo = quantity;
+        this.beginRoute(pod, selection.approachRoute, 'TO_PROVIDER', time);
+        remainingIdlePods -= 1;
+        wanted -= quantity;
+      }
     }
+
+    // Fill explicit requests first. Once those jobs have claimed idle pods,
+    // active providers offload their remaining stock to any marked storage.
+    const storageStationsByResource = new Map<ResourceId, Station[]>();
+    for (const station of this.stations.values()) {
+      if (
+        station.storageId === undefined ||
+        station.role === 'depot' ||
+        station.buffer === undefined
+      )
+        continue;
+      const sameResource = storageStationsByResource.get(
+        station.buffer.resourceId,
+      );
+      if (sameResource === undefined)
+        storageStationsByResource.set(station.buffer.resourceId, [station]);
+      else sameResource.push(station);
+    }
+    const storageRouteCache = new Map<
+      string,
+      { readonly station: Station; readonly route: RailRoute }[]
+    >();
+    const activeProviders = [...this.stations.values()]
+      .filter(
+        (station) =>
+          (station.role === 'active-provider' || station.role === 'storage') &&
+          station.buffer !== undefined &&
+          station.buffer.quantity >= station.minBatch,
+      )
+      .sort((a, b) => b.priority - a.priority || a.id.localeCompare(b.id));
+    for (const provider of activeProviders) {
+      if (remainingIdlePods === 0) break;
+      const source = provider.buffer;
+      if (source === undefined || source.quantity < provider.minBatch) continue;
+      const routeCacheKey = `${provider.railNodeId}\u0000${source.resourceId}\u0000${provider.storageId ?? ''}`;
+      let destinations = storageRouteCache.get(routeCacheKey);
+      if (destinations === undefined) {
+        destinations = (storageStationsByResource.get(source.resourceId) ?? [])
+          .filter(
+            (station) =>
+              station.railNodeId !== provider.railNodeId &&
+              station.storageId !== provider.storageId &&
+              station.buffer !== source,
+          )
+          .flatMap((station) => {
+            const route = this.rails.route(
+              provider.railNodeId,
+              station.railNodeId,
+            );
+            return route === undefined ? [] : [{ station, route }];
+          })
+          .sort(
+            (a, b) =>
+              a.route.distance - b.route.distance ||
+              a.station.id.localeCompare(b.station.id),
+          );
+        storageRouteCache.set(routeCacheKey, destinations);
+      }
+      for (const destination of destinations) {
+        while (source.quantity >= provider.minBatch && remainingIdlePods > 0) {
+          const destinationCapacity = this.destinationCapacity(
+            destination.station,
+            reservations,
+          );
+          const available = Math.min(
+            Math.max(0, source.quantity - (provider.stockMaximum ?? 0)),
+            provider.maxBatch,
+            destination.station.maxBatch,
+            destinationCapacity,
+          );
+          if (available < provider.minBatch) break;
+          const podCandidate = nextIdlePodRoute(provider, provider.minBatch);
+          if (podCandidate === undefined) break;
+          const quantity = Math.min(available, podCandidate.pod.capacity);
+          if (quantity < provider.minBatch) break;
+          source.remove(quantity);
+          const mission: TrafficMission = {
+            id: `mission-${++this.#missionSequence}`,
+            providerId: provider.id,
+            requesterId: destination.station.id,
+            podId: podCandidate.pod.id,
+            resourceId: source.resourceId,
+            quantity,
+            createdAt: time,
+            approachRoute: podCandidate.route,
+            deliveryRoute: destination.route,
+            status: 'TO_PROVIDER',
+          };
+          this.addMission(mission);
+          this.reserveDestination(
+            reservations,
+            destination.station,
+            source.resourceId,
+            quantity,
+          );
+          created.push(mission);
+          const pod = podCandidate.pod;
+          pod.missionId = mission.id;
+          pod.resourceId = source.resourceId;
+          pod.cargo = quantity;
+          this.beginRoute(pod, podCandidate.route, 'TO_PROVIDER', time);
+          remainingIdlePods -= 1;
+        }
+      }
+    }
+    if (!this.#deferAutomaticDispatch) this.routeDeferredDepotPods(time);
     return created;
   }
 
-  advanceTo(target: SimTime, maxEvents = Number.MAX_SAFE_INTEGER): number {
+  /**
+   * When `dispatchAfterEvents` is false, defer every dispatch triggered by
+   * these events until the caller has synchronized world state and calls
+   * `dispatch` once. The default preserves the standalone behavior.
+   */
+  advanceTo(
+    target: SimTime,
+    maxEvents = Number.MAX_SAFE_INTEGER,
+    dispatchAfterEvents = true,
+  ): number {
     let processed = 0;
-    while (true) {
-      this.#events.sort(
-        (a, b) =>
-          compareTime(a.time, b.time) ||
-          a.podId.localeCompare(b.podId) ||
-          a.sequence - b.sequence,
-      );
-      const event = this.#events[0];
-      if (event === undefined || event.time > target || processed >= maxEvents)
-        break;
-      const batchTime = event.time;
-      const batch = this.#events
-        .filter((item) => item.time === batchTime)
-        .sort(
-          (a, b) => a.podId.localeCompare(b.podId) || a.sequence - b.sequence,
-        );
-      for (const item of batch)
-        this.#events.splice(this.#events.indexOf(item), 1);
-      for (const item of batch) this.process(item);
-      this.dispatch(batchTime);
-      processed += batch.length;
+    const previousDefer = this.#deferAutomaticDispatch;
+    this.#deferAutomaticDispatch = previousDefer || !dispatchAfterEvents;
+    try {
+      while (true) {
+        const event = this.#events[0];
+        if (
+          event === undefined ||
+          event.time > target ||
+          processed >= maxEvents
+        )
+          break;
+        const batchTime = event.time;
+        const batch: TrafficEvent[] = [];
+        while (this.#events[0]?.time === batchTime)
+          batch.push(this.#popEvent()!);
+        for (const item of batch) this.process(item);
+        if (!this.#deferAutomaticDispatch) this.dispatch(batchTime);
+        processed += batch.length;
+      }
+    } finally {
+      this.#deferAutomaticDispatch = previousDefer;
     }
     this.detectGridlock();
     return processed;
@@ -475,7 +888,7 @@ export class PodTrafficSystem {
       pod.state = 'IDLE';
       pod.stationId = this.stationAt(pod.nodeId)?.id ?? pod.stationId;
       delete pod.route;
-      this.dispatch(time);
+      if (!this.#deferAutomaticDispatch) this.dispatch(time);
     }
   }
 
@@ -540,12 +953,16 @@ export class PodTrafficSystem {
     pod.cargo = 0;
     delete pod.resourceId;
     mission.status = 'DELIVERED';
+    this.unindexActiveMission(mission);
     if (requester.berthVehicleId === pod.id) delete requester.berthVehicleId;
     delete pod.missionId;
     delete pod.route;
     pod.state = 'IDLE';
-    const assigned = this.dispatch(time).length > 0 && pod.state !== 'IDLE';
-    if (!assigned) this.sendToDepot(pod, time);
+    if (this.#deferAutomaticDispatch) this.#deferredDepotPods.add(pod.id);
+    else {
+      const assigned = this.dispatch(time).length > 0 && pod.state !== 'IDLE';
+      if (!assigned) this.sendToDepot(pod, time);
+    }
     this.wakeWaiting(time);
   }
 
@@ -571,6 +988,16 @@ export class PodTrafficSystem {
       (depot.station.reservedDepotSlots ?? 0) + 1;
     pod.reservedDepotId = depot.station.id;
     this.beginRoute(pod, depot.route, 'TO_DEPOT', time);
+  }
+
+  private routeDeferredDepotPods(time: SimTime): void {
+    const pending = [...this.#deferredDepotPods];
+    this.#deferredDepotPods.clear();
+    for (const podId of pending) {
+      const pod = this.pods.get(podId);
+      if (pod?.state === 'IDLE' && pod.missionId === undefined)
+        this.sendToDepot(pod, time);
+    }
   }
 
   private wakeWaiting(time: SimTime): void {
@@ -633,7 +1060,202 @@ export class PodTrafficSystem {
     podId: string,
     type: TrafficEvent['type'],
   ): void {
-    this.#events.push({ time, podId, type, sequence: ++this.#sequence });
+    this.#pushEvent({ time, podId, type, sequence: ++this.#sequence });
+  }
+  #pushEvent(event: TrafficEvent): void {
+    this.#events.push(event);
+    let index = this.#events.length - 1;
+    while (index > 0) {
+      const parent = Math.floor((index - 1) / 2);
+      if (this.#compareEvents(this.#events[parent]!, event) <= 0) break;
+      this.#events[index] = this.#events[parent]!;
+      index = parent;
+    }
+    this.#events[index] = event;
+  }
+  #popEvent(): TrafficEvent | undefined {
+    const first = this.#events[0];
+    const last = this.#events.pop();
+    if (first === undefined || last === undefined) return first;
+    if (this.#events.length === 0) return first;
+    let index = 0;
+    while (true) {
+      const left = index * 2 + 1;
+      if (left >= this.#events.length) break;
+      const right = left + 1;
+      const child =
+        right < this.#events.length &&
+        this.#compareEvents(this.#events[right]!, this.#events[left]!) < 0
+          ? right
+          : left;
+      if (this.#compareEvents(last, this.#events[child]!) <= 0) break;
+      this.#events[index] = this.#events[child]!;
+      index = child;
+    }
+    this.#events[index] = last;
+    return first;
+  }
+  #heapifyEvents(): void {
+    for (
+      let index = Math.floor(this.#events.length / 2) - 1;
+      index >= 0;
+      index -= 1
+    ) {
+      const event = this.#events[index]!;
+      let current = index;
+      while (true) {
+        const left = current * 2 + 1;
+        if (left >= this.#events.length) break;
+        const right = left + 1;
+        const child =
+          right < this.#events.length &&
+          this.#compareEvents(this.#events[right]!, this.#events[left]!) < 0
+            ? right
+            : left;
+        if (this.#compareEvents(event, this.#events[child]!) <= 0) break;
+        this.#events[current] = this.#events[child]!;
+        current = child;
+      }
+      this.#events[current] = event;
+    }
+  }
+  #compareEvents(left: TrafficEvent, right: TrafficEvent): number {
+    return (
+      compareTime(left.time, right.time) ||
+      left.podId.localeCompare(right.podId) ||
+      left.sequence - right.sequence
+    );
+  }
+
+  private addMission(mission: TrafficMission): void {
+    this.missions.set(mission.id, mission);
+    if (mission.status !== 'DELIVERED') this.indexActiveMission(mission);
+  }
+
+  private removeMission(missionId: string): void {
+    const mission = this.missions.get(missionId);
+    if (mission === undefined) return;
+    this.missions.delete(missionId);
+    if (mission.status !== 'DELIVERED') this.unindexActiveMission(mission);
+  }
+
+  private indexActiveMission(mission: TrafficMission): void {
+    for (const stationId of new Set([
+      mission.providerId,
+      mission.requesterId,
+    ])) {
+      let missionIds = this.#activeMissionIdsByStation.get(stationId);
+      if (missionIds === undefined) {
+        missionIds = new Set();
+        this.#activeMissionIdsByStation.set(stationId, missionIds);
+      }
+      missionIds.add(mission.id);
+    }
+  }
+
+  private unindexActiveMission(mission: TrafficMission): void {
+    for (const stationId of new Set([
+      mission.providerId,
+      mission.requesterId,
+    ])) {
+      const missionIds = this.#activeMissionIdsByStation.get(stationId);
+      missionIds?.delete(mission.id);
+      if (missionIds?.size === 0)
+        this.#activeMissionIdsByStation.delete(stationId);
+    }
+  }
+
+  private createReservations(): TrafficReservations {
+    const reservations: TrafficReservations = {
+      byRequester: new Map(),
+      byStorage: new Map(),
+      byStorageResource: new Map(),
+      byBuffer: new Map(),
+    };
+    for (const mission of this.missions.values()) {
+      if (mission.status === 'DELIVERED') continue;
+      increment(
+        reservations.byRequester,
+        mission.requesterId,
+        mission.quantity,
+      );
+      const destination = this.stations.get(mission.requesterId);
+      if (destination === undefined || destination.buffer === undefined)
+        continue;
+      const buffer = destination.buffer;
+      if (destination.storageId === undefined)
+        increment(reservations.byBuffer, buffer, mission.quantity);
+      else {
+        increment(
+          reservations.byStorage,
+          destination.storageId,
+          mission.quantity,
+        );
+        incrementStorageResource(
+          reservations.byStorageResource,
+          destination.storageId,
+          mission.resourceId,
+          mission.quantity,
+        );
+      }
+    }
+    return reservations;
+  }
+
+  private reserveDestination(
+    reservations: TrafficReservations,
+    destination: Station,
+    resourceId: ResourceId,
+    quantity: number,
+  ): void {
+    increment(reservations.byRequester, destination.id, quantity);
+    const buffer = destination.buffer;
+    if (buffer === undefined) return;
+    if (destination.storageId === undefined)
+      increment(reservations.byBuffer, buffer, quantity);
+    else {
+      increment(reservations.byStorage, destination.storageId, quantity);
+      incrementStorageResource(
+        reservations.byStorageResource,
+        destination.storageId,
+        resourceId,
+        quantity,
+      );
+    }
+  }
+
+  private destinationCapacity(
+    destination: Station,
+    reservations: TrafficReservations,
+  ): number {
+    const buffer = destination.buffer;
+    if (buffer === undefined) return 0;
+    if (destination.storageId === undefined)
+      return Math.max(
+        0,
+        buffer.freeSpace - (reservations.byBuffer.get(buffer) ?? 0),
+      );
+    const shared = (
+      buffer as typeof buffer & {
+        readonly inventory?: { readonly freeSpace?: number };
+      }
+    ).inventory;
+    const totalFree =
+      shared?.freeSpace ?? destination.storageFreeSpace ?? buffer.freeSpace;
+    const pendingResource =
+      reservations.byStorageResource
+        .get(destination.storageId)
+        ?.get(buffer.resourceId) ?? 0;
+    return Math.max(
+      0,
+      Math.min(
+        totalFree - (reservations.byStorage.get(destination.storageId) ?? 0),
+        buffer.freeSpace - pendingResource,
+        (destination.stockMaximum ?? Number.MAX_SAFE_INTEGER) -
+          buffer.quantity -
+          pendingResource,
+      ),
+    );
   }
 }
 

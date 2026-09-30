@@ -8,6 +8,7 @@ import type {
   WorldEntityId,
 } from '../domain';
 import { WorldBuffer } from '../simulation';
+import { createStatesFixture } from './states-fixture';
 import {
   OreKind,
   TerrainKind,
@@ -20,6 +21,227 @@ import {
 } from './index';
 
 describe('world runtime persistence', () => {
+  it('permanently destroys a legacy dismantling factory without restoration records', () => {
+    const fixture = createStatesFixture();
+    const runtime = fixture.runtime;
+    const entityId = asId<WorldEntityId>(fixture.ids.waitingFactory);
+    runtime.dismantleEntity(entityId);
+    const { dismantlingFactories, ...legacySave } =
+      serializeWorldRuntime(runtime);
+    void dismantlingFactories;
+    const restored = deserializeWorldRuntime(legacySave);
+    const entity = restored.entities.get(entityId)!;
+    const station = [...restored.entities.values()].find(
+      (candidate) =>
+        candidate.kind === 'station' && candidate.linkedEntityId === entityId,
+    )!;
+    const salvageIds = [...restored.traffic.stations.keys()].filter((id) =>
+      id.startsWith(`salvage:${entityId}:`),
+    );
+    expect(salvageIds.length).toBeGreaterThan(0);
+
+    restored.destroyDismantledEntity(entityId);
+
+    expect(restored.entities.has(entityId)).toBe(false);
+    for (const id of salvageIds)
+      expect(restored.traffic.stations.has(id)).toBe(false);
+    expect(restored.entities.get(station.id)).not.toHaveProperty(
+      'linkedEntityId',
+    );
+    expect(
+      restored.world.grid.occupancy[
+        entity.transform.position.y * restored.world.grid.width +
+          entity.transform.position.x
+      ],
+    ).toBe(0);
+    const saved = deserializeWorldRuntime(serializeWorldRuntime(restored));
+    expect(saved.entities.has(entityId)).toBe(false);
+  });
+
+  it('rejects permanent destruction of a factory that is not dismantling', () => {
+    const fixture = createStatesFixture();
+    const entityId = asId<WorldEntityId>(fixture.ids.waitingFactory);
+    expect(() => fixture.runtime.destroyDismantledEntity(entityId)).toThrow(
+      'Building is not being dismantled',
+    );
+    expect(fixture.runtime.entities.has(entityId)).toBe(true);
+  });
+
+  it('reclaims delivered salvage once after cancellation and restores the factory without retaining receipts', () => {
+    const fixture = createStatesFixture();
+    const runtime = fixture.runtime;
+    const entityId = asId<WorldEntityId>(fixture.ids.waitingFactory);
+    runtime.dismantleEntity(entityId);
+    const source = [...runtime.traffic.stations.values()].find(
+      (station) =>
+        station.id.startsWith(`salvage:${entityId}:`) &&
+        station.buffer!.quantity > 0,
+    )!;
+    const destination = new WorldBuffer(source.buffer!.resourceId, 10);
+    source.buffer!.remove(1);
+    destination.add(1);
+    runtime.addTrafficStation({
+      id: 'escaped-salvage',
+      railNodeId: source.railNodeId,
+      role: 'provider',
+      buffer: destination,
+      priority: 0,
+      target: 0,
+      minBatch: 1,
+      maxBatch: 10,
+    });
+    const route = { nodeIds: [source.railNodeId], edgeIds: [], distance: 0 };
+    runtime.restoreTraffic({
+      ...runtime.traffic.serialize(),
+      missionSequence: 1,
+      missions: [
+        {
+          id: 'mission-1',
+          providerId: source.id,
+          requesterId: 'escaped-salvage',
+          podId: 'old-pod',
+          resourceId: source.buffer!.resourceId,
+          quantity: 1,
+          createdAt: runtime.logicalTime,
+          approachRoute: route,
+          deliveryRoute: route,
+          status: 'DELIVERED',
+        },
+      ],
+    });
+    runtime.advanceTo(runtime.logicalTime);
+    runtime.cancelDismantle(entityId);
+    runtime.advanceTo(runtime.logicalTime);
+    const returnStationId = `restoration-return:${entityId}:mission-1`;
+    expect(
+      runtime.traffic.stations.get('escaped-salvage')!.buffer!.quantity,
+    ).toBe(0);
+    expect(
+      runtime.traffic.stations.get(returnStationId)!.buffer!.quantity,
+    ).toBe(1);
+    expect(runtime.traffic.missions.has('mission-1')).toBe(true);
+    const restored = deserializeWorldRuntime(serializeWorldRuntime(runtime));
+    restored.advanceTo(restored.logicalTime);
+    expect(
+      restored.traffic.stations.get(returnStationId)!.buffer!.quantity,
+    ).toBe(1);
+    expect(
+      restored.traffic.stations.get('escaped-salvage')!.buffer!.quantity,
+    ).toBe(0);
+    restored.addPod('restoration-pod', source.railNodeId, source.id);
+    restored.advanceTo(restored.logicalTime + 20_000_000n);
+    expect(restored.entities.get(entityId)?.kind).toBe('factory');
+    expect(restored.traffic.missions.size).toBe(0);
+    expect(
+      restored.traffic.stations.get('escaped-salvage')!.buffer!.quantity,
+    ).toBe(0);
+  });
+
+  it('retains salvage delivery receipts until dismantling can no longer be cancelled', () => {
+    const fixture = createStatesFixture();
+    const runtime = fixture.runtime;
+    const entityId = asId<WorldEntityId>(fixture.ids.waitingFactory);
+    runtime.dismantleEntity(entityId);
+    const source = [...runtime.traffic.stations.values()].find(
+      (station) =>
+        station.id.startsWith(`salvage:${entityId}:`) &&
+        station.buffer!.quantity > 0,
+    )!;
+    const route = { nodeIds: [source.railNodeId], edgeIds: [], distance: 0 };
+    runtime.traffic.missions.set('mission-1', {
+      id: 'mission-1',
+      providerId: source.id,
+      requesterId: 'old-requester',
+      podId: 'old-pod',
+      resourceId: source.buffer!.resourceId,
+      quantity: 1,
+      createdAt: runtime.logicalTime,
+      approachRoute: route,
+      deliveryRoute: route,
+      status: 'DELIVERED',
+    });
+    runtime.advanceTo(runtime.logicalTime);
+    expect(runtime.traffic.missions.has('mission-1')).toBe(true);
+    expect(runtime.snapshot().missions).toHaveLength(0);
+    const restored = deserializeWorldRuntime(serializeWorldRuntime(runtime));
+    expect(restored.traffic.missions.has('mission-1')).toBe(true);
+    restored.destroyDismantledEntity(entityId);
+    restored.advanceTo(restored.logicalTime);
+    expect(restored.traffic.missions.size).toBe(0);
+  });
+
+  it('discards legacy delivery history and keeps repeated deliveries bounded across saves', () => {
+    const runtime = WorldRuntime.generate({
+      ...defaultWorldGenerationConfig('bounded-mission-history'),
+      width: 64,
+      height: 64,
+      spawnClearingSize: 24,
+    });
+    const pod = [...runtime.traffic.pods.values()][0]!;
+    const resourceId = asId<ResourceId>('ironOre');
+    const route = { nodeIds: [pod.nodeId], edgeIds: [], distance: 0 };
+    const traffic = runtime.traffic.serialize();
+    runtime.restoreTraffic({
+      ...traffic,
+      missionSequence: 1447,
+      missions: Array.from({ length: 1447 }, (_, index) => ({
+        id: `mission-${index + 1}`,
+        providerId: 'old-provider',
+        requesterId: 'old-requester',
+        podId: pod.id,
+        resourceId,
+        quantity: 10,
+        createdAt: 0n,
+        approachRoute: route,
+        deliveryRoute: route,
+        status: 'DELIVERED' as const,
+      })),
+    });
+    expect(runtime.snapshot().missions).toHaveLength(0);
+    runtime.advanceTo(0n);
+    expect(runtime.traffic.missions.size).toBe(0);
+    expect(runtime.traffic.missionSequence).toBe(1447);
+    const provider = new WorldBuffer(resourceId, 10);
+    const requester = new WorldBuffer(resourceId, 10);
+    runtime.addTrafficStation({
+      id: 'repeat-provider',
+      railNodeId: pod.nodeId,
+      role: 'provider',
+      buffer: provider,
+      priority: 0,
+      target: 0,
+      minBatch: 1,
+      maxBatch: 10,
+    });
+    runtime.addTrafficStation({
+      id: 'repeat-requester',
+      railNodeId: pod.nodeId,
+      role: 'requester',
+      buffer: requester,
+      priority: 1,
+      target: 10,
+      minBatch: 1,
+      maxBatch: 10,
+    });
+    for (let delivery = 0; delivery < 30; delivery += 1) {
+      provider.add(10);
+      runtime.advanceTo(runtime.logicalTime + 2_000_000n);
+      expect(requester.quantity).toBe(10);
+      requester.remove(10);
+      expect(runtime.traffic.missions.size).toBe(0);
+      expect(runtime.snapshot().missions).toHaveLength(0);
+    }
+    const state = serializeWorldRuntime(runtime);
+    expect(state.traffic.missions).toHaveLength(0);
+    expect(state.traffic.missionSequence).toBe(1477);
+    const restored = deserializeWorldRuntime(state);
+    restored.traffic.stations.get('repeat-provider')!.buffer!.add(10);
+    restored.advanceTo(restored.logicalTime);
+    expect(restored.snapshot().missions.map((mission) => mission.id)).toEqual([
+      'mission-1478',
+    ]);
+  });
+
   it('reconnects a restored mine output to its logistics station', () => {
     const runtime = WorldRuntime.generate({
       ...defaultWorldGenerationConfig('mine-output-restore'),
@@ -86,8 +308,9 @@ describe('world runtime persistence', () => {
     ).toHaveLength(1);
     expect(snapshot.pods).toHaveLength(2);
     expect(
-      snapshot.stations.find((station) => station.id === 'hub:ironPlate')
-        ?.quantity,
+      snapshot.stations.find(
+        (station) => station.id === 'rule:world-starter-storage:ironPlate',
+      )?.quantity,
     ).toBe(200);
     expect(runtime.traffic.stations.get('depot:starter')?.depotCapacity).toBe(
       8,
@@ -541,8 +764,9 @@ describe('world runtime persistence', () => {
       });
       const storageNode = runtime.railNodes.get('rail-starter-storage')!;
       const depotNode = runtime.railNodes.get('rail-starter-depot')!;
-      runtime.placeRailPath([depotNode.position, storageNode.position]);
-      runtime.placeRailPath([storageNode.position, depotNode.position]);
+      const corner = gridPoint(storageNode.position.x, depotNode.position.y);
+      runtime.placeRailPath([depotNode.position, corner, storageNode.position]);
+      runtime.placeRailPath([storageNode.position, corner, depotNode.position]);
       return runtime;
     };
     const depotId = asId<WorldEntityId>('world-starter-depot');
@@ -579,5 +803,68 @@ describe('world runtime persistence', () => {
         .snapshot(),
     ).toEqual(original);
     expect(cancelled.traffic.pods.size).toBe(2);
+  });
+});
+
+describe('storage stock rule configuration', () => {
+  const storageId = asId<WorldEntityId>('world-starter-storage');
+  const resourceId = asId<ResourceId>('ironOre');
+  const makeRuntime = () =>
+    WorldRuntime.generate({
+      ...defaultWorldGenerationConfig('stock-rules'),
+      width: 64,
+      height: 64,
+      spawnClearingSize: 24,
+    });
+  it('adds a zero rule once, updates it, and preserves its range across saves', () => {
+    const runtime = makeRuntime();
+    runtime.configureStation(storageId, resourceId, 'stock', 0, 0, 0);
+    runtime.configureStation(storageId, resourceId, 'stock', 50, 0, 100);
+    expect(
+      runtime
+        .snapshot()
+        .stations.filter((station) => station.resourceId === resourceId),
+    ).toHaveLength(1);
+    const restored = parseWorldRuntime(stringifyWorldRuntime(runtime));
+    expect(
+      restored.traffic.stations.get(`rule:${storageId}:${resourceId}`),
+    ).toMatchObject({ target: 50, stockMaximum: 100 });
+    expect(() =>
+      runtime.configureStation(storageId, resourceId, 'stock', 100, 0, 50),
+    ).toThrow('Stock thresholds');
+    expect(() => runtime.removeStationRule(storageId, resourceId)).toThrow(
+      'Storage rules cannot',
+    );
+  });
+  it('merges legacy providers and requests without duplicating inventory', () => {
+    const runtime = makeRuntime();
+    const iron = asId<ResourceId>('ironPlate');
+    const canonicalId = `rule:${storageId}:${iron}`;
+    const canonical = runtime.traffic.stations.get(canonicalId)!;
+    runtime.traffic.stations.delete(canonicalId);
+    runtime.addTrafficStation({
+      ...canonical,
+      id: `storage:${storageId}:${iron}`,
+      role: 'provider',
+    });
+    const { stockMaximum: _maximum, ...legacy } = canonical;
+    void _maximum;
+    runtime.addTrafficStation({
+      ...legacy,
+      id: `${canonicalId}:request`,
+      role: 'requester',
+      target: 50,
+    });
+    runtime.dispatch();
+    expect(
+      runtime
+        .snapshot()
+        .stations.filter((station) => station.resourceId === iron),
+    ).toHaveLength(1);
+    expect(runtime.traffic.stations.get(canonicalId)).toMatchObject({
+      target: 50,
+      stockMaximum: 50,
+    });
+    expect(runtime.storageInventories.get(storageId)!.amount(iron)).toBe(200);
   });
 });

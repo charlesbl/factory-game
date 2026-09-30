@@ -312,8 +312,9 @@ export class MineRuntime {
   dismantleDrill(id: WorldEntityId): void {
     const drill = this.drills.get(id);
     if (drill === undefined) throw new Error('Unknown drill');
-    for (const item of this.drillCost)
-      this.salvage.add(item.resourceId, item.quantity);
+    if (drill.state !== 'GHOST')
+      for (const item of this.drillCost)
+        this.salvage.add(item.resourceId, item.quantity);
     this.drills.delete(id);
   }
 }

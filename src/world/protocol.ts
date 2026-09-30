@@ -20,6 +20,7 @@ import type {
   WorldRailBlock,
   WorldRailEdge,
   WorldRailNode,
+  StationRuleMode,
   WorldSnapshot,
   WorldStationSnapshot,
   WorldValidationResult,
@@ -81,7 +82,7 @@ export type WorldCommand =
       readonly position: GridPoint;
       readonly size: { readonly width: number; readonly height: number };
       readonly rotation: QuarterTurn;
-      readonly stationId: StationId;
+      readonly stationId?: StationId;
       readonly cost?: readonly {
         readonly resourceId: ResourceId;
         readonly quantity: number;
@@ -97,10 +98,16 @@ export type WorldCommand =
       readonly position: GridPoint;
     })
   | (RevisionRequest & {
-      readonly type: 'CONFIGURE_STATION';
+      readonly type: 'REMOVE_STATION_RULE';
       readonly entityId: WorldEntityId;
       readonly resourceId: ResourceId;
-      readonly mode: 'request' | 'provide';
+    })
+  | (RevisionRequest & {
+      readonly type: 'CONFIGURE_STATION';
+      readonly maximum?: number;
+      readonly entityId: WorldEntityId;
+      readonly resourceId: ResourceId;
+      readonly mode: StationRuleMode;
       readonly target: number;
       readonly priority: number;
     })
@@ -110,6 +117,19 @@ export type WorldCommand =
     })
   | (RevisionRequest & {
       readonly type: 'DISMANTLE_ENTITY';
+      readonly entityId: WorldEntityId;
+    })
+  | (RevisionRequest & {
+      readonly type: 'DISMANTLE_SELECTION';
+      readonly entityIds: readonly WorldEntityId[];
+      readonly railEdgeIds: readonly RailEdgeId[];
+    })
+  | (RevisionRequest & {
+      readonly type: 'CANCEL_DISMANTLE';
+      readonly entityId: WorldEntityId;
+    })
+  | (RevisionRequest & {
+      readonly type: 'DESTROY_DISMANTLED_ENTITY';
       readonly entityId: WorldEntityId;
     })
   | (RevisionRequest & {
@@ -181,7 +201,7 @@ export type WorldCommand =
 export interface TrafficStationInput {
   readonly id: string;
   readonly railNodeId: string;
-  readonly role: 'provider' | 'requester' | 'depot';
+  readonly role: 'provider' | 'requester' | 'active-provider' | 'depot';
   readonly priority: number;
   readonly target: number;
   readonly minBatch: number;
@@ -240,12 +260,20 @@ type WorldWorkerResponseMessage =
       readonly requestId: string;
       readonly type: 'DELTA';
       readonly delta: WorldDelta;
+      readonly commandFailures?: readonly {
+        readonly targetId: string;
+        readonly message: string;
+      }[];
     }
   | {
       readonly protocolVersion: 3;
       readonly requestId: string;
       readonly type: 'ADVANCE_PAUSED';
       readonly delta: WorldDelta;
+      readonly commandFailures?: readonly {
+        readonly targetId: string;
+        readonly message: string;
+      }[];
     }
   | {
       readonly protocolVersion: 3;

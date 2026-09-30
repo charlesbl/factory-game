@@ -26,6 +26,8 @@ import {
 import {
   WorldRuntime,
   type ConstructionTargetRecord,
+  type DismantlingBuildingRecord,
+  type DismantlingFactoryRecord,
   type PodProductionRecord,
   type SerializedMineRecord,
   type SerializedStorageRecord,
@@ -69,6 +71,9 @@ export interface SerializedWorldState {
     readonly contract: SerializedFactoryContract;
     readonly instance: InstanceSnapshot;
   }[];
+  /** Optional so older schema-4 saves without generic dismantling still load. */
+  readonly dismantlingBuildings?: readonly DismantlingBuildingRecord[];
+  readonly dismantlingFactories?: readonly DismantlingFactoryRecord[];
   readonly storages: readonly SerializedStorageRecord[];
   readonly nextPodSequence?: number;
   readonly podProductions?: readonly PodProductionRecord[];
@@ -105,6 +110,8 @@ export const serializeWorldRuntime = (
     .map((target) => ({ ...target, siteId: target.siteId })),
   mines: runtime.mineRecords(),
   factories: runtime.factoryRecords(),
+  dismantlingBuildings: runtime.dismantlingBuildingRecords(),
+  dismantlingFactories: runtime.dismantlingFactoryRecords(),
   storages: runtime.storageRecords(),
   nextPodSequence: runtime.nextPodSequence,
   podProductions: [...runtime.podProductions.values()].sort(
@@ -139,6 +146,10 @@ export const deserializeWorldRuntime = (
     !Array.isArray(state.constructionTargets) ||
     !Array.isArray(state.mines) ||
     !Array.isArray(state.factories) ||
+    (state.dismantlingFactories !== undefined &&
+      !Array.isArray(state.dismantlingFactories)) ||
+    (state.dismantlingBuildings !== undefined &&
+      !Array.isArray(state.dismantlingBuildings)) ||
     !Array.isArray(state.storages) ||
     (state.schemaVersion === 4 &&
       (!Number.isSafeInteger(state.nextPodSequence) ||
@@ -266,6 +277,8 @@ export const deserializeWorldRuntime = (
   runtime.restoreMines(state.mines);
   runtime.restoreStorages(state.storages);
   runtime.restoreFactories(state.factories);
+  runtime.restoreDismantlingFactories(state.dismantlingFactories ?? []);
+  runtime.restoreDismantlingBuildings(state.dismantlingBuildings ?? []);
   runtime.restoreEventQueue(state.eventQueue);
   runtime.restorePodProductions(
     (state.podProductions ?? []).map((production) => ({

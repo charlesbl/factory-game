@@ -222,7 +222,7 @@ export function createStatesFixture(): StatesFixture {
   // full buffer stops extraction while the drill stays ACTIVE.
   for (const cost of worldContent.drill.buildCost)
     runtime.traffic.stations
-      .get(`drill-build:${mineId}:${cost.resourceId}`)!
+      .get(`drill-build:states-drill:${cost.resourceId}`)!
       .buffer!.add(cost.quantity);
   runtime.advanceTo(runtime.logicalTime + 1n);
   runtime.advanceTo(
@@ -309,7 +309,7 @@ export function createStatesFixture(): StatesFixture {
       blockedFactory: blocked.id,
       mine: mineId,
       drill: 'states-drill',
-      drillBuildStation: `drill-build:${mineId}:ironPlate`,
+      drillBuildStation: 'drill-build:states-drill:ironPlate',
       mineHeadStation: 'states-station-head',
       constructionSite: partialSite.id,
       completeSite: completeSite.id,

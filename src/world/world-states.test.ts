@@ -628,7 +628,7 @@ describe('dismantling recovery (real worker)', () => {
         resourceId,
         quantity,
         capacity: quantity,
-        role: 'provider',
+        role: 'active-provider',
       }))
       .sort((a, b) => a.resourceId.localeCompare(b.resourceId));
 
@@ -671,7 +671,7 @@ describe('dismantling recovery (real worker)', () => {
     );
   });
 
-  it('removes a dismantled mine immediately and parks salvage at its station', () => {
+  it('keeps a dismantled mine cancellable until its salvage and active deliveries have cleared', () => {
     const fixture = createStatesFixture();
     loadFixture(fixture);
     const before = snapshotOf();
@@ -686,6 +686,13 @@ describe('dismantling recovery (real worker)', () => {
       expected.set(resourceId, (expected.get(resourceId) ?? 0) + quantity);
     };
     bump(oreId, mine.output.quantity);
+    for (const item of [...mine.construction.items, ...mine.salvage.items])
+      bump(String(item.resourceId), item.quantity);
+    for (const item of worldContent.drill.buildCost)
+      bump(
+        String(item.resourceId),
+        item.quantity * (mine.drills.active + mine.drills.exhausted),
+      );
     for (const item of worldContent.buildings.find(
       (building) => building.kind === 'mine',
     )?.buildCost ?? [])
@@ -696,12 +703,16 @@ describe('dismantling recovery (real worker)', () => {
     });
     expect(response.type).toBe('DELTA');
     const after = snapshotOf();
-    // The mine is non-factory: it disappears immediately, drills and all.
+    // Its footprint remains reserved while recovered materials await pickup.
     expect(
       after.entities.find(
         (candidate) => candidate.id === asId<WorldEntityId>(fixture.ids.mine),
       ),
-    ).toBeUndefined();
+    ).toMatchObject({
+      kind: 'mine',
+      dismantling: true,
+      canCancelDismantle: true,
+    });
     expect(
       after.buildings.find(
         (building) => building.entityId === fixture.ids.mine,

@@ -579,7 +579,7 @@ describe('world session clock, queue, and persistence', () => {
     const record = worlds.writes.at(-1);
     expect(record?.schemaVersion).toBe(2);
     const saved = JSON.parse(record?.payload ?? '{}');
-    expect(saved.schemaVersion).toBe(2);
+    expect(saved.schemaVersion).toBe(state.schemaVersion);
     expect(saved.generated.config.seed).toBe(seed);
     expect(saved.generated.config.generatorVersion).toBeGreaterThanOrEqual(1);
     expect(saved.factories[0].contract.blueprintHash).not.toBe('');

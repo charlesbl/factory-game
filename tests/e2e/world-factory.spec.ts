@@ -114,22 +114,23 @@ const seedWorld = async (page: Page): Promise<void> => {
       createdAt: 0n,
     });
 
-    // Rails: depot -> hub storage -> station B, in both directions, with an
-    // L-bend wherever two consecutive waypoints are diagonal.
-    const waypoints = [
-      nodeById('rail-starter-depot').position,
-      nodeById('rail-starter-storage').position,
-      stationBNode.position,
-    ];
-    const path = [waypoints[0]];
-    for (const target of waypoints.slice(1)) {
-      const last = path[path.length - 1];
-      if (last.x !== target.x && last.y !== target.y)
-        path.push(gridPoint(last.x, target.y));
-      path.push(target);
+    // Approach the exterior hookups from the south, then route around the
+    // factory and starter buildings through the clear western corridor.
+    const depot = nodeById('rail-starter-depot').position;
+    const hub = nodeById('rail-starter-storage').position;
+    for (const path of [
+      [depot, gridPoint(depot.x, 36), gridPoint(hub.x, 36), hub],
+      [
+        hub,
+        gridPoint(hub.x, 36),
+        gridPoint(8, 36),
+        gridPoint(8, stationBNode.position.y),
+        stationBNode.position,
+      ],
+    ]) {
+      runtime.placeRailPath(path);
+      runtime.placeRailPath([...path].reverse());
     }
-    runtime.placeRailPath(path);
-    runtime.placeRailPath([...path].reverse());
 
     runtime.createConstructionSite({
       targetKind: 'storage',
@@ -190,8 +191,25 @@ const listButton = (page: Page, name: string) =>
   page.getByRole('button', { name, exact: true });
 
 test.describe('placed factory edit/replace and save continuity', () => {
-  test.beforeEach(() => {
+  test.beforeEach(async ({ page }) => {
     test.setTimeout(120_000);
+    // Repeated pixel reads can switch Chromium's canvas from GPU to CPU
+    // rasterisation. Use the same rasteriser before and after reload.
+    await page.addInitScript(() => {
+      const original = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (
+        this: HTMLCanvasElement,
+        type: string,
+        options?: object,
+      ) {
+        return Reflect.apply(original, this, [
+          type,
+          type === '2d' && this.classList.contains('world-minimap-canvas')
+            ? { ...options, willReadFrequently: true }
+            : options,
+        ]);
+      } as typeof original;
+    });
   });
 
   test('opens the placed factory blueprint, not the catalogue selection', async ({

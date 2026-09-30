@@ -226,6 +226,36 @@ describe('station and depot rail nodes', () => {
       depotNode.id,
     );
   });
+  it('builds a paid autonomous depot through its own hookup without a station', () => {
+    const runtime = create();
+    clear(runtime, 18, 18, 20, 20);
+    const transform: WorldTransform = {
+      position: gridPoint(30, 30),
+      size: gridSize(4, 4),
+      rotation: 0,
+    };
+    expect(runtime.validateGhost('depot', transform)).toEqual({ valid: true });
+    const site = runtime.createConstructionSite({
+      targetKind: 'depot',
+      transform,
+      stationId: asId<StationId>('autonomous-depot-construction'),
+      cost: [{ resourceId: asId<ResourceId>('ironPlate'), quantity: 5 }],
+    });
+    const requester = [...runtime.traffic.stations.values()].find(
+      (station) => station.role === 'requester',
+    )!;
+    expect(runtime.railNodes.get(requester.railNodeId)?.position).toEqual(
+      hookupCell(transform),
+    );
+    const restored = deserializeWorldRuntime(serializeWorldRuntime(runtime));
+    restored.traffic.stations.get(requester.id)!.buffer!.add(5);
+    restored.advanceTo(restored.logicalTime);
+    const depot = restored.entities.get(site.id) as DepotWorldEntity;
+    expect(depot.kind).toBe('depot');
+    expect(depot.railNodeId).toBe(requester.railNodeId);
+    expect(restored.railNodes.get(depot.railNodeId)?.kind).toBe('depot');
+    expect(restored.traffic.stations.has(requester.id)).toBe(false);
+  });
   it('keeps paid depot construction delivery on the supplying station', () => {
     const runtime = create();
     clear(runtime, 18, 18, 20, 20);
@@ -305,7 +335,6 @@ describe('station and depot rail nodes', () => {
       kind: 'depot',
       railNodeId: asId<RailNodeId>('rail-legacy-depot'),
       podCapacity: 8,
-      podIds: [],
       transform: depotTransform,
       createdAt: 0n,
     });

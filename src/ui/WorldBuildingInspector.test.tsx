@@ -21,7 +21,7 @@ describe('WorldBuildingInspector pod production', () => {
     const html = renderToStaticMarkup(
       <WorldBuildingInspector
         entity={depot}
-        snapshot={snapshot}
+        getSnapshot={() => snapshot}
         onQueuePod={() => undefined}
         onCancelPod={() => undefined}
       />,

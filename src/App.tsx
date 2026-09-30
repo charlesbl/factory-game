@@ -285,15 +285,23 @@ const App = () => {
     };
   }, [history, initialBlueprint]);
   useEffect(() => {
+    let active = true;
     void compiler
       .compile(compilationBlueprint, childContracts)
       .then((result) => {
         if (
+          !active ||
           !mounted.current ||
           result.generation < displayedCompilation.current
         )
           return;
         if (result.stale && result.contract === undefined) return;
+        if (!result.stale)
+          setLibraryError((current) =>
+            current?.startsWith('Factory compilation failed:')
+              ? undefined
+              : current,
+          );
         displayedCompilation.current = result.generation;
         setDiagnostics(result.diagnostics);
         if (result.contract === undefined) {
@@ -303,7 +311,19 @@ const App = () => {
         }
         setContract(result.contract);
         setCompileState(result.stale ? 'compiling' : 'ready');
+      })
+      .catch((error: unknown) => {
+        if (!active || !mounted.current) return;
+        console.error('Factory compilation failed.', error);
+        setContract(undefined);
+        setCompileState('invalid');
+        setLibraryError(
+          `Factory compilation failed: ${error instanceof Error ? error.message : 'unknown compiler error'}`,
+        );
       });
+    return () => {
+      active = false;
+    };
   }, [childContracts, compilationBlueprint]);
   useEffect(() => {
     if (!libraryReady || view !== 'factory') return undefined;

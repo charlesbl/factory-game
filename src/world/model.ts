@@ -112,6 +112,8 @@ export interface FactoryWorldEntity extends EntityBase {
   readonly instanceId: InstanceId;
   readonly stationId: StationId;
   readonly state: 'CONSTRUCTING' | 'ACTIVE' | 'DISMANTLING';
+  /** Snapshot-only action availability for cancelling demolition safely. */
+  readonly canCancelDismantle?: boolean;
 }
 export interface MineWorldEntity extends EntityBase {
   readonly kind: 'mine';
@@ -119,6 +121,10 @@ export interface MineWorldEntity extends EntityBase {
   readonly resourceId: ResourceId;
   readonly constructionBuffer: WorldInventory;
   readonly salvageBuffer: WorldInventory;
+  /** Snapshot flag for a mine whose salvage is still in progress. */
+  readonly dismantling?: boolean;
+  /** Snapshot-only availability of the cancel action. */
+  readonly canCancelDismantle?: boolean;
 }
 export interface DrillWorldEntity extends EntityBase {
   readonly kind: 'drill';
@@ -138,11 +144,19 @@ export interface StorageWorldEntity extends EntityBase {
   readonly stationId: StationId;
   readonly inventory: WorldInventory;
   readonly limits: readonly StorageLimit[];
+  /** Snapshot flag for a storage whose salvage is still in progress. */
+  readonly dismantling?: boolean;
+  /** Snapshot-only availability of the cancel action. */
+  readonly canCancelDismantle?: boolean;
 }
 export interface DepotWorldEntity extends EntityBase {
   readonly kind: 'depot';
   readonly railNodeId: RailNodeId;
   readonly podCapacity: number;
+  /** Snapshot flag for a depot whose salvage is still in progress. */
+  readonly dismantling?: boolean;
+  /** Snapshot-only availability of the cancel action. */
+  readonly canCancelDismantle?: boolean;
 }
 export interface ConstructionSiteWorldEntity extends EntityBase {
   readonly kind: 'construction-site';
@@ -166,9 +180,12 @@ export interface StorageLimit {
   readonly resourceId: ResourceId;
   readonly maximum: number;
 }
+export type StationRuleMode =
+  'request' | 'passive-provider' | 'active-provider' | 'stock';
+
 export interface StationRule {
   readonly resourceId: ResourceId;
-  readonly mode: 'request' | 'provide';
+  readonly mode: StationRuleMode;
   readonly target: number;
   readonly minBatch: number;
   readonly maxBatch: number;
@@ -267,9 +284,11 @@ export interface WorldValidationResult {
     | 'NOT_CONNECTED';
 }
 export interface WorldStationSnapshot {
+  readonly stockMaximum?: number;
   readonly id: string;
   readonly railNodeId: RailNodeId;
-  readonly role: 'provider' | 'requester' | 'depot';
+  readonly role:
+    'provider' | 'requester' | 'active-provider' | 'storage' | 'depot';
   readonly resourceId?: ResourceId;
   readonly quantity?: number;
   readonly capacity?: number;

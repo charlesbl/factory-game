@@ -32,6 +32,9 @@ export function createReviewFixture() {
     },
     createdAt: 0n,
   });
+  const oreIndex = 10 * 64 + 16;
+  runtime.world.grid.oreKinds[oreIndex] = OreKind.IRON;
+  runtime.world.grid.oreRemaining[oreIndex] = 1;
   const mine = runtime.createConstructionSite({
     targetKind: 'mine',
     transform: {
@@ -44,13 +47,10 @@ export function createReviewFixture() {
     resourceId: asId('ironOre'),
   });
   const mineId = mine.id;
-  const oreIndex = 10 * 64 + 16;
-  runtime.world.grid.oreKinds[oreIndex] = OreKind.IRON;
-  runtime.world.grid.oreRemaining[oreIndex] = 1;
   runtime.placeDrill(mineId, asId('review-drill'), gridPoint(16, 10));
   for (const cost of worldContent.drill.buildCost)
     runtime.traffic.stations
-      .get(`drill-build:${mineId}:${cost.resourceId}`)!
+      .get(`drill-build:review-drill:${cost.resourceId}`)!
       .buffer!.add(cost.quantity);
   runtime.advanceTo(1n);
   runtime.takeGridChanges();

@@ -13,16 +13,9 @@ import {
 } from '../editor';
 import { ContractCache } from './cache';
 import type { CompileRequest, CompileResponse } from './protocol';
+import { sha256 } from './sha256';
 
-export const sha256 = async (value: string): Promise<string> => {
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(value),
-  );
-  return [...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-};
+export { sha256 } from './sha256';
 export interface CompilationResult {
   readonly generation: number;
   readonly revision: number;
@@ -38,32 +31,60 @@ interface QueuedCompilation {
   readonly resolve: (result: CompilationResult) => void;
   readonly reject: (reason?: unknown) => void;
 }
+interface PendingWorkerRequest {
+  readonly resolve: (response: CompileResponse) => void;
+  readonly reject: (reason?: unknown) => void;
+}
 
 export class CompilationClient {
   readonly cache = new ContractCache();
-  readonly #worker: Worker | undefined;
-  readonly #pending = new Map<string, (response: CompileResponse) => void>();
+  #worker: Worker | undefined;
+  readonly #pending = new Map<string, PendingWorkerRequest>();
   #request = 0;
   #active: QueuedCompilation | undefined;
   #queued: QueuedCompilation | undefined;
   constructor() {
-    this.#worker =
-      typeof Worker === 'undefined'
-        ? undefined
-        : new Worker(new URL('./compile.worker.ts', import.meta.url), {
-            type: 'module',
-            name: 'factory-compiler',
-          });
+    let worker: Worker | undefined;
+    try {
+      worker =
+        typeof Worker === 'undefined'
+          ? undefined
+          : new Worker(new URL('./compile.worker.ts', import.meta.url), {
+              type: 'module',
+              name: 'factory-compiler',
+            });
+    } catch {
+      worker = undefined;
+    }
+    this.#worker = worker;
     this.#worker?.addEventListener(
       'message',
       (event: MessageEvent<CompileResponse>) => {
-        const resolve = this.#pending.get(event.data.requestId);
-        if (resolve !== undefined) {
+        const request = this.#pending.get(event.data.requestId);
+        if (request !== undefined) {
           this.#pending.delete(event.data.requestId);
-          resolve(event.data);
+          request.resolve(event.data);
         }
       },
     );
+    this.#worker?.addEventListener('error', (event: ErrorEvent) => {
+      event.preventDefault();
+      this.#disableWorker(new Error(event.message || 'Compiler worker failed'));
+    });
+    this.#worker?.addEventListener('messageerror', () => {
+      this.#disableWorker(
+        new Error('Compiler worker returned unreadable data'),
+      );
+    });
+  }
+
+  #disableWorker(error: Error): void {
+    const worker = this.#worker;
+    if (worker === undefined) return;
+    this.#worker = undefined;
+    worker.terminate();
+    for (const request of this.#pending.values()) request.reject(error);
+    this.#pending.clear();
   }
   compile(
     blueprint: FactoryBlueprint,
@@ -103,16 +124,8 @@ export class CompilationClient {
     const cached = this.cache.get(hash);
     if (cached !== undefined)
       return { revision, contract: cached, diagnostics: cached.diagnostics };
-    if (this.#worker === undefined) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
-      const compiled = compileBlueprint(
-        blueprint,
-        new ExactDagFlowSolver(childContracts),
-      );
-      if (!isContract(compiled)) return { revision, diagnostics: compiled };
-      const contract = this.cache.set({ ...compiled, blueprintHash: hash });
-      return { revision, contract, diagnostics: contract.diagnostics };
-    }
+    if (this.#worker === undefined)
+      return this.#compileLocally(blueprint, childContracts, revision, hash);
     const request: CompileRequest = {
       protocolVersion: 1,
       requestId,
@@ -127,12 +140,58 @@ export class CompilationClient {
         ).values(),
       ].map(serializeContract),
     };
-    const response = await new Promise<CompileResponse>((resolve) => {
-      this.#pending.set(requestId, resolve);
-      this.#worker!.postMessage(request);
-    });
+    const worker = this.#worker;
+    if (worker === undefined)
+      return this.#compileLocally(blueprint, childContracts, revision, hash);
+    let response: CompileResponse;
+    try {
+      response = await new Promise<CompileResponse>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          this.#disableWorker(new Error('Compiler worker did not respond'));
+        }, 15_000);
+        this.#pending.set(requestId, {
+          resolve: (result) => {
+            clearTimeout(timeout);
+            resolve(result);
+          },
+          reject: (error) => {
+            clearTimeout(timeout);
+            reject(error);
+          },
+        });
+        try {
+          worker.postMessage(request);
+        } catch (error) {
+          this.#disableWorker(
+            error instanceof Error
+              ? error
+              : new Error('Compiler worker failed'),
+          );
+        }
+      });
+    } catch (error) {
+      if (this.#worker === undefined)
+        return this.#compileLocally(blueprint, childContracts, revision, hash);
+      throw error;
+    }
     if (!response.ok) return { revision, diagnostics: response.diagnostics };
     const contract = this.cache.set(deserializeContract(response.contract));
+    return { revision, contract, diagnostics: contract.diagnostics };
+  }
+
+  async #compileLocally(
+    blueprint: FactoryBlueprint,
+    childContracts: ReadonlyMap<string, FactoryContract>,
+    revision: number,
+    hash: string,
+  ): Promise<Omit<CompilationResult, 'generation' | 'stale'>> {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    const compiled = compileBlueprint(
+      blueprint,
+      new ExactDagFlowSolver(childContracts),
+    );
+    if (!isContract(compiled)) return { revision, diagnostics: compiled };
+    const contract = this.cache.set({ ...compiled, blueprintHash: hash });
     return { revision, contract, diagnostics: contract.diagnostics };
   }
 

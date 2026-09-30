@@ -8,23 +8,15 @@ import {
 } from '../compiler';
 import { canonicalCompilationInput, deserializeBlueprint } from '../editor';
 import type { CompileRequest, CompileResponse } from './protocol';
+import { sha256 } from './sha256';
 
-const hash = async (value: string): Promise<string> => {
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(value),
-  );
-  return [...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-};
 const contracts = new Map<string, ReturnType<typeof serializeContract>>();
 self.addEventListener('message', (event: MessageEvent<CompileRequest>) => {
   void (async () => {
     const request = event.data;
     try {
       const blueprint = deserializeBlueprint(request.blueprint);
-      const blueprintHash = await hash(canonicalCompilationInput(blueprint));
+      const blueprintHash = await sha256(canonicalCompilationInput(blueprint));
       const cached = contracts.get(blueprintHash);
       if (cached !== undefined) {
         self.postMessage({

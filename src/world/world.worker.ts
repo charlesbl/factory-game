@@ -19,8 +19,12 @@ const CHECKPOINT_COMMANDS = new Set([
   'CREATE_SITE',
   'PLACE_DRILL',
   'CONFIGURE_STATION',
+  'REMOVE_STATION_RULE',
   'CANCEL_CONSTRUCTION',
   'DISMANTLE_ENTITY',
+  'DISMANTLE_SELECTION',
+  'CANCEL_DISMANTLE',
+  'DESTROY_DISMANTLED_ENTITY',
   'REPLACE_FACTORY',
   'PLACE_ENTITY',
   'REMOVE_ENTITY',
@@ -158,6 +162,9 @@ self.onmessage = (event: MessageEvent<WorldCommand>) => {
     const baseRevision = runtime.revision;
     const beforeEntityIds = new Set(runtime.entities.keys());
     let exhausted = false;
+    let commandFailures:
+      | readonly { readonly targetId: string; readonly message: string }[]
+      | undefined;
     if (command.type === 'PLACE_RAIL_PATH')
       runtime.placeRailPath(command.points);
     else if (command.type === 'REMOVE_RAIL_EDGE')
@@ -194,7 +201,9 @@ self.onmessage = (event: MessageEvent<WorldCommand>) => {
           size: gridSize(command.size.width, command.size.height),
           rotation: command.rotation,
         },
-        stationId: command.stationId,
+        stationId:
+          command.stationId ??
+          asId<StationId>(`depot-construction-${runtime.revision + 1}`),
         cost,
         ...(command.factoryId === undefined
           ? {}
@@ -217,6 +226,8 @@ self.onmessage = (event: MessageEvent<WorldCommand>) => {
         ),
         command.position,
       );
+    else if (command.type === 'REMOVE_STATION_RULE')
+      runtime.removeStationRule(command.entityId, command.resourceId);
     else if (command.type === 'CONFIGURE_STATION')
       runtime.configureStation(
         command.entityId,
@@ -224,11 +235,21 @@ self.onmessage = (event: MessageEvent<WorldCommand>) => {
         command.mode,
         command.target,
         command.priority,
+        command.maximum,
       );
     else if (command.type === 'CANCEL_CONSTRUCTION')
       runtime.cancelConstruction(command.siteId);
     else if (command.type === 'DISMANTLE_ENTITY')
       runtime.dismantleEntity(command.entityId);
+    else if (command.type === 'DISMANTLE_SELECTION')
+      commandFailures = runtime.dismantleSelection(
+        command.entityIds,
+        command.railEdgeIds,
+      );
+    else if (command.type === 'CANCEL_DISMANTLE')
+      runtime.cancelDismantle(command.entityId);
+    else if (command.type === 'DESTROY_DISMANTLED_ENTITY')
+      runtime.destroyDismantledEntity(command.entityId);
     else if (command.type === 'REPLACE_FACTORY')
       runtime.replaceFactory(command.entityId, {
         transform: {
@@ -293,6 +314,9 @@ self.onmessage = (event: MessageEvent<WorldCommand>) => {
       requestId: command.requestId,
       type: exhausted ? 'ADVANCE_PAUSED' : 'DELTA',
       delta,
+      ...(commandFailures === undefined || commandFailures.length === 0
+        ? {}
+        : { commandFailures }),
     });
   } catch (error) {
     if (rollbackState !== undefined) {

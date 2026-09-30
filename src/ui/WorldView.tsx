@@ -1,7 +1,7 @@
+import { StockRules } from './StockRules';
 import {
   lazy,
   Suspense,
-  type KeyboardEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -14,7 +14,6 @@ import {
   formatRate,
   gridSize,
   resourceById,
-  resources,
   worldContent,
 } from '../domain';
 import type {
@@ -70,8 +69,8 @@ const tools: readonly {
 }[] = [
   { id: 'select', label: 'Select', key: 'S' },
   { id: 'rail', label: 'Rail', key: 'T' },
-  { id: 'rail-erase', label: 'Erase rail', key: 'X' },
-  { id: 'junction', label: 'Junction', key: 'J' },
+  { id: 'rail-erase', label: 'Remove rail', key: 'X' },
+  { id: 'junction', label: 'Rail junction', key: 'J' },
   { id: 'station', label: 'Station', key: 'G' },
   { id: 'factory', label: 'Factory', key: 'F' },
   { id: 'mine', label: 'Mine', key: 'M' },
@@ -81,6 +80,7 @@ const tools: readonly {
   { id: 'dismantle', label: 'Dismantle', key: 'C' },
 ];
 const samePoint = (a: GridPoint, b: GridPoint) => a.x === b.x && a.y === b.y;
+const HIDDEN_RENDERER_RELEASE_DELAY_MS = 30_000;
 const entityAt = (
   snapshot: WorldSnapshot,
   point: GridPoint,
@@ -88,6 +88,13 @@ const entityAt = (
   snapshot.entities.find((entity) =>
     occupiedCells(entity.transform).some((cell) => samePoint(cell, point)),
   );
+const isEntityDismantling = (entity: WorldEntity): boolean =>
+  entity.kind === 'factory'
+    ? entity.state === 'DISMANTLING'
+    : (entity.kind === 'mine' ||
+        entity.kind === 'storage' ||
+        entity.kind === 'depot') &&
+      entity.dismantling === true;
 const adjacent = (a: WorldTransform, b: WorldTransform) =>
   occupiedCells(a).some((one) =>
     occupiedCells(b).some(
@@ -110,7 +117,18 @@ export const WorldView = ({
     session.store.subscribe,
     session.store.getSnapshot,
   );
+  const [rendererReleased, setRendererReleased] = useState(false);
+  const [previousHidden, setPreviousHidden] = useState(hidden);
+  if (previousHidden !== hidden) {
+    setPreviousHidden(hidden);
+    if (!hidden && rendererReleased) setRendererReleased(false);
+  }
   const { snapshot, workerFailed, saveState, busy } = sessionState;
+  // Keep grid buffers out of React's development prop-diff serialization.
+  const getSnapshot = useCallback(() => {
+    if (!snapshot) throw new Error('World is loading.');
+    return snapshot;
+  }, [snapshot]);
   const run = session.run;
   const [seed, setSeed] = useState('starter-world');
   const [selected, setSelected] = useState<GridPoint>();
@@ -119,6 +137,7 @@ export const WorldView = ({
   const [showSettings, setShowSettings] = useState(false);
   const [showCatalogue, setShowCatalogue] = useState(false);
   const [showInspector, setShowInspector] = useState(true);
+  const [showObjectBrowser, setShowObjectBrowser] = useState(false);
   const [catalogueQuery, setCatalogueQuery] = useState('');
   const [boundMineId, setBoundMineId] = useState<WorldEntity['id']>();
   const [confirmation, setConfirmation] = useState<{
@@ -131,16 +150,7 @@ export const WorldView = ({
   const [hovered, setHovered] = useState<GridPoint>();
   const [tool, setTool] = useState<WorldTool>('select');
   const [rotation, setRotation] = useState<QuarterTurn>(0);
-  const [railDraft, setRailDraft] = useState<readonly GridPoint[]>([]);
-  const [railSubmitting, setRailSubmitting] = useState(false);
-  const railSubmissionRef = useRef(false);
   const [mineResource, setMineResource] = useState<ResourceId>(asId('ironOre'));
-  const [ruleResource, setRuleResource] = useState<ResourceId>(
-    asId('ironPlate'),
-  );
-  const [ruleMode, setRuleMode] = useState<'request' | 'provide'>('request');
-  const [ruleTarget, setRuleTarget] = useState(50);
-  const [rulePriority, setRulePriority] = useState(0);
   const [interactionError, setError] = useState<string>();
   const error = interactionError ?? sessionState.error;
   const [selectedRailEdgeId, setSelectedRailEdgeId] = useState<RailEdgeId>();
@@ -148,6 +158,14 @@ export const WorldView = ({
     readonly RailEdgeId[]
   >([]);
   const [cameraFocus, setCameraFocus] = useState<GridPoint>();
+  useEffect(() => {
+    if (!hidden) return undefined;
+    const timeout = window.setTimeout(() => {
+      setCameraFocus(undefined);
+      setRendererReleased(true);
+    }, HIDDEN_RENDERER_RELEASE_DELAY_MS);
+    return () => window.clearTimeout(timeout);
+  }, [hidden]);
   const transformFor = useCallback(
     (activeTool: WorldTool, point: GridPoint): WorldTransform | undefined => {
       if (activeTool === 'factory') {
@@ -232,7 +250,7 @@ export const WorldView = ({
           reason: 'Wait for a valid compilation of the current factory draft.',
         };
       if (
-        ['factory', 'mine', 'storage', 'depot'].includes(activeTool) &&
+        ['factory', 'mine', 'storage'].includes(activeTool) &&
         !stationFor(transform)
       )
         return {
@@ -250,8 +268,51 @@ export const WorldView = ({
       )
         return {
           valid: false,
-          reason: 'Place the mine head outside the ore patch.',
+          reason:
+            'Keep the mine head outside the ore patch; drills sit on the ore.',
         };
+      if (activeTool === 'mine') {
+        const mineOre =
+          mineResource === asId<ResourceId>('ironOre')
+            ? OreKind.IRON
+            : mineResource === asId<ResourceId>('copperOre')
+              ? OreKind.COPPER
+              : undefined;
+        if (mineOre === undefined)
+          return {
+            valid: false,
+            reason: 'Choose iron ore or copper ore for this mine.',
+          };
+        const mineOreName = mineOre === OreKind.IRON ? 'iron' : 'copper';
+        const touchesSelectedOre = occupiedCells(transform).some((cell) =>
+          [
+            { x: cell.x + 1, y: cell.y },
+            { x: cell.x - 1, y: cell.y },
+            { x: cell.x, y: cell.y + 1 },
+            { x: cell.x, y: cell.y - 1 },
+          ].some((point) => {
+            if (
+              point.x < 0 ||
+              point.y < 0 ||
+              point.x >= snapshot.grid.width ||
+              point.y >= snapshot.grid.height
+            )
+              return false;
+            const index = point.y * snapshot.grid.width + point.x;
+            return (
+              snapshot.grid.oreKinds[index] === mineOre &&
+              snapshot.grid.oreRemaining[index] !== 0
+            );
+          }),
+        );
+        if (!touchesSelectedOre)
+          return {
+            valid: false,
+            reason:
+              `No non-exhausted ${mineOreName} ore touches this mine footprint. ` +
+              'Select the matching ore or move the head against its patch.',
+          };
+      }
       if (activeTool === 'drill') {
         const mine = snapshot.entities.find(
           (entity) =>
@@ -324,7 +385,14 @@ export const WorldView = ({
       }
       return { valid: true };
     },
-    [snapshot, compileState, contract, stationFor, effectiveBoundMineId],
+    [
+      snapshot,
+      compileState,
+      contract,
+      stationFor,
+      effectiveBoundMineId,
+      mineResource,
+    ],
   );
   const ghostTransform =
     hovered === undefined ? undefined : transformFor(tool, hovered);
@@ -345,7 +413,6 @@ export const WorldView = ({
     : '';
   const [validatedGhost, setValidatedGhost] = useState<{
     key: string;
-    revision: number;
     result: WorldValidationResult;
   }>();
   useEffect(() => {
@@ -364,8 +431,7 @@ export const WorldView = ({
     )
       return;
     const station = stationFor(ghostTransform);
-    if (!station && ['factory', 'mine', 'storage', 'depot'].includes(tool))
-      return;
+    if (!station && ['factory', 'mine', 'storage'].includes(tool)) return;
     return session.validateLatest(
       {
         type: 'VALIDATE_GHOST',
@@ -380,7 +446,9 @@ export const WorldView = ({
         position: ghostTransform.position,
         size: ghostTransform.size,
         rotation: ghostTransform.rotation,
-        ...(station ? { stationId: station.stationId } : {}),
+        ...(tool !== 'depot' && station
+          ? { stationId: station.stationId }
+          : {}),
         ...(effectiveBoundMineId ? { mineId: effectiveBoundMineId } : {}),
         ...(tool === 'mine' ? { resourceId: mineResource } : {}),
       },
@@ -388,7 +456,6 @@ export const WorldView = ({
         if (result.validation && result.validationRevision !== undefined)
           setValidatedGhost({
             key: ghostKey,
-            revision: result.validationRevision,
             result: result.validation,
           });
       },
@@ -397,10 +464,7 @@ export const WorldView = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ghostKey, snapshot?.revision, localResult?.valid, session]);
   const authoritative =
-    validatedGhost?.key === ghostKey &&
-    validatedGhost.revision === snapshot?.revision
-      ? validatedGhost.result
-      : undefined;
+    validatedGhost?.key === ghostKey ? validatedGhost.result : undefined;
   const ghost =
     ghostTransform === undefined
       ? undefined
@@ -421,13 +485,27 @@ export const WorldView = ({
       : undefined;
   const hoveredDismantleEntityId =
     tool === 'dismantle' && snapshot !== undefined && hovered !== undefined
-      ? entityAt(snapshot, hovered)?.id
+      ? (() => {
+          const entity = entityAt(snapshot, hovered);
+          return entity === undefined || isEntityDismantling(entity)
+            ? undefined
+            : entity.id;
+        })()
       : undefined;
   const selectedEntity =
     snapshot === undefined || selectedEntityId === undefined
       ? undefined
       : snapshot.entities.find((entity) => entity.id === selectedEntityId);
   const selectedPod = snapshot?.pods.find((pod) => pod.id === selectedPodId);
+  const factoryOptions = useMemo(() => {
+    const query = catalogueQuery.trim().toLowerCase();
+    return factories.filter(
+      (factory) =>
+        query.length === 0 ||
+        factory.name.toLowerCase().includes(query) ||
+        'factory design blueprint'.includes(query),
+    );
+  }, [catalogueQuery, factories]);
   useEffect(() => {
     if (!showInspector) return;
     const frame = requestAnimationFrame(() => {
@@ -458,6 +536,47 @@ export const WorldView = ({
     }) => setConfirmation(request),
     [],
   );
+  const dismantleSelection = useCallback(
+    async (selection: {
+      readonly entityIds: readonly WorldEntity['id'][];
+      readonly railEdgeIds: readonly RailEdgeId[];
+    }) => {
+      setError(undefined);
+      setSelected(undefined);
+      setSelectedEntityId(undefined);
+      setSelectedPodId(undefined);
+      setSelectedRailEdgeId(undefined);
+      setRailCandidateEdges([]);
+      if (
+        selection.entityIds.length === 0 &&
+        selection.railEdgeIds.length === 0
+      )
+        return;
+      const result = await run((client) =>
+        client.command({
+          type: 'DISMANTLE_SELECTION',
+          entityIds: selection.entityIds,
+          railEdgeIds: selection.railEdgeIds,
+        }),
+      );
+      if (result === undefined) {
+        setError(
+          session.store.getSnapshot().error ??
+            'The selected objects could not be dismantled.',
+        );
+        return;
+      }
+      if (result.commandFailures !== undefined) {
+        const messages = [
+          ...new Set(result.commandFailures.map((failure) => failure.message)),
+        ];
+        setError(
+          `Some selected targets could not be dismantled: ${messages.join(' ')}`,
+        );
+      }
+    },
+    [run, session],
+  );
   const chooseTool = useCallback(
     (next: WorldTool) => {
       if (next === 'drill') {
@@ -474,7 +593,6 @@ export const WorldView = ({
         setBoundMineId(mineId);
       } else setBoundMineId(undefined);
       setTool(next);
-      setRailDraft([]);
       setError(undefined);
     },
     [selectedEntity],
@@ -499,39 +617,30 @@ export const WorldView = ({
   useEffect(() => {
     placementContextRef.current = placementContext;
   }, [placementContext]);
-  const commitRail = useCallback(async () => {
-    if (railDraft.length < 2 || railSubmissionRef.current) return;
-    const clearance = snapshot && validateRailPath(snapshot.grid, railDraft);
-    if (!clearance?.valid) {
-      setError(clearance?.reason ?? 'World is not ready');
-      return;
-    }
-    const points = railDraft;
-    const context = placementContextRef.current;
-    railSubmissionRef.current = true;
-    setRailSubmitting(true);
-    try {
-      const result = await run((client) =>
+  const placeRail = useCallback(
+    async (points: readonly GridPoint[]) => {
+      const endpoint = points.at(-1);
+      if (endpoint !== undefined) setSelected(endpoint);
+      setSelectedEntityId(undefined);
+      setSelectedPodId(undefined);
+      setSelectedRailEdgeId(undefined);
+      setRailCandidateEdges([]);
+      setError(undefined);
+      const clearance = snapshot && validateRailPath(snapshot.grid, points);
+      if (!clearance?.valid) {
+        setError(clearance?.reason ?? 'World is not ready');
+        return;
+      }
+      await run((client) =>
         client.command({ type: 'PLACE_RAIL_PATH', points }),
       );
-      if (result !== undefined && placementContextRef.current === context)
-        setRailDraft((current) => {
-          if (current === points) return [];
-          // Preserve points added while the accepted prefix was being submitted.
-          return points.every(
-            (point, i) => current[i] && samePoint(current[i]!, point),
-          )
-            ? current.slice(points.length - 1)
-            : current;
-        });
-    } finally {
-      railSubmissionRef.current = false;
-      setRailSubmitting(false);
-    }
-  }, [railDraft, run, snapshot]);
+    },
+    [run, snapshot],
+  );
 
   const handleMapClick = useCallback(
     async (point: GridPoint) => {
+      if (tool === 'rail' || tool === 'dismantle') return;
       const context = placementContextRef.current;
       const key = `${context}:${point.x}:${point.y}`;
       if (pendingPlacementsRef.current.has(key)) return;
@@ -546,23 +655,6 @@ export const WorldView = ({
         setSelectedEntityId(undefined);
         setSelectedPodId(undefined);
         setSelectedRailEdgeId(undefined);
-        if (tool === 'rail') {
-          setRailDraft((current) => {
-            if (current.length === 0) return [point];
-            const last = current.at(-1)!;
-            if (last.x !== point.x && last.y !== point.y) {
-              const dx = Math.abs(point.x - last.x);
-              const dy = Math.abs(point.y - last.y);
-              const snapped =
-                dx >= dy
-                  ? { x: point.x, y: last.y }
-                  : { x: last.x, y: point.y };
-              return samePoint(last, snapped) ? current : [...current, snapped];
-            }
-            return samePoint(last, point) ? current : [...current, point];
-          });
-          return;
-        }
         if (tool === 'rail-erase') {
           const edges =
             snapshot === undefined ? [] : railEdgesAt(snapshot, point);
@@ -584,35 +676,6 @@ export const WorldView = ({
           await run((client) =>
             client.command({ type: 'REMOVE_RAIL_EDGE', edgeId: edge.id }),
           );
-          return;
-        }
-        if (tool === 'dismantle') {
-          const target =
-            snapshot === undefined ? undefined : entityAt(snapshot, point);
-          if (
-            target === undefined ||
-            target.kind === 'station' ||
-            target.kind === 'construction-site' ||
-            target.kind === 'drill'
-          ) {
-            setError(
-              'Select a dismantleable building (factory, mine, storage, or depot).',
-            );
-            return;
-          }
-          askConfirmation({
-            title: 'Dismantle building?',
-            message: `Dismantling this ${target.kind} routes its contents to salvage by rail.`,
-            confirmText: 'Dismantle',
-            action: async () => {
-              await run((client) =>
-                client.command({
-                  type: 'DISMANTLE_ENTITY',
-                  entityId: target.id,
-                }),
-              );
-            },
-          });
           return;
         }
         if (tool === 'junction' || tool === 'station') {
@@ -639,9 +702,16 @@ export const WorldView = ({
         const transform = transformFor(tool, point);
         if (transform === undefined) return;
         const station = stationFor(transform);
-        if (station === undefined) {
+        if (station === undefined && tool !== 'depot') {
           setError('Place one free adjacent station first.');
           return;
+        }
+        if (tool === 'mine') {
+          const local = localValidation(transform, tool);
+          if (!local.valid) {
+            setError(local.reason ?? 'Invalid mine placement.');
+            return;
+          }
         }
         if (tool === 'factory' && (compileState !== 'ready' || !contract)) {
           setError('The current factory draft needs a valid compilation.');
@@ -656,7 +726,9 @@ export const WorldView = ({
               position: transform.position,
               size: transform.size,
               rotation: transform.rotation,
-              stationId: station.stationId,
+              ...(tool !== 'depot' && station
+                ? { stationId: station.stationId }
+                : {}),
               ...(targetKind === 'mine' ? { resourceId: mineResource } : {}),
             }),
           false,
@@ -675,7 +747,7 @@ export const WorldView = ({
         }
         if (placementContextRef.current !== context) {
           setError(
-            'Placement cancelled because the tool or factory definition changed.',
+            'Placement cancelled because the building or factory design changed.',
           );
           return;
         }
@@ -686,7 +758,9 @@ export const WorldView = ({
             position: transform.position,
             size: transform.size,
             rotation: transform.rotation,
-            stationId: station.stationId,
+            ...(tool !== 'depot' && station
+              ? { stationId: station.stationId }
+              : {}),
             ...(targetKind === 'factory' && contract !== undefined
               ? {
                   cost: contract.billOfMaterials ?? [],
@@ -712,9 +786,9 @@ export const WorldView = ({
       effectiveBoundMineId,
       snapshot,
       stationFor,
+      localValidation,
       tool,
       transformFor,
-      askConfirmation,
     ],
   );
   const regenerate = async () => {
@@ -738,7 +812,6 @@ export const WorldView = ({
     );
     if (result !== undefined) {
       setSelected(undefined);
-      setRailDraft([]);
       setSelectedEntityId(undefined);
       setSelectedPodId(undefined);
     }
@@ -749,7 +822,6 @@ export const WorldView = ({
     setSelected(undefined);
     setSelectedEntityId(undefined);
     setSelectedPodId(undefined);
-    setRailDraft([]);
     setTool('select');
   };
   const openConfirmation = async () => {
@@ -778,100 +850,148 @@ export const WorldView = ({
       }
     }
   };
-  const onWorkspaceKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const target = event.target;
-    if (
-      event.defaultPrevented ||
-      event.repeat ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey ||
-      (target instanceof HTMLElement &&
+  const onWorldKeyDown = useCallback(
+    (event: globalThis.KeyboardEvent) => {
+      if (
+        hidden ||
+        event.defaultPrevented ||
+        event.repeat ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey
+      )
+        return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
         target.closest(
-          'input,textarea,select,[contenteditable="true"],[role="dialog"],[role="alertdialog"],[role="menu"],[role="toolbar"]',
-        ))
-    )
-      return;
-    const found = tools.find(
-      (item) => item.key.toLowerCase() === event.key.toLowerCase(),
-    );
-    if (found !== undefined) {
-      event.preventDefault();
-      chooseTool(found.id);
-      return;
-    }
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      setConfirmation(undefined);
-      setRailDraft([]);
-      chooseTool('select');
-      return;
-    }
-    if (
-      event.key.toLowerCase() === 'r' &&
-      ['factory', 'mine', 'storage', 'depot'].includes(tool)
-    ) {
-      event.preventDefault();
-      setRotation(
-        (value) => ((value + (event.shiftKey ? 3 : 1)) % 4) as QuarterTurn,
-      );
-      return;
-    }
-    if (event.key === 'Enter' && railDraft.length >= 2) {
-      event.preventDefault();
-      void commitRail();
-      return;
-    }
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      if (selectedRailEdgeId !== undefined) {
+          'input,textarea,select,[contenteditable="true"],[role="dialog"],[role="alertdialog"]',
+        )
+      )
+        return;
+
+      const factoryIndex = Number(event.key) - 1;
+      const numberedFactory =
+        event.key.length === 1 && factoryIndex >= 0 && factoryIndex < 9
+          ? factoryOptions[factoryIndex]
+          : undefined;
+      if (numberedFactory !== undefined) {
         event.preventDefault();
-        const edgeId = selectedRailEdgeId;
-        askConfirmation({
-          title: 'Remove rail segment?',
-          message:
-            'Pods using this edge may reject removal until their active route is clear.',
-          confirmText: 'Remove rail',
-          action: async () => {
-            await run((client) =>
-              client.command({ type: 'REMOVE_RAIL_EDGE', edgeId }),
-            );
-          },
-        });
-      } else if (selectedEntity !== undefined) {
-        event.preventDefault();
-        const entity = selectedEntity;
-        if (entity.kind === 'construction-site')
-          askConfirmation({
-            title: 'Cancel construction?',
-            message:
-              'Delivered materials will be evacuated through the station.',
-            confirmText: 'Cancel construction',
-            action: async () => {
-              await run((client) =>
-                client.command({
-                  type: 'CANCEL_CONSTRUCTION',
-                  siteId: entity.id,
-                }),
-              );
-            },
-          });
-        else if (['factory', 'mine', 'storage', 'depot'].includes(entity.kind))
-          askConfirmation({
-            title: 'Dismantle building?',
-            message: 'Its contents will be recovered through rail salvage.',
-            confirmText: 'Dismantle',
-            action: async () => {
-              await run((client) =>
-                client.command({
-                  type: 'DISMANTLE_ENTITY',
-                  entityId: entity.id,
-                }),
-              );
-            },
-          });
+        onSelectFactory(numberedFactory.id);
+        chooseTool('factory');
+        return;
       }
-    }
-  };
+
+      const found = tools.find(
+        (item) => item.key.toLowerCase() === event.key.toLowerCase(),
+      );
+      if (found !== undefined) {
+        event.preventDefault();
+        chooseTool(found.id);
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setConfirmation(undefined);
+        chooseTool('select');
+        return;
+      }
+      if (
+        event.key.toLowerCase() === 'r' &&
+        ['factory', 'mine', 'storage', 'depot'].includes(tool)
+      ) {
+        event.preventDefault();
+        setRotation(
+          (value) => ((value + (event.shiftKey ? 3 : 1)) % 4) as QuarterTurn,
+        );
+        return;
+      }
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault();
+        if (selectedRailEdgeId !== undefined) {
+          const edgeId = selectedRailEdgeId;
+          askConfirmation({
+            title: 'Remove rail segment?',
+            message:
+              'Pods using this edge may reject removal until their active route is clear.',
+            confirmText: 'Remove rail',
+            action: async () => {
+              await run((client) =>
+                client.command({ type: 'REMOVE_RAIL_EDGE', edgeId }),
+              );
+            },
+          });
+        } else if (selectedEntity !== undefined) {
+          const entity = selectedEntity;
+          if (entity.kind === 'construction-site')
+            askConfirmation({
+              title: 'Cancel construction?',
+              message:
+                'Delivered materials will be evacuated through the station.',
+              confirmText: 'Cancel construction',
+              action: async () => {
+                await run((client) =>
+                  client.command({
+                    type: 'CANCEL_CONSTRUCTION',
+                    siteId: entity.id,
+                  }),
+                );
+              },
+            });
+          else if (
+            [
+              'factory',
+              'mine',
+              'storage',
+              'depot',
+              'station',
+              'drill',
+            ].includes(entity.kind)
+          )
+            askConfirmation({
+              title:
+                entity.kind === 'station'
+                  ? 'Remove station?'
+                  : entity.kind === 'drill'
+                    ? 'Dismantle drill?'
+                    : 'Dismantle building?',
+              message:
+                entity.kind === 'station'
+                  ? 'The station must be unlinked and clear of logistics traffic. ' +
+                    'Connected rail stays as a plain endpoint.'
+                  : entity.kind === 'drill'
+                    ? 'Recovered materials return by rail from the mine station.'
+                    : 'Its contents will be recovered through rail salvage.',
+              confirmText:
+                entity.kind === 'station' ? 'Remove station' : 'Dismantle',
+              action: async () => {
+                await run((client) =>
+                  client.command({
+                    type: 'DISMANTLE_ENTITY',
+                    entityId: entity.id,
+                  }),
+                );
+              },
+            });
+        }
+      }
+    },
+    [
+      hidden,
+      factoryOptions,
+      onSelectFactory,
+      chooseTool,
+      tool,
+      selectedRailEdgeId,
+      selectedEntity,
+      askConfirmation,
+      run,
+    ],
+  );
+  useEffect(() => {
+    window.addEventListener('keydown', onWorldKeyDown);
+    return () => window.removeEventListener('keydown', onWorldKeyDown);
+  }, [onWorldKeyDown]);
   const setTime = async (
     paused: boolean,
     timeScale = snapshot?.timeScale ?? 1,
@@ -920,11 +1040,24 @@ export const WorldView = ({
               .reduce((total, port) => total + port.capacity, 0n),
           })),
         ];
-  const catalogueTools = tools.filter((item) =>
-    `${item.label} ${item.id}`
-      .toLowerCase()
-      .includes(catalogueQuery.trim().toLowerCase()),
+  const query = catalogueQuery.trim().toLowerCase();
+  const matchesQuery = (item: (typeof tools)[number]) =>
+    `${item.label} ${item.id}`.toLowerCase().includes(query);
+  const catalogueBuildings = tools.filter(
+    (item) =>
+      ['mine', 'drill', 'station', 'storage', 'depot'].includes(item.id) &&
+      matchesQuery(item),
   );
+  const catalogueActions = tools.filter(
+    (item) =>
+      ['select', 'rail', 'rail-erase', 'junction', 'dismantle'].includes(
+        item.id,
+      ) && matchesQuery(item),
+  );
+  const activeToolLabel =
+    tool === 'factory'
+      ? factoryName
+      : (tools.find((item) => item.id === tool)?.label ?? 'Select');
   const toolFootprint = (id: WorldTool) => {
     if (id === 'factory') return contract?.footprint;
     if (id === 'station') return worldContent.stationFootprint;
@@ -942,136 +1075,181 @@ export const WorldView = ({
     );
   };
   const toolRequirement = (id: WorldTool) =>
-    ['factory', 'mine', 'storage', 'depot'].includes(id)
+    ['factory', 'mine', 'storage'].includes(id)
       ? 'Requires an adjacent free station'
-      : id === 'drill'
-        ? `Bound mine: ${effectiveBoundMineId ?? 'select a mine first'}`
-        : id === 'rail'
-          ? 'Connect endpoints in one straight or orthogonal path'
-          : id === 'junction'
-            ? 'Places a control node; it does not occupy a tile'
-            : id === 'station'
-              ? '2 × 2 station anchor'
-              : 'Select an existing world object';
+      : id === 'depot'
+        ? 'Autonomous depot; connect its rail hookup for construction deliveries'
+        : id === 'drill'
+          ? `Bound mine: ${effectiveBoundMineId ?? 'select a mine first'}`
+          : id === 'rail'
+            ? 'Connect endpoints in one straight or orthogonal path'
+            : id === 'junction'
+              ? 'Places a control node; it does not occupy a tile'
+              : id === 'station'
+                ? '2 × 2 station anchor'
+                : id === 'select'
+                  ? 'Click a building to inspect it'
+                  : id === 'rail-erase'
+                    ? 'Click a segment to remove it'
+                    : id === 'dismantle'
+                      ? 'Drag over objects and rail cells · release to dismantle · Esc to cancel'
+                      : '';
   return (
     <div
       ref={workspaceRef}
       tabIndex={0}
-      onKeyDown={onWorkspaceKeyDown}
       className={`world-workspace world-workspace--map${hidden ? ' is-hidden' : ''}${showInspector ? ' has-inspector' : ''}${showCatalogue ? ' has-catalogue' : ''}`}
       aria-hidden={hidden}
     >
       <aside className={`world-sites panel${showCatalogue ? ' is-open' : ''}`}>
         <div className="panel-heading">
           <div>
-            <span className="eyebrow">World editor</span>
-            <h2>Build tools</h2>
+            <span className="eyebrow">Construction</span>
+            <h2>Buildings</h2>
           </div>
-          <span>{snapshot?.revision ?? 0}</span>
           <button
-            aria-label="Close build catalogue"
+            aria-label="Close building list"
             onClick={() => setShowCatalogue(false)}
           >
             ×
           </button>
         </div>
-        <div
-          className="world-tool-grid"
-          role="toolbar"
-          aria-label="World build tools"
-        >
-          {catalogueTools.map((item) => (
-            <button
-              key={item.id}
-              aria-pressed={tool === item.id}
-              className={tool === item.id ? 'is-active' : ''}
-              onClick={() => {
-                chooseTool(item.id);
-              }}
-            >
-              <WorldThumbnail kind={item.id} />
-              <span>{item.label}</span>
-              <kbd>{item.key}</kbd>
-              <small>
-                {toolFootprint(item.id) === undefined
-                  ? 'Network action'
-                  : `${toolFootprint(item.id)!.width} × ${toolFootprint(item.id)!.height} tiles`}
-                {toolCost(item.id).length === 0
-                  ? ''
-                  : ` · ${toolCost(item.id).reduce((sum, cost) => sum + cost.quantity, 0)} materials`}
-              </small>
-            </button>
-          ))}
-        </div>
         <label className="world-catalogue-search">
-          <span>Search catalogue</span>
+          <span>Find a building or action</span>
           <input
             value={catalogueQuery}
             onChange={(event) => setCatalogueQuery(event.target.value)}
-            placeholder="Find a tool"
+            placeholder="Search by name"
           />
         </label>
-        {toolRequirement(tool).length > 0 && (
-          <p className="world-catalogue-requirement">{toolRequirement(tool)}</p>
-        )}
-        {tool === 'rail' && (
-          <div className="world-tool-options">
-            <p>
-              {railDraft.length === 0
-                ? 'Start on the round anchor inside a station.'
-                : `${railDraft.length} points · finish on another anchor`}
-            </p>
-            <button
-              disabled={railDraft.length < 2 || railSubmitting}
-              onClick={() => void commitRail()}
-            >
-              Finish rail
-            </button>
-            <button
-              disabled={railDraft.length === 0}
-              onClick={() => setRailDraft([])}
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-        {tool === 'rail-erase' && (
-          <div className="world-tool-options">
-            <p>Hover a segment to highlight it, then click to remove it.</p>
-          </div>
-        )}
-        {tool === 'dismantle' && (
-          <div className="world-tool-options">
-            <p>
-              Click on a factory, mine, storage, or depot to dismantle it.
-              Contents will be salvaged via rail.
-            </p>
-          </div>
-        )}
-        {(tool === 'rail' || tool === 'rail-erase') && (
+        <section className="world-palette-section">
+          <h3>Factory designs</h3>
           <div
-            className="world-rail-legend"
-            aria-label="Rail connection legend"
+            className="world-tool-grid"
+            role="group"
+            aria-label="Factory designs"
           >
-            <span>
-              <i className="connected" />
-              Connected
-            </span>
-            <span>
-              <i className="disconnected" />
-              Open end
-            </span>
+            {factoryOptions.map((factory, index) => {
+              const isCurrentDesign = factory.id === activeFactoryId;
+              const footprint = isCurrentDesign
+                ? contract?.footprint
+                : undefined;
+              const cost =
+                isCurrentDesign && contract?.billOfMaterials !== undefined
+                  ? contract.billOfMaterials.reduce(
+                      (sum, item) => sum + item.quantity,
+                      0,
+                    )
+                  : undefined;
+              return (
+                <button
+                  key={factory.id}
+                  className={`world-building-option${tool === 'factory' && isCurrentDesign ? ' is-active' : ''}`}
+                  aria-label={`Build ${factory.name}`}
+                  aria-pressed={tool === 'factory' && isCurrentDesign}
+                  onClick={() => {
+                    onSelectFactory(factory.id);
+                    chooseTool('factory');
+                  }}
+                >
+                  <WorldThumbnail kind="factory" />
+                  <span className="world-building-option-copy">
+                    <strong>{factory.name}</strong>
+                    <small>
+                      {footprint === undefined
+                        ? isCurrentDesign
+                          ? compileState === 'invalid'
+                            ? 'Fix this design before building'
+                            : 'Preparing design…'
+                          : 'Factory blueprint'
+                        : `${footprint.width} × ${footprint.height} tiles${cost === undefined ? '' : ` · ${cost} materials`}`}
+                    </small>
+                  </span>
+                  {index < 9 && <kbd>{index + 1}</kbd>}
+                </button>
+              );
+            })}
+            {factoryOptions.length === 0 && (
+              <p className="world-palette-empty">
+                {factories.length === 0
+                  ? 'No factory designs yet.'
+                  : 'No factory designs match this search.'}
+              </p>
+            )}
           </div>
+          {factoryOptions.length > 0 && (
+            <p className="world-shortcut-hint">
+              Press 1–9 to choose a design. Press <kbd>F</kbd> to enter
+              placement mode with the selected one.
+            </p>
+          )}
+        </section>
+        {catalogueBuildings.length > 0 && (
+          <section className="world-palette-section">
+            <h3>Buildings</h3>
+            <div
+              className="world-tool-grid"
+              role="group"
+              aria-label="Buildings"
+            >
+              {catalogueBuildings.map((item) => {
+                const footprint = toolFootprint(item.id);
+                const totalCost = toolCost(item.id).reduce(
+                  (sum, cost) => sum + cost.quantity,
+                  0,
+                );
+                return (
+                  <button
+                    key={item.id}
+                    className={`world-building-option${tool === item.id ? ' is-active' : ''}`}
+                    aria-pressed={tool === item.id}
+                    onClick={() => chooseTool(item.id)}
+                  >
+                    <WorldThumbnail kind={item.id} />
+                    <span className="world-building-option-copy">
+                      <strong>{item.label}</strong>
+                      <small>
+                        {footprint === undefined
+                          ? toolRequirement(item.id)
+                          : `${footprint.width} × ${footprint.height} tiles${totalCost === 0 ? '' : ` · ${totalCost} materials`}`}
+                      </small>
+                    </span>
+                    <kbd>{item.key}</kbd>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
         )}
-        <div className="world-tool-options">
-          <button
-            onClick={() =>
-              setRotation((value) => ((value + 1) % 4) as QuarterTurn)
-            }
-          >
-            Rotate · {rotation * 90}° <kbd>R</kbd>
-          </button>
-          {tool === 'mine' && (
+        {catalogueActions.length > 0 && (
+          <section className="world-palette-section">
+            <h3>Rail &amp; actions</h3>
+            <div
+              className="world-tool-grid"
+              role="group"
+              aria-label="Rail and actions"
+            >
+              {catalogueActions.map((item) => (
+                <button
+                  key={item.id}
+                  className={`world-building-option${tool === item.id ? ' is-active' : ''}`}
+                  aria-pressed={tool === item.id}
+                  onClick={() => chooseTool(item.id)}
+                >
+                  <WorldThumbnail kind={item.id} />
+                  <span className="world-building-option-copy">
+                    <strong>{item.label}</strong>
+                    <small>{toolRequirement(item.id)}</small>
+                  </span>
+                  <kbd>{item.key}</kbd>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+        {tool === 'mine' && (
+          <label className="world-tool-options">
+            <span>Ore to extract</span>
             <select
               aria-label="Mine resource"
               value={mineResource}
@@ -1082,45 +1260,20 @@ export const WorldView = ({
               <option value="ironOre">Iron ore</option>
               <option value="copperOre">Copper ore</option>
             </select>
-          )}
-        </div>
-        <div className="world-site-list">
-          {factories.map((factory, index) => (
-            <button
-              key={factory.id}
-              aria-label={`View ${factory.name} in world`}
-              aria-pressed={factory.id === activeFactoryId}
-              className={`world-site ${factory.id === activeFactoryId ? 'is-active' : ''}`}
-              onClick={() => onSelectFactory(factory.id)}
-            >
-              <span className="world-site-mark">F{index + 1}</span>
-              <span>
-                <strong>{factory.name}</strong>
-                <small>
-                  {factory.id === activeFactoryId
-                    ? 'Placement definition'
-                    : 'Choose definition'}
-                </small>
-              </span>
-            </button>
-          ))}
-        </div>
-        <section className="world-summary">
-          <dl>
-            <div>
-              <dt>Entities</dt>
-              <dd>{snapshot?.entities.length ?? 0}</dd>
-            </div>
-            <div>
-              <dt>Pods</dt>
-              <dd>{snapshot?.pods.length ?? 0}</dd>
-            </div>
-            <div>
-              <dt>Events</dt>
-              <dd>{snapshot?.scheduledEvents ?? 0}</dd>
-            </div>
-          </dl>
-        </section>
+          </label>
+        )}
+        {tool === 'rail' && (
+          <p className="world-palette-hint">
+            Drag across the map and release to place one straight line. Diagonal
+            drags follow the longer grid axis.
+          </p>
+        )}
+        {['factory', 'mine', 'storage', 'depot'].includes(tool) && (
+          <p className="world-palette-hint">
+            Rotate with <kbd>R</kbd>; use <kbd>Shift</kbd> + <kbd>R</kbd> to
+            rotate back.
+          </p>
+        )}
       </aside>
       <section
         className="world-map world-map--three"
@@ -1130,6 +1283,8 @@ export const WorldView = ({
           <div className="world-loading">
             {error ?? 'Generating deterministic world…'}
           </div>
+        ) : rendererReleased && hidden ? (
+          <div className="world-loading">World renderer is inactive.</div>
         ) : (
           <Suspense
             fallback={
@@ -1138,12 +1293,14 @@ export const WorldView = ({
           >
             <WorldCanvas
               key={`${snapshot.worldId}:${sessionState.generation}`}
-              snapshot={snapshot}
+              getSnapshot={getSnapshot}
               settingsOpen={showSettings}
               interactionBlocked={confirmation !== undefined}
               activeTool={tool}
-              onCommitRail={() => void commitRail()}
-              onCancel={() => chooseTool('select')}
+              onPlaceRail={(points) => void placeRail(points)}
+              onDismantleSelection={(selection) =>
+                void dismantleSelection(selection)
+              }
               onSelectEntity={(id) => {
                 setSelectedEntityId(id);
                 if (id) {
@@ -1179,17 +1336,19 @@ export const WorldView = ({
               {...(selectedRailEdgeId === undefined
                 ? {}
                 : { selectedRailEdgeId })}
-              railDraft={railDraft}
               onSelect={(point) => void handleMapClick(point)}
               onHover={setHovered}
             />
           </Suspense>
         )}
         <div className="world-map-caption">
-          <span>{tool.replaceAll('-', ' ')} tool</span>
+          <span>{activeToolLabel}</span>
           <small>
-            Seed {snapshot?.generation.config.seed ?? seed} · right-drag to
-            orbit · wheel to zoom
+            {tool === 'rail'
+              ? 'Drag to draw · release to place'
+              : tool === 'dismantle'
+                ? 'Drag over objects and rail cells · release to dismantle · Esc to cancel'
+                : 'Right-drag to orbit · wheel to zoom'}
           </small>
         </div>
         <div
@@ -1241,7 +1400,7 @@ export const WorldView = ({
             }}
             aria-expanded={showCatalogue}
           >
-            Build catalogue
+            Buildings
           </button>
           <button
             onClick={() => {
@@ -1253,6 +1412,32 @@ export const WorldView = ({
           >
             Inspector
           </button>
+          {selectedEntity !== undefined &&
+            isEntityDismantling(selectedEntity) && (
+              <div className="world-permanent-destroy-action">
+                <button
+                  className="button button--danger"
+                  onClick={() =>
+                    askConfirmation({
+                      title: 'Détruire définitivement ce bâtiment ?',
+                      message:
+                        'Le bâtiment, les ressources encore en récupération et les cargaisons liées seront détruits définitivement.',
+                      confirmText: 'Détruire définitivement',
+                      action: async () => {
+                        await run((client) =>
+                          client.command({
+                            type: 'DESTROY_DISMANTLED_ENTITY',
+                            entityId: selectedEntity.id,
+                          }),
+                        );
+                      },
+                    })
+                  }
+                >
+                  Détruire définitivement
+                </button>
+              </div>
+            )}
           <button
             aria-label={saveState === 'error' ? 'Retry save' : 'Save world now'}
             onClick={() => void run((client) => client.save(true))}
@@ -1338,10 +1523,10 @@ export const WorldView = ({
           >
             <strong>
               {ghost.pending
-                ? 'Validation pending'
+                ? 'Checking placement…'
                 : ghost.valid
-                  ? 'Placement ready'
-                  : 'Placement blocked'}
+                  ? 'Ready to build'
+                  : 'Can’t build here'}
             </strong>
             <span>{ghost.reason ?? toolRequirement(tool)}</span>
             <small>
@@ -1351,86 +1536,19 @@ export const WorldView = ({
                     `${cost.quantity} ${resourceById.get(cost.resourceId)?.name ?? cost.resourceId}`,
                 )
                 .join(' · ') || 'No construction materials'}
+              {['factory', 'mine', 'storage', 'depot'].includes(tool)
+                ? ` · ${rotation * 90}°`
+                : ''}
             </small>
           </div>
         )}
       </section>
-      {tool === 'rail' && (
-        <div
-          className="world-rail-actions"
-          role="group"
-          aria-label="Rail construction"
-        >
-          <div role="status" aria-live="polite">
-            <strong>
-              {railSubmitting
-                ? 'Building rail...'
-                : railDraft.length < 2
-                  ? 'Draw a rail path'
-                  : railDraft.length -
-                    1 +
-                    (railDraft.length === 2
-                      ? ' rail segment ready'
-                      : ' rail segments ready')}
-            </strong>
-            <span>
-              {railDraft.length === 0
-                ? 'Click a start tile, then an end tile. You can also drag.'
-                : railDraft.length === 1
-                  ? 'Click an end tile to add the first segment.'
-                  : ((snapshot &&
-                      validateRailPath(snapshot.grid, railDraft).reason) ??
-                    'Ends snap into existing rails. Build follows the arrow direction.')}
-            </span>
-          </div>
-          <button
-            className="world-rail-build"
-            disabled={railDraft.length < 2 || railSubmitting}
-            onClick={() => void commitRail()}
-          >
-            Build rail
-          </button>
-          <button
-            disabled={railDraft.length === 0 || railSubmitting}
-            onClick={() => {
-              setRailDraft((current) => current.slice(0, -1));
-              setError(undefined);
-            }}
-          >
-            Undo point
-          </button>
-          <button onClick={() => chooseTool('select')}>Cancel</button>
-        </div>
-      )}
-      <nav className="world-build-dock" aria-label="Build tools">
+      <nav className="world-build-dock" aria-label="Quick actions">
         <button
           aria-pressed={tool === 'select'}
           onClick={() => chooseTool('select')}
         >
           Select <kbd>S</kbd>
-        </button>
-        <button
-          aria-pressed={tool === 'factory'}
-          disabled={contract === undefined || compileState !== 'ready'}
-          onClick={() => chooseTool('factory')}
-        >
-          Factory <kbd>F</kbd>
-        </button>
-        <button
-          aria-pressed={tool === 'mine' || tool === 'drill'}
-          onClick={() => chooseTool('mine')}
-        >
-          Mining <kbd>M</kbd>
-        </button>
-        <button
-          aria-pressed={tool === 'storage' || tool === 'depot'}
-          onClick={() => {
-            chooseTool('storage');
-            setShowCatalogue(true);
-            setShowInspector(false);
-          }}
-        >
-          Storage <kbd>B</kbd>
         </button>
         <button
           aria-pressed={tool === 'rail'}
@@ -1444,521 +1562,518 @@ export const WorldView = ({
         >
           Dismantle <kbd>C</kbd>
         </button>
-        <button
-          onClick={() => {
-            setShowCatalogue((value) => !value);
-            setShowInspector(false);
-          }}
-          aria-expanded={showCatalogue}
-        >
-          All tools
-        </button>
       </nav>
       <aside
         className={`world-inspector panel${showInspector ? ' is-open' : ''}`}
       >
-        <div className="panel-heading">
-          <div>
-            <span className="eyebrow">Operate</span>
-            <h2>World runtime</h2>
-          </div>
-          <span
-            className={`badge ${compileState === 'ready' ? 'good' : 'waiting'}`}
-          >
-            {compileState}
-          </span>
-          <button
-            aria-label="Close inspector"
-            onClick={() => setShowInspector(false)}
-          >
-            ×
-          </button>
-        </div>
-        {error !== undefined && (
-          <p className="world-error" role="alert">
-            {error}
-          </p>
-        )}
-        <section className="inspector-card">
-          <h3>Logical clock</h3>
-          <dl>
-            <div>
-              <dt>Time</dt>
-              <dd>{Number(snapshot?.logicalTime ?? 0n) / 1_000_000}s</dd>
-            </div>
-            <div>
-              <dt>State</dt>
-              <dd>
-                {snapshot?.paused === false
-                  ? `${snapshot.timeScale}×`
-                  : 'Paused'}
-              </dd>
-            </div>
-          </dl>
-          {snapshot?.pendingAdvanceTarget !== undefined && (
-            <button
-              disabled={snapshot.paused}
-              onClick={() => void run((client) => client.continueAdvance())}
-            >
-              Continue catch-up
-            </button>
-          )}
-        </section>
-        {selected !== undefined && selectedDescription !== undefined && (
-          <section className="inspector-card">
-            <h3>
-              Tile {selected.x}, {selected.y}
-            </h3>
-            <dl>
+        {showInspector && !hidden && (
+          <>
+            <div className="panel-heading">
               <div>
-                <dt>Terrain</dt>
-                <dd>{selectedDescription.terrain}</dd>
+                <span className="eyebrow">World</span>
+                <h2>Inspector</h2>
               </div>
-              {selectedDescription.ore !== undefined && (
-                <>
+              <button
+                aria-label="Close inspector"
+                onClick={() => setShowInspector(false)}
+              >
+                ×
+              </button>
+            </div>
+            {error !== undefined && (
+              <p className="world-error" role="alert">
+                {error}
+              </p>
+            )}
+            {selected !== undefined && selectedDescription !== undefined && (
+              <section className="inspector-card">
+                <h3>Tile</h3>
+                <dl>
                   <div>
-                    <dt>Deposit</dt>
-                    <dd>{selectedDescription.ore}</dd>
+                    <dt>Terrain</dt>
+                    <dd>{selectedDescription.terrain}</dd>
+                  </div>
+                  {selectedDescription.ore !== undefined && (
+                    <>
+                      <div>
+                        <dt>Deposit</dt>
+                        <dd>{selectedDescription.ore}</dd>
+                      </div>
+                      <div>
+                        <dt>Remaining</dt>
+                        <dd>{selectedDescription.amount}</dd>
+                      </div>
+                    </>
+                  )}
+                </dl>
+              </section>
+            )}
+            {selectedPod !== undefined && snapshot !== undefined && (
+              <section className="inspector-card world-pod-card">
+                <h3>Cargo pod</h3>
+                <dl>
+                  <div>
+                    <dt>Status</dt>
+                    <dd>
+                      {selectedPod.state.toLowerCase().replaceAll('_', ' ')}
+                    </dd>
                   </div>
                   <div>
-                    <dt>Remaining</dt>
-                    <dd>{selectedDescription.amount}</dd>
+                    <dt>Cargo</dt>
+                    <dd>
+                      {selectedPod.cargo === undefined
+                        ? 'Empty'
+                        : `${resourceById.get(selectedPod.cargo.resourceId)?.name ?? selectedPod.cargo.resourceId} · ${selectedPod.cargo.quantity}`}
+                    </dd>
                   </div>
-                </>
-              )}
-            </dl>
-          </section>
-        )}
-        {selectedPod !== undefined && snapshot !== undefined && (
-          <section className="inspector-card world-pod-card">
-            <h3>Cargo pod</h3>
-            <dl>
-              <div>
-                <dt>State</dt>
-                <dd>{selectedPod.state.toLowerCase().replaceAll('_', ' ')}</dd>
-              </div>
-              <div>
-                <dt>Location</dt>
-                <dd>
-                  {
-                    snapshot.railNodes.find(
-                      (node) => node.id === selectedPod.nodeId,
-                    )?.position.x
-                  }
-                  ,{' '}
-                  {
-                    snapshot.railNodes.find(
-                      (node) => node.id === selectedPod.nodeId,
-                    )?.position.y
-                  }
-                </dd>
-              </div>
-              <div>
-                <dt>Cargo</dt>
-                <dd>
-                  {selectedPod.cargo === undefined
-                    ? 'Empty'
-                    : `${resourceById.get(selectedPod.cargo.resourceId)?.name ?? selectedPod.cargo.resourceId} · ${selectedPod.cargo.quantity}`}
-                </dd>
-              </div>
-              {selectedPod.missionId !== undefined && (
-                <div>
-                  <dt>Mission</dt>
-                  <dd>
-                    {snapshot.missions.find(
-                      (mission) => mission.id === selectedPod.missionId,
-                    )?.quantity ?? 'In transit'}{' '}
-                    units
-                  </dd>
-                </div>
-              )}
-            </dl>
-            <details>
-              <summary>Developer details</summary>
-              <code>{selectedPod.id}</code>
-            </details>
-          </section>
-        )}
-        {selectedRailEdge !== undefined && (
-          <section className="inspector-card">
-            <h3>Rail segment</h3>
-            <dl>
-              <div>
-                <dt>Length</dt>
-                <dd>{selectedRailEdge.length}</dd>
-              </div>
-              <div>
-                <dt>From</dt>
-                <dd>
-                  {
-                    snapshot?.railNodes.find(
-                      (node) => node.id === selectedRailEdge.from,
-                    )?.position.x
-                  }
-                  ,{' '}
-                  {
-                    snapshot?.railNodes.find(
-                      (node) => node.id === selectedRailEdge.from,
-                    )?.position.y
-                  }
-                </dd>
-              </div>
-              <div>
-                <dt>To</dt>
-                <dd>
-                  {
-                    snapshot?.railNodes.find(
-                      (node) => node.id === selectedRailEdge.to,
-                    )?.position.x
-                  }
-                  ,{' '}
-                  {
-                    snapshot?.railNodes.find(
-                      (node) => node.id === selectedRailEdge.to,
-                    )?.position.y
-                  }
-                </dd>
-              </div>
-            </dl>
-            {railCandidateEdges.length > 1 && (
-              <div
-                className="world-rail-candidates"
-                aria-label="Overlapping rail choices"
-              >
-                <strong>Choose rail direction</strong>
-                {railCandidateEdges.map((edgeId, index) => {
-                  const edge = snapshot?.railEdges.find(
-                    (candidate) => candidate.id === edgeId,
-                  );
-                  if (edge === undefined) return null;
-                  const from = snapshot?.railNodes.find(
-                    (node) => node.id === edge.from,
-                  )?.position;
-                  const to = snapshot?.railNodes.find(
-                    (node) => node.id === edge.to,
-                  )?.position;
-                  return (
-                    <button
-                      key={edgeId}
-                      aria-pressed={selectedRailEdgeId === edgeId}
-                      onClick={() => setSelectedRailEdgeId(edgeId)}
-                    >
-                      Path {index + 1}: {from?.x}, {from?.y} → {to?.x}, {to?.y}
-                    </button>
-                  );
-                })}
-              </div>
+                  {selectedPod.missionId !== undefined && (
+                    <div>
+                      <dt>Delivery</dt>
+                      <dd>
+                        {snapshot.missions.find(
+                          (mission) => mission.id === selectedPod.missionId,
+                        )?.quantity ?? 'In transit'}{' '}
+                        units
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </section>
             )}
-            <button
-              className="danger-button"
-              onClick={() =>
-                askConfirmation({
-                  title: 'Remove rail segment?',
-                  message:
-                    'Pods using this edge may reject removal until their active route is clear.',
-                  confirmText: 'Remove rail',
-                  action: async () => {
-                    await run((client) =>
-                      client.command({
-                        type: 'REMOVE_RAIL_EDGE',
-                        edgeId: selectedRailEdge.id,
-                      }),
-                    );
-                  },
-                })
-              }
-            >
-              Remove rail
-            </button>
-          </section>
-        )}
-        {selectedEntity !== undefined && snapshot !== undefined && (
-          <section className="inspector-card world-building-card">
-            <h3>Selected {selectedEntity.kind}</h3>
-            <WorldBuildingInspector
-              entity={selectedEntity}
-              snapshot={snapshot}
-            />
-            {selectedEntity.kind === 'factory' && (
-              <button
-                className="button button--block"
-                aria-label={
-                  'Open placed ' +
-                  (factories.find(
-                    (factory) => factory.id === selectedEntity.factoryId,
-                  )?.name ?? 'factory') +
-                  ' blueprint'
-                }
-                onClick={() => onOpenFactory(selectedEntity.factoryId)}
-              >
-                Open placed factory blueprint
-              </button>
-            )}
-            {(selectedEntity.kind === 'factory' ||
-              selectedEntity.kind === 'mine' ||
-              selectedEntity.kind === 'storage' ||
-              selectedEntity.kind === 'depot') && (
-              <button
-                className="danger-button"
-                onClick={() => {
-                  askConfirmation({
-                    title: 'Dismantle building?',
-                    message: `Dismantling this ${selectedEntity.kind} routes its contents to salvage by rail.`,
-                    confirmText: 'Dismantle',
-                    action: async () => {
-                      await run((client) =>
-                        client.command({
-                          type: 'DISMANTLE_ENTITY',
-                          entityId: selectedEntity.id,
-                        }),
+            {selectedRailEdge !== undefined && (
+              <section className="inspector-card">
+                <h3>Rail segment</h3>
+                <dl>
+                  <div>
+                    <dt>Length</dt>
+                    <dd>{selectedRailEdge.length}</dd>
+                  </div>
+                </dl>
+                {railCandidateEdges.length > 1 && (
+                  <div
+                    className="world-rail-candidates"
+                    aria-label="Overlapping rail choices"
+                  >
+                    <strong>Choose rail direction</strong>
+                    {railCandidateEdges.map((edgeId, index) => {
+                      const edge = snapshot?.railEdges.find(
+                        (candidate) => candidate.id === edgeId,
                       );
-                    },
-                  });
-                }}
-              >
-                Dismantle
-              </button>
-            )}
-            {selectedEntity.kind === 'construction-site' && (
-              <button
-                className="danger-button"
-                onClick={() =>
-                  askConfirmation({
-                    title: 'Cancel construction?',
-                    message:
-                      'Delivered materials will be evacuated through the site station. The site remains until evacuation finishes.',
-                    confirmText: 'Cancel construction',
-                    action: async () => {
-                      await run((client) =>
-                        client.command({
-                          type: 'CANCEL_CONSTRUCTION',
-                          siteId: selectedEntity.id,
-                        }),
+                      if (edge === undefined) return null;
+                      const from = snapshot?.railNodes.find(
+                        (node) => node.id === edge.from,
+                      )?.position;
+                      const to = snapshot?.railNodes.find(
+                        (node) => node.id === edge.to,
+                      )?.position;
+                      return (
+                        <button
+                          key={edgeId}
+                          aria-pressed={selectedRailEdgeId === edgeId}
+                          onClick={() => setSelectedRailEdgeId(edgeId)}
+                        >
+                          Path {index + 1}: {from?.x}, {from?.y} → {to?.x},{' '}
+                          {to?.y}
+                        </button>
                       );
-                    },
-                  })
-                }
-              >
-                Cancel and evacuate
-              </button>
-            )}
-            {selectedEntity.kind === 'factory' &&
-              contract !== undefined &&
-              compileState === 'ready' && (
+                    })}
+                  </div>
+                )}
                 <button
-                  className="button button--primary button--block"
+                  className="danger-button"
                   onClick={() =>
                     askConfirmation({
-                      title: 'Replace placed factory?',
-                      message: `The new footprint will be ${contract.footprint.width} × ${contract.footprint.height} tiles at the same position, orientation and station. Existing contents will be routed to salvage; the new factory will be rebuilt with ${contract.billOfMaterials?.reduce((sum, item) => sum + item.quantity, 0) ?? 0} construction items.`,
-                      confirmText: 'Replace factory',
+                      title: 'Remove rail segment?',
+                      message:
+                        'Pods using this edge may reject removal until their active route is clear.',
+                      confirmText: 'Remove rail',
                       action: async () => {
                         await run((client) =>
                           client.command({
-                            type: 'REPLACE_FACTORY',
-                            entityId: selectedEntity.id,
-                            position: selectedEntity.transform.position,
-                            size: gridSize(
-                              contract.footprint.width,
-                              contract.footprint.height,
-                            ),
-                            rotation: selectedEntity.transform.rotation,
-                            cost: contract.billOfMaterials ?? [],
-                            factoryId: activeFactoryId,
-                            instanceId: asId<InstanceId>(
-                              `instance-${Date.now()}`,
-                            ),
-                            contract: serializeContract(contract),
+                            type: 'REMOVE_RAIL_EDGE',
+                            edgeId: selectedRailEdge.id,
                           }),
                         );
                       },
                     })
                   }
                 >
-                  Replace with {factoryName}
+                  Remove rail
                 </button>
-              )}
-            {selectedEntity.kind === 'storage' && (
-              <div className="world-rule-editor">
-                <h4>New logistics rule</h4>
-                <select
-                  aria-label="Rule resource"
-                  value={ruleResource}
-                  onChange={(event) =>
-                    setRuleResource(asId<ResourceId>(event.target.value))
-                  }
-                >
-                  {resources.map((resource) => (
-                    <option key={resource.id} value={resource.id}>
-                      {resource.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  aria-label="Rule mode"
-                  value={ruleMode}
-                  onChange={(event) =>
-                    setRuleMode(event.target.value as 'request' | 'provide')
-                  }
-                >
-                  <option value="request">Request</option>
-                  <option value="provide">Provide</option>
-                </select>
-                <input
-                  aria-label="Rule target"
-                  type="number"
-                  min="0"
-                  value={ruleTarget}
-                  onChange={(event) =>
-                    setRuleTarget(Number(event.target.value))
-                  }
-                />
-                <input
-                  aria-label="Rule priority"
-                  type="number"
-                  value={rulePriority}
-                  onChange={(event) =>
-                    setRulePriority(Number(event.target.value))
-                  }
-                />
-                <button
-                  onClick={() =>
+              </section>
+            )}
+            {selectedEntity !== undefined && snapshot !== undefined && (
+              <section className="inspector-card world-building-card">
+                <h3>
+                  Selected{' '}
+                  {selectedEntity.kind === 'factory'
+                    ? (factories.find(
+                        (factory) => factory.id === selectedEntity.factoryId,
+                      )?.name ?? 'factory')
+                    : selectedEntity.kind.replaceAll('-', ' ')}
+                </h3>
+                <WorldBuildingInspector
+                  entity={selectedEntity}
+                  getSnapshot={getSnapshot}
+                  onRemoveRule={(resourceId) =>
                     void run((client) =>
                       client.command({
-                        type: 'CONFIGURE_STATION',
+                        type: 'REMOVE_STATION_RULE',
                         entityId: selectedEntity.id,
-                        resourceId: ruleResource,
-                        mode: ruleMode,
-                        target: ruleTarget,
-                        priority: rulePriority,
+                        resourceId,
                       }),
                     )
                   }
-                >
-                  Apply rule
-                </button>
-              </div>
-            )}
-          </section>
-        )}
-        <section className="inspector-card world-contract">
-          <h3>Build blueprint · {factoryName}</h3>
-          <p>
-            {contract === undefined
-              ? 'Compile the blueprint before placing it.'
-              : `${contract.footprint.width} × ${contract.footprint.height} tiles · ${contract.billOfMaterials?.reduce((sum, item) => sum + item.quantity, 0) ?? 0} build items.`}
-          </p>
-          {contractRows.map((row) => (
-            <div
-              className="world-contract-row"
-              key={`${row.role}-${row.resourceId}`}
-            >
-              <span>Contract rate</span>
-              <strong>
-                {resourceById.get(row.resourceId)?.name ?? row.resourceId}
-              </strong>
-              <b>{formatRate(row.rate)}/s</b>
-              <small>max {formatRate(row.maximum)}/s</small>
-            </div>
-          ))}
-          <button
-            aria-label={`Open ${factoryName} factory`}
-            className="button button--block"
-            onClick={() => onOpenFactory(activeFactoryId)}
-          >
-            Open factory blueprint
-          </button>
-        </section>
-        <section className="inspector-card">
-          <h3>Accessible entities</h3>
-          <ul className="world-entity-list">
-            {snapshot?.entities.map((entity) => (
-              <li key={entity.id}>
-                <button
-                  onClick={() => {
-                    setSelected(entity.transform.position);
-                    setSelectedEntityId(entity.id);
-                    setSelectedPodId(undefined);
-                    setCameraFocus(entity.transform.position);
+                  {...(selectedEntity.kind === 'factory'
+                    ? {
+                        displayName:
+                          factories.find(
+                            (factory) =>
+                              factory.id === selectedEntity.factoryId,
+                          )?.name ?? 'Factory',
+                      }
+                    : {})}
+                  busy={busy}
+                  onQueuePod={() => {
+                    if (selectedEntity.kind !== 'depot') return;
+                    void run((client) =>
+                      client.command({
+                        type: 'QUEUE_POD_PRODUCTION',
+                        depotId: selectedEntity.id,
+                      }),
+                    );
                   }}
-                >
-                  {entity.kind.replaceAll('-', ' ')} ·{' '}
-                  {entity.transform.position.x}, {entity.transform.position.y}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-        <section className="inspector-card">
-          <h3>Accessible cargo pods</h3>
-          {snapshot?.pods.length === 0 ? (
-            <p>No cargo pods.</p>
-          ) : (
-            <ul className="world-entity-list">
-              {snapshot?.pods.map((pod) => {
-                const node = snapshot.railNodes.find(
-                  (item) => item.id === pod.nodeId,
-                );
-                return (
-                  <li key={pod.id}>
+                  onCancelPod={() => {
+                    if (selectedEntity.kind !== 'depot') return;
+                    void run((client) =>
+                      client.command({
+                        type: 'CANCEL_POD_PRODUCTION',
+                        depotId: selectedEntity.id,
+                      }),
+                    );
+                  }}
+                />
+                {selectedEntity.kind === 'factory' && (
+                  <button
+                    className="button button--block"
+                    aria-label={
+                      'Open placed ' +
+                      (factories.find(
+                        (factory) => factory.id === selectedEntity.factoryId,
+                      )?.name ?? 'factory') +
+                      ' blueprint'
+                    }
+                    onClick={() => onOpenFactory(selectedEntity.factoryId)}
+                  >
+                    Open placed factory blueprint
+                  </button>
+                )}
+                {isEntityDismantling(selectedEntity) ? (
+                  <>
                     <button
-                      aria-pressed={selectedPodId === pod.id}
+                      className="button button--block"
+                      title="Return this building to construction and recover its remaining materials."
+                      onClick={() =>
+                        void run((client) =>
+                          client.command({
+                            type: 'CANCEL_DISMANTLE',
+                            entityId: selectedEntity.id,
+                          }),
+                        )
+                      }
+                    >
+                      Cancel dismantling
+                    </button>
+                    <p className="world-empty-state">
+                      This building returns to construction; materials already
+                      recovered are reused.
+                    </p>
+                  </>
+                ) : (
+                  (selectedEntity.kind === 'factory' ||
+                    selectedEntity.kind === 'mine' ||
+                    selectedEntity.kind === 'storage' ||
+                    selectedEntity.kind === 'depot' ||
+                    selectedEntity.kind === 'station' ||
+                    selectedEntity.kind === 'drill') && (
+                    <button
+                      className="danger-button"
                       onClick={() => {
-                        setSelectedPodId(pod.id);
-                        setSelectedEntityId(undefined);
-                        if (node !== undefined) {
-                          setSelected(node.position);
-                          setCameraFocus(node.position);
-                        }
+                        askConfirmation({
+                          title:
+                            selectedEntity.kind === 'station'
+                              ? 'Remove station?'
+                              : selectedEntity.kind === 'drill'
+                                ? 'Dismantle drill?'
+                                : 'Dismantle building?',
+                          message:
+                            selectedEntity.kind === 'station'
+                              ? 'The station must be unlinked and clear of logistics traffic. ' +
+                                'Connected rail stays as a plain endpoint.'
+                              : selectedEntity.kind === 'drill'
+                                ? 'Recovered materials return by rail from the mine station.'
+                                : `Dismantling this ${selectedEntity.kind} routes its contents to salvage by rail.`,
+                          confirmText:
+                            selectedEntity.kind === 'station'
+                              ? 'Remove station'
+                              : 'Dismantle',
+                          action: async () => {
+                            await run((client) =>
+                              client.command({
+                                type: 'DISMANTLE_ENTITY',
+                                entityId: selectedEntity.id,
+                              }),
+                            );
+                          },
+                        });
                       }}
                     >
-                      Pod · {pod.state.toLowerCase().replaceAll('_', ' ')} ·{' '}
-                      {node?.position.x}, {node?.position.y}
+                      {selectedEntity.kind === 'station'
+                        ? 'Remove station'
+                        : 'Dismantle'}
                     </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-        <section className="inspector-card">
-          <h3>Accessible rails</h3>
-          <ul className="world-entity-list">
-            {snapshot?.railEdges.map((edge, index) => (
-              <li key={edge.id}>
-                <button
-                  onClick={() => {
-                    setSelectedRailEdgeId(edge.id);
-                    setSelectedEntityId(undefined);
-                    setSelectedPodId(undefined);
-                    setCameraFocus(edge.points[0]);
-                  }}
-                >
-                  Rail {index + 1}: {edge.points[0]?.x}, {edge.points[0]?.y} →{' '}
-                  {edge.points.at(-1)?.x}, {edge.points.at(-1)?.y}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-        <section className="inspector-card">
-          <h3>Traffic diagnostics</h3>
-          {snapshot?.diagnostics.length === 0 ? (
-            <p>No blocking cycle.</p>
-          ) : (
-            <ul className="world-entity-list">
-              {snapshot?.diagnostics.map((diagnostic) => (
-                <li
-                  key={`${diagnostic.code}-${diagnostic.entityIds.join('-')}`}
-                >
-                  <button onClick={() => focusEntities(diagnostic.entityIds)}>
-                    {diagnostic.message}
+                  )
+                )}
+                {selectedEntity.kind === 'construction-site' && (
+                  <button
+                    className="danger-button"
+                    onClick={() =>
+                      askConfirmation({
+                        title: 'Cancel construction?',
+                        message:
+                          'Delivered materials will be evacuated through the site station. The site remains until evacuation finishes.',
+                        confirmText: 'Cancel construction',
+                        action: async () => {
+                          await run((client) =>
+                            client.command({
+                              type: 'CANCEL_CONSTRUCTION',
+                              siteId: selectedEntity.id,
+                            }),
+                          );
+                        },
+                      })
+                    }
+                  >
+                    Cancel and evacuate
                   </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+                )}
+                {selectedEntity.kind === 'factory' &&
+                  selectedEntity.state !== 'DISMANTLING' &&
+                  contract !== undefined &&
+                  compileState === 'ready' && (
+                    <button
+                      className="button button--primary button--block"
+                      onClick={() =>
+                        askConfirmation({
+                          title: 'Replace placed factory?',
+                          message: `The new footprint will be ${contract.footprint.width} × ${contract.footprint.height} tiles at the same position, orientation and station. Existing contents will be routed to salvage; the new factory will be rebuilt with ${contract.billOfMaterials?.reduce((sum, item) => sum + item.quantity, 0) ?? 0} construction items.`,
+                          confirmText: 'Replace factory',
+                          action: async () => {
+                            await run((client) =>
+                              client.command({
+                                type: 'REPLACE_FACTORY',
+                                entityId: selectedEntity.id,
+                                position: selectedEntity.transform.position,
+                                size: gridSize(
+                                  contract.footprint.width,
+                                  contract.footprint.height,
+                                ),
+                                rotation: selectedEntity.transform.rotation,
+                                cost: contract.billOfMaterials ?? [],
+                                factoryId: activeFactoryId,
+                                instanceId: asId<InstanceId>(
+                                  `instance-${Date.now()}`,
+                                ),
+                                contract: serializeContract(contract),
+                              }),
+                            );
+                          },
+                        })
+                      }
+                    >
+                      Replace with {factoryName}
+                    </button>
+                  )}
+                {selectedEntity.kind === 'storage' && (
+                  <StockRules
+                    busy={busy}
+                    stations={snapshot.stations.filter(
+                      (station) =>
+                        station.id.startsWith(`rule:${selectedEntity.id}:`) &&
+                        station.role === 'storage',
+                    )}
+                    onChange={(resourceId, minimum, maximum) =>
+                      void run((client) =>
+                        client.command({
+                          type: 'CONFIGURE_STATION',
+                          entityId: selectedEntity.id,
+                          resourceId,
+                          mode: 'stock',
+                          target: minimum,
+                          maximum,
+                          priority: 0,
+                        }),
+                      )
+                    }
+                  />
+                )}
+              </section>
+            )}
+            {selected === undefined &&
+              selectedEntity === undefined &&
+              selectedPod === undefined &&
+              selectedRailEdge === undefined && (
+                <p className="world-inspector-empty">
+                  Select a building, rail segment or tile to see its details.
+                </p>
+              )}
+            {tool === 'factory' && (
+              <section className="inspector-card world-contract">
+                <h3>Design · {factoryName}</h3>
+                <p>
+                  {contract === undefined
+                    ? compileState === 'invalid'
+                      ? 'Fix the factory design before building it.'
+                      : 'Preparing factory design…'
+                    : `${contract.footprint.width} × ${contract.footprint.height} tiles · ${contract.billOfMaterials?.reduce((sum, item) => sum + item.quantity, 0) ?? 0} materials.`}
+                </p>
+                {contractRows.map((row) => (
+                  <div
+                    className="world-contract-row"
+                    key={`${row.role}-${row.resourceId}`}
+                  >
+                    <span>{row.role === 'input' ? 'Input' : 'Output'}</span>
+                    <strong>
+                      {resourceById.get(row.resourceId)?.name ?? row.resourceId}
+                    </strong>
+                    <b>{formatRate(row.rate)}/s</b>
+                    <small>Capacity {formatRate(row.maximum)}/s</small>
+                  </div>
+                ))}
+                <button
+                  aria-label={`Open ${factoryName} factory`}
+                  className="button button--block"
+                  onClick={() => onOpenFactory(activeFactoryId)}
+                >
+                  Edit this design
+                </button>
+              </section>
+            )}
+            <details
+              className="world-object-browser"
+              open={showObjectBrowser}
+              onToggle={(event) =>
+                setShowObjectBrowser(event.currentTarget.open)
+              }
+            >
+              <summary>Browse all world objects</summary>
+              {showObjectBrowser && (
+                <>
+                  <section className="inspector-card">
+                    <h3>Buildings &amp; sites</h3>
+                    <ul className="world-entity-list">
+                      {snapshot?.entities.map((entity) => (
+                        <li key={entity.id}>
+                          <button
+                            aria-pressed={selectedEntityId === entity.id}
+                            onClick={() => {
+                              setSelected(entity.transform.position);
+                              setSelectedEntityId(entity.id);
+                              setSelectedPodId(undefined);
+                              setCameraFocus(entity.transform.position);
+                            }}
+                          >
+                            {entity.kind === 'factory'
+                              ? (factories.find(
+                                  (factory) => factory.id === entity.factoryId,
+                                )?.name ?? 'Factory')
+                              : entity.kind.replaceAll('-', ' ')}{' '}
+                            · {entity.transform.position.x},{' '}
+                            {entity.transform.position.y}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                  <section className="inspector-card">
+                    <h3>Cargo pods</h3>
+                    {snapshot?.pods.length === 0 ? (
+                      <p>No cargo pods.</p>
+                    ) : (
+                      <ul className="world-entity-list">
+                        {snapshot?.pods.map((pod) => {
+                          const node = snapshot.railNodes.find(
+                            (item) => item.id === pod.nodeId,
+                          );
+                          return (
+                            <li key={pod.id}>
+                              <button
+                                aria-pressed={selectedPodId === pod.id}
+                                onClick={() => {
+                                  setSelectedPodId(pod.id);
+                                  setSelectedEntityId(undefined);
+                                  if (node !== undefined) {
+                                    setSelected(node.position);
+                                    setCameraFocus(node.position);
+                                  }
+                                }}
+                              >
+                                Pod ·{' '}
+                                {pod.state.toLowerCase().replaceAll('_', ' ')}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </section>
+                  <section className="inspector-card">
+                    <h3>Rail segments</h3>
+                    <ul className="world-entity-list">
+                      {snapshot?.railEdges.map((edge, index) => (
+                        <li key={edge.id}>
+                          <button
+                            aria-pressed={selectedRailEdgeId === edge.id}
+                            onClick={() => {
+                              setSelectedRailEdgeId(edge.id);
+                              setSelectedEntityId(undefined);
+                              setSelectedPodId(undefined);
+                              setCameraFocus(edge.points[0]);
+                            }}
+                          >
+                            Segment {index + 1} · {edge.length} tiles
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                  <section className="inspector-card">
+                    <h3>Logistics alerts</h3>
+                    {snapshot?.diagnostics.length === 0 ? (
+                      <p>No current logistics alerts.</p>
+                    ) : (
+                      <ul className="world-entity-list">
+                        {snapshot?.diagnostics.map((diagnostic) => (
+                          <li
+                            key={`${diagnostic.code}-${diagnostic.entityIds.join('-')}`}
+                          >
+                            <button
+                              onClick={() =>
+                                focusEntities(diagnostic.entityIds)
+                              }
+                            >
+                              {diagnostic.message}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                </>
+              )}
+            </details>
+          </>
+        )}
       </aside>
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {error ??

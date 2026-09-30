@@ -3,6 +3,9 @@ import { AssetRegistry } from './AssetRegistry';
 import { InstancePool } from './InstancePool';
 import { RenderClock } from './RenderClock';
 import { SpatialPicking, segmentDistance } from './SpatialPicking';
+import { MinimapBackground } from './MinimapBackground';
+import { TrafficOverlay } from './TrafficOverlay';
+import { worldProfiler } from '../../profiling/worldProfiler';
 import type { CameraState } from './CameraState';
 import type { GridPoint, PodId, RailEdgeId, WorldEntityId } from '../../domain';
 import {
@@ -29,6 +32,14 @@ import {
   railNodeDegrees,
 } from '../../ui/worldRailVisual';
 
+const isEntityDismantling = (entity: WorldEntity): boolean =>
+  entity.kind === 'factory'
+    ? entity.state === 'DISMANTLING'
+    : (entity.kind === 'mine' ||
+        entity.kind === 'storage' ||
+        entity.kind === 'depot') &&
+      entity.dismantling === true;
+
 export interface GhostState {
   readonly kind: string;
   readonly transform: WorldTransform;
@@ -47,6 +58,11 @@ export interface WorldRendererOptions {
 }
 export type QualityMode = 'low' | 'standard' | 'high' | 'auto';
 
+interface GpuTimerExtension {
+  readonly TIME_ELAPSED_EXT: number;
+  readonly GPU_DISJOINT_EXT: number;
+}
+
 interface PickInfo {
   readonly kind: 'entity' | 'rail' | 'pod';
   readonly id: string;
@@ -61,6 +77,131 @@ interface DrawnRail {
   readonly group: THREE.Group;
   readonly signature: string;
 }
+
+interface ScreenPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+interface ScreenRect {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+}
+
+const pointInRect = (point: ScreenPoint, rect: ScreenRect) =>
+  point.x >= rect.left &&
+  point.x <= rect.right &&
+  point.y >= rect.top &&
+  point.y <= rect.bottom;
+
+const cross = (a: ScreenPoint, b: ScreenPoint, c: ScreenPoint) =>
+  (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+
+const pointOnSegment = (
+  point: ScreenPoint,
+  start: ScreenPoint,
+  end: ScreenPoint,
+) =>
+  Math.abs(cross(start, end, point)) < 0.001 &&
+  point.x >= Math.min(start.x, end.x) - 0.001 &&
+  point.x <= Math.max(start.x, end.x) + 0.001 &&
+  point.y >= Math.min(start.y, end.y) - 0.001 &&
+  point.y <= Math.max(start.y, end.y) + 0.001;
+
+const segmentsIntersect = (
+  a: ScreenPoint,
+  b: ScreenPoint,
+  c: ScreenPoint,
+  d: ScreenPoint,
+) => {
+  const abC = cross(a, b, c);
+  const abD = cross(a, b, d);
+  const cdA = cross(c, d, a);
+  const cdB = cross(c, d, b);
+  const oppositeSides = (first: number, second: number) =>
+    (first < 0 && second > 0) || (first > 0 && second < 0);
+  return (
+    (oppositeSides(abC, abD) && oppositeSides(cdA, cdB)) ||
+    pointOnSegment(c, a, b) ||
+    pointOnSegment(d, a, b) ||
+    pointOnSegment(a, c, d) ||
+    pointOnSegment(b, c, d)
+  );
+};
+
+const pointInPolygon = (
+  point: ScreenPoint,
+  polygon: readonly ScreenPoint[],
+) => {
+  let inside = false;
+  for (
+    let i = 0, previous = polygon.length - 1;
+    i < polygon.length;
+    previous = i++
+  ) {
+    const currentPoint = polygon[i]!;
+    const previousPoint = polygon[previous]!;
+    if (pointOnSegment(point, previousPoint, currentPoint)) return true;
+    if (
+      currentPoint.y > point.y !== previousPoint.y > point.y &&
+      point.x <
+        ((previousPoint.x - currentPoint.x) * (point.y - currentPoint.y)) /
+          (previousPoint.y - currentPoint.y) +
+          currentPoint.x
+    )
+      inside = !inside;
+  }
+  return inside;
+};
+
+const rectIntersectsPolygon = (
+  rect: ScreenRect,
+  polygon: readonly ScreenPoint[],
+) => {
+  if (polygon.some((point) => pointInRect(point, rect))) return true;
+  const corners = [
+    { x: rect.left, y: rect.top },
+    { x: rect.right, y: rect.top },
+    { x: rect.right, y: rect.bottom },
+    { x: rect.left, y: rect.bottom },
+  ];
+  if (corners.some((point) => pointInPolygon(point, polygon))) return true;
+  return polygon.some((point, index) => {
+    const next = polygon[(index + 1) % polygon.length]!;
+    return corners.some((corner, cornerIndex) =>
+      segmentsIntersect(
+        point,
+        next,
+        corner,
+        corners[(cornerIndex + 1) % corners.length]!,
+      ),
+    );
+  });
+};
+
+const rectIntersectsSegment = (
+  rect: ScreenRect,
+  start: ScreenPoint,
+  end: ScreenPoint,
+) => {
+  if (pointInRect(start, rect) || pointInRect(end, rect)) return true;
+  const corners = [
+    { x: rect.left, y: rect.top },
+    { x: rect.right, y: rect.top },
+    { x: rect.right, y: rect.bottom },
+    { x: rect.left, y: rect.bottom },
+  ];
+  return corners.some((corner, index) =>
+    segmentsIntersect(
+      start,
+      end,
+      corner,
+      corners[(index + 1) % corners.length]!,
+    ),
+  );
+};
 
 interface DrawnOre {
   readonly mesh: THREE.InstancedMesh;
@@ -155,7 +296,7 @@ export class WorldRenderer {
   readonly trafficLayer = new THREE.Group();
   private readonly statusInstances = new InstancePool();
   private statusSignature = '';
-  private trafficSignature = '';
+  private trafficOverlay: TrafficOverlay | undefined;
   readonly pickTargets: THREE.Object3D[] = [];
   private readonly spatialPicking = new SpatialPicking();
   private pickingDirty = true;
@@ -197,11 +338,13 @@ export class WorldRenderer {
   ghost: GhostState | undefined;
   selected: GridPoint | undefined;
   selectedEntityId: WorldEntityId | undefined;
-  railDraft: readonly GridPoint[] = [];
-  railPreview: GridPoint | undefined;
+  railGesture:
+    { readonly start: GridPoint; readonly end: GridPoint } | undefined;
   keyboardCursor: GridPoint | undefined;
   hoveredRailEdgeId: RailEdgeId | undefined;
   hoveredDismantleEntityId: WorldEntityId | undefined;
+  dismantleSelectionIds: readonly WorldEntityId[] = [];
+  dismantleRailEdgeIds: readonly RailEdgeId[] = [];
   selectedRailEdgeId: RailEdgeId | undefined;
   activeTool = 'select';
   showGrid = true;
@@ -228,17 +371,29 @@ export class WorldRenderer {
   private selectionOutline = new THREE.LineSegments();
   private minimapCanvas: HTMLCanvasElement | undefined;
   private minimapContext: CanvasRenderingContext2D | undefined;
+  private minimapBackground = new MinimapBackground();
   private resizeMinimapPending = false;
   private lastMinimapDrawnAt = 0;
   private readySent = false;
   private lastDrawnAt = 0;
   private lastMetricsAt = 0;
+  private metricsEnabledFromQuery = false;
+  private profilingEnabled = false;
+  private originalRenderBufferDirect:
+    THREE.WebGLRenderer['renderBufferDirect'] | undefined;
+  private gpuTimerExtension: GpuTimerExtension | undefined;
+  private readonly pendingGpuQueries: WebGLQuery[] = [];
+  private profileSceneObjects = 0;
+  private profileEstimatedGpuBufferBytes: number | null = null;
   private mainPassStart: { calls: number; triangles: number } | undefined;
-  private qualityMode: QualityMode = 'standard';
+  private qualityMode: QualityMode | undefined;
   private activeQuality: Exclude<QualityMode, 'auto'> = 'standard';
   private frameIntervals: number[] = [];
   private lastQualityCheck = 0;
   private lastQualityChange = 0;
+  private railSnapshot:
+    Pick<WorldSnapshot, 'railNodes' | 'railEdges'> | undefined;
+  private railAssetsReady = false;
   private readonly options: WorldRendererOptions;
 
   constructor(
@@ -258,8 +413,8 @@ export class WorldRenderer {
       extraction: this.material('#c77b4a'),
       service: this.material('#d9b45f'),
       rock: this.material('#68746b'),
-      iron: this.material('#b8754b'),
-      copper: this.material('#7ab3a5'),
+      iron: this.material('#7ab3a5'),
+      copper: this.material('#b8754b'),
       rail: this.material('#3d4b50', 0.45),
       railTop: this.material('#bdc1ae', 0.55),
       pod: this.material('#33434a', 0.38),
@@ -301,17 +456,10 @@ export class WorldRenderer {
       powerPreference: 'high-performance',
     });
     this.renderer.info.autoReset = false;
-    if (new URLSearchParams(location.search).has('world-metrics')) {
-      const draw = this.renderer.renderBufferDirect.bind(this.renderer);
-      this.renderer.renderBufferDirect = (...args) => {
-        if (args[0] === this.camera && !this.mainPassStart)
-          this.mainPassStart = {
-            calls: this.renderer.info.render.calls,
-            triangles: this.renderer.info.render.triangles,
-          };
-        draw(...args);
-      };
-    }
+    this.metricsEnabledFromQuery = new URLSearchParams(location.search).has(
+      'world-metrics',
+    );
+    if (this.metricsEnabledFromQuery) this.installMainPassInstrumentation();
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1;
@@ -425,6 +573,122 @@ export class WorldRenderer {
     return this.mainPassStart;
   }
 
+  private installMainPassInstrumentation() {
+    if (this.originalRenderBufferDirect !== undefined) return;
+    const renderer = this.renderer;
+    const original = renderer.renderBufferDirect;
+    const draw = original.bind(renderer);
+    this.originalRenderBufferDirect = original;
+    renderer.renderBufferDirect = (...args) => {
+      if (args[0] === this.camera && !this.mainPassStart)
+        this.mainPassStart = {
+          calls: renderer.info.render.calls,
+          triangles: renderer.info.render.triangles,
+        };
+      draw(...args);
+    };
+  }
+
+  setProfiling(enabled: boolean) {
+    if (this.profilingEnabled === enabled) return;
+    this.profilingEnabled = enabled;
+    if (enabled) {
+      this.installMainPassInstrumentation();
+      try {
+        const context = this.renderer.getContext() as WebGL2RenderingContext;
+        this.gpuTimerExtension =
+          (context.getExtension(
+            'EXT_disjoint_timer_query_webgl2',
+          ) as GpuTimerExtension | null) ?? undefined;
+      } catch {
+        this.gpuTimerExtension = undefined;
+      }
+    } else {
+      if (!this.metricsEnabledFromQuery && this.originalRenderBufferDirect) {
+        this.renderer.renderBufferDirect = this.originalRenderBufferDirect;
+        this.originalRenderBufferDirect = undefined;
+      }
+      this.clearGpuQueries();
+      this.gpuTimerExtension = undefined;
+    }
+  }
+
+  private clearGpuQueries() {
+    try {
+      const context = this.renderer.getContext() as WebGL2RenderingContext;
+      for (const query of this.pendingGpuQueries)
+        try {
+          context.deleteQuery(query);
+        } catch {
+          // A lost graphics context releases its own query objects.
+        }
+    } catch {
+      // A lost graphics context releases its own query objects.
+    }
+    this.pendingGpuQueries.length = 0;
+  }
+
+  private pollGpuQueries() {
+    const extension = this.gpuTimerExtension;
+    if (!this.profilingEnabled || extension === undefined) return;
+    const context = this.renderer.getContext() as WebGL2RenderingContext;
+    try {
+      if (context.getParameter(extension.GPU_DISJOINT_EXT)) {
+        this.clearGpuQueries();
+        return;
+      }
+      for (let index = this.pendingGpuQueries.length - 1; index >= 0; index--) {
+        const query = this.pendingGpuQueries[index]!;
+        if (!context.getQueryParameter(query, context.QUERY_RESULT_AVAILABLE))
+          continue;
+        const elapsedNanoseconds = context.getQueryParameter(
+          query,
+          context.QUERY_RESULT,
+        ) as number;
+        if (Number.isFinite(elapsedNanoseconds))
+          worldProfiler.recordGpuFrame(elapsedNanoseconds / 1_000_000);
+        context.deleteQuery(query);
+        this.pendingGpuQueries.splice(index, 1);
+      }
+    } catch {
+      this.clearGpuQueries();
+      this.gpuTimerExtension = undefined;
+    }
+  }
+
+  private beginGpuQuery() {
+    const extension = this.gpuTimerExtension;
+    if (
+      !this.profilingEnabled ||
+      extension === undefined ||
+      this.pendingGpuQueries.length >= 4
+    )
+      return undefined;
+    const context = this.renderer.getContext() as WebGL2RenderingContext;
+    const query = context.createQuery();
+    if (query === null) return undefined;
+    try {
+      context.beginQuery(extension.TIME_ELAPSED_EXT, query);
+      return query;
+    } catch {
+      context.deleteQuery(query);
+      this.gpuTimerExtension = undefined;
+      return undefined;
+    }
+  }
+
+  private finishGpuQuery(query: WebGLQuery | undefined) {
+    if (query === undefined || this.gpuTimerExtension === undefined) return;
+    const context = this.renderer.getContext() as WebGL2RenderingContext;
+    try {
+      context.endQuery(this.gpuTimerExtension.TIME_ELAPSED_EXT);
+      this.pendingGpuQueries.push(query);
+    } catch {
+      context.deleteQuery(query);
+      this.gpuTimerExtension = undefined;
+    }
+  }
+
   private material(color: string, metalness = 0.04) {
     return new THREE.MeshStandardMaterial({
       color,
@@ -455,7 +719,10 @@ export class WorldRenderer {
   setSnapshot(snapshot: WorldSnapshot) {
     const worldChanged = snapshot.worldId !== this.worldId;
     this.snapshot = snapshot;
+    const syncStarted = this.profilingEnabled ? performance.now() : 0;
     this.syncSnapshot(snapshot, worldChanged);
+    if (this.profilingEnabled)
+      worldProfiler.recordSnapshotSync(performance.now() - syncStarted);
     if (worldChanged) this.setHome();
   }
 
@@ -480,8 +747,10 @@ export class WorldRenderer {
   }
 
   private clearWorld() {
+    this.railSnapshot = undefined;
+    this.minimapBackground = new MinimapBackground();
     this.overlaySignature = '';
-    this.trafficSignature = '';
+    this.trafficOverlay = undefined;
     this.statusSignature = '';
     this.statusInstances.clear();
     for (const object of [...this.trafficLayer.children])
@@ -713,15 +982,18 @@ export class WorldRenderer {
       clusters.set(key, chunk);
     }
     for (const { kind, indices } of clusters.values()) {
+      // The ore assets carry their color, so use the opposite authored model.
+      const modelOreKind =
+        kind === OreKind.IRON ? OreKind.COPPER : OreKind.IRON;
       const mesh = new THREE.InstancedMesh(
         (
           this.assets.models
-            .get(kind === OreKind.IRON ? 'ore-iron:0' : 'ore-copper:0')
+            .get(modelOreKind === OreKind.IRON ? 'ore-iron:0' : 'ore-copper:0')
             ?.getObjectByName('body') as THREE.Mesh | undefined
         )?.geometry ?? this.geometry.oreCluster,
         (
           this.assets.models
-            .get(kind === OreKind.IRON ? 'ore-iron:0' : 'ore-copper:0')
+            .get(modelOreKind === OreKind.IRON ? 'ore-iron:0' : 'ore-copper:0')
             ?.getObjectByName('body') as THREE.Mesh | undefined
         )?.material ??
           (kind === OreKind.IRON ? this.materials.iron : this.materials.copper),
@@ -967,7 +1239,7 @@ export class WorldRenderer {
           object.castShadow = false;
         }
       });
-    if (entity.kind === 'factory' && entity.state === 'DISMANTLING') {
+    if (isEntityDismantling(entity)) {
       for (const x of [-1, 1])
         for (const z of [-1, 1])
           this.addBox(
@@ -1655,8 +1927,19 @@ export class WorldRenderer {
       { node: WorldRailNode; anchor: WorldEntity; crane: boolean }
     >();
     for (const entity of snapshot.entities) {
-      if (entity.kind !== 'station' && entity.kind !== 'depot') continue;
-      const node = nodes.get(entity.railNodeId);
+      const depotSite =
+        entity.kind === 'construction-site' && entity.targetKind === 'depot';
+      if (entity.kind !== 'station' && entity.kind !== 'depot' && !depotSite)
+        continue;
+      const hook = hookupCell(entity.transform);
+      const node =
+        entity.kind === 'station' || entity.kind === 'depot'
+          ? nodes.get(entity.railNodeId)
+          : snapshot.railNodes.find(
+              (candidate) =>
+                candidate.position.x === hook.x &&
+                candidate.position.y === hook.y,
+            );
       if (node === undefined) continue;
       const cell = hookupCell(entity.transform);
       const derived = node.position.x === cell.x && node.position.y === cell.y;
@@ -1839,6 +2122,14 @@ export class WorldRenderer {
   }
 
   private reconcileRails(snapshot: WorldSnapshot) {
+    if (
+      this.railSnapshot?.railNodes === snapshot.railNodes &&
+      this.railSnapshot?.railEdges === snapshot.railEdges &&
+      this.railAssetsReady === this.assetsReady
+    )
+      return;
+    this.railSnapshot = snapshot;
+    this.railAssetsReady = this.assetsReady;
     this.pickingDirty = true;
     let changed = false;
     const degrees = railNodeDegrees(snapshot.railEdges);
@@ -2127,74 +2418,13 @@ export class WorldRenderer {
   }
 
   private updateTraffic() {
-    const next = signature([this.snapshot.railEdges, this.snapshot.railBlocks]);
-    if (next === this.trafficSignature) return;
-    this.trafficSignature = next;
-    for (const object of [...this.trafficLayer.children])
-      this.disposeDetached(object);
-    this.trafficLayer.clear();
-    const positions: number[] = [],
-      colors: number[] = [];
-    const blocks = new Map(
-      this.snapshot.railBlocks.map((block) => [block.edgeId, block]),
-    );
-    const line = (
-      ax: number,
-      az: number,
-      bx: number,
-      bz: number,
-      color: THREE.Color,
-    ) => {
-      positions.push(ax + 0.5, 0.32, az + 0.5, bx + 0.5, 0.32, bz + 0.5);
-      colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
-    };
-    for (const edge of this.snapshot.railEdges) {
-      const block = blocks.get(edge.id),
-        color = new THREE.Color(
-          block?.occupantId
-            ? '#edb85f'
-            : block?.reservedById
-              ? '#e8dec7'
-              : '#4c9690',
-        );
-      for (let i = 1; i < edge.points.length; i++) {
-        const a = edge.points[i - 1]!,
-          b = edge.points[i]!,
-          length = Math.hypot(b.x - a.x, b.y - a.y);
-        if (!length) continue;
-        const dx = (b.x - a.x) / length,
-          dz = (b.y - a.y) / length,
-          x = (a.x + b.x) / 2,
-          z = (a.y + b.y) / 2;
-        if (block?.occupantId || block?.reservedById)
-          line(a.x, a.y, b.x, b.y, color);
-        line(
-          x - dx * 0.28 - dz * 0.18,
-          z - dz * 0.28 + dx * 0.18,
-          x + dx * 0.28,
-          z + dz * 0.28,
-          color,
-        );
-        line(
-          x - dx * 0.28 + dz * 0.18,
-          z - dz * 0.28 - dx * 0.18,
-          x + dx * 0.28,
-          z + dz * 0.28,
-          color,
-        );
-      }
+    if (!this.trafficOverlay) {
+      this.trafficOverlay = new TrafficOverlay();
+      this.trafficLayer.add(this.trafficOverlay.object);
     }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute(
-      'position',
-      new THREE.Float32BufferAttribute(positions, 3),
-    );
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    this.trafficLayer.add(
-      new THREE.LineSegments(
-        geometry,
-        new THREE.LineBasicMaterial({ vertexColors: true }),
-      ),
+    this.trafficOverlay.update(
+      this.snapshot.railEdges,
+      this.snapshot.railBlocks,
     );
     this.trafficLayer.visible = this.showLogistics;
   }
@@ -2205,9 +2435,12 @@ export class WorldRenderer {
       return;
     }
     this.animationFrame = requestAnimationFrame(this.renderFrame);
-    if (now - this.lastDrawnAt < 15.5) return;
-    const frameInterval = this.lastDrawnAt === 0 ? 16 : now - this.lastDrawnAt;
+    // Draw at the display's refresh rate; a fixed 60 Hz gate skips frames on
+    // 120/144/240 Hz monitors even when CPU and GPU have capacity available.
+    const frameInterval = this.lastDrawnAt === 0 ? 0 : now - this.lastDrawnAt;
     this.lastDrawnAt = now;
+    const profiling = this.profilingEnabled;
+    const updateStarted = profiling ? performance.now() : 0;
     this.frameIntervals.push(frameInterval);
     if (this.frameIntervals.length > 120) this.frameIntervals.shift();
     this.considerAutomaticQuality(now);
@@ -2280,13 +2513,19 @@ export class WorldRenderer {
         }
     this.podLayer.updateMatrixWorld(true);
     this.podInstances.update();
+    const updateMs = profiling ? performance.now() - updateStarted : 0;
     this.mainPassStart = undefined;
     this.renderer.info.reset();
+    this.pollGpuQueries();
+    const gpuQuery = this.beginGpuQuery();
+    const submitStarted = profiling ? performance.now() : 0;
     this.renderer.render(this.scene, this.camera);
+    const webglSubmitMs = profiling ? performance.now() - submitStarted : 0;
+    this.finishGpuQuery(gpuQuery);
     this.renderer.domElement.dataset.firstFrame = 'true';
     if (
-      new URLSearchParams(location.search).has('world-metrics') &&
-      now - this.lastMetricsAt > 1000
+      (this.metricsEnabledFromQuery || profiling) &&
+      now - this.lastMetricsAt > (this.metricsEnabledFromQuery ? 1000 : 2500)
     ) {
       this.lastMetricsAt = now;
       const buffers = new Set<ArrayBufferLike>();
@@ -2317,26 +2556,52 @@ export class WorldRenderer {
         : 0;
       const framebufferBytes =
         this.renderer.domElement.width * this.renderer.domElement.height * 12;
-      this.renderer.domElement.dataset.worldStats = JSON.stringify({
-        ready: this.readySent,
-        sceneObjects,
-        mainCalls:
-          this.renderer.info.render.calls - (this.readMainPass()?.calls ?? 0),
-        mainTriangles:
-          this.renderer.info.render.triangles -
-          (this.readMainPass()?.triangles ?? 0),
+      const estimatedGpuBytes =
+        [...buffers].reduce((sum, buffer) => sum + buffer.byteLength, 0) +
+        shadowBytes +
+        framebufferBytes;
+      this.profileSceneObjects = sceneObjects;
+      this.profileEstimatedGpuBufferBytes = estimatedGpuBytes;
+      if (this.metricsEnabledFromQuery)
+        this.renderer.domElement.dataset.worldStats = JSON.stringify({
+          ready: this.readySent,
+          sceneObjects,
+          mainCalls:
+            this.renderer.info.render.calls - (this.readMainPass()?.calls ?? 0),
+          mainTriangles:
+            this.renderer.info.render.triangles -
+            (this.readMainPass()?.triangles ?? 0),
+          calls: this.renderer.info.render.calls,
+          triangles: this.renderer.info.render.triangles,
+          geometries: this.renderer.info.memory.geometries,
+          textures: this.renderer.info.memory.textures,
+          estimatedGpuBytes,
+          quality: this.activeQuality,
+          logicalTime: this.snapshot.logicalTime.toString(),
+          pods: this.snapshot.pods.length,
+          entities: this.snapshot.entities.length,
+        });
+    }
+    if (profiling && frameInterval > 0) {
+      const mainPass = this.readMainPass();
+      worldProfiler.recordFrame({
+        intervalMs: frameInterval,
+        updateMs,
+        webglSubmitMs,
+        mainCalls: this.renderer.info.render.calls - (mainPass?.calls ?? 0),
         calls: this.renderer.info.render.calls,
+        mainTriangles:
+          this.renderer.info.render.triangles - (mainPass?.triangles ?? 0),
         triangles: this.renderer.info.render.triangles,
+        entities: this.snapshot.entities.length,
+        rails: this.snapshot.railEdges.length,
+        pods: this.snapshot.pods.length,
+        missions: this.snapshot.missions.length,
         geometries: this.renderer.info.memory.geometries,
         textures: this.renderer.info.memory.textures,
-        estimatedGpuBytes:
-          [...buffers].reduce((sum, buffer) => sum + buffer.byteLength, 0) +
-          shadowBytes +
-          framebufferBytes,
+        sceneObjects: this.profileSceneObjects,
+        estimatedGpuBufferBytes: this.profileEstimatedGpuBufferBytes,
         quality: this.activeQuality,
-        logicalTime: this.snapshot.logicalTime.toString(),
-        pods: this.snapshot.pods.length,
-        entities: this.snapshot.entities.length,
       });
     }
     if (
@@ -2472,6 +2737,7 @@ export class WorldRenderer {
   }
 
   setQuality(mode: QualityMode) {
+    if (this.qualityMode === mode) return;
     this.qualityMode = mode;
     if (mode !== 'auto') this.applyQuality(mode);
     else this.lastQualityCheck = performance.now();
@@ -2682,6 +2948,109 @@ export class WorldRenderer {
     return selected;
   }
 
+  entitiesInScreenRect(
+    startX: number,
+    startY: number,
+    endX: number,
+    endY: number,
+  ): readonly WorldEntityId[] {
+    const canvasRect = this.renderer.domElement.getBoundingClientRect();
+    if (canvasRect.width === 0 || canvasRect.height === 0) return [];
+    const rect = {
+      left: Math.min(startX, endX) - canvasRect.left,
+      top: Math.min(startY, endY) - canvasRect.top,
+      right: Math.max(startX, endX) - canvasRect.left,
+      bottom: Math.max(startY, endY) - canvasRect.top,
+    };
+    this.camera.updateMatrixWorld(true);
+    const project = (x: number, z: number): ScreenPoint => {
+      const point = new THREE.Vector3(x, 0, z).project(this.camera);
+      return {
+        x: ((point.x + 1) * canvasRect.width) / 2,
+        y: ((1 - point.y) * canvasRect.height) / 2,
+      };
+    };
+    const matches: WorldEntityId[] = [];
+    for (const entity of this.snapshot.entities) {
+      const [width, depth] = footprintSize(entity.transform);
+      const [centreX, , centreZ] = footprintCentre(entity.transform);
+      const centre = new THREE.Vector3(centreX, 0, centreZ).project(
+        this.camera,
+      );
+      if (centre.z < -1 || centre.z > 1) continue;
+      const left = centreX - width / 2;
+      const right = centreX + width / 2;
+      const top = centreZ - depth / 2;
+      const bottom = centreZ + depth / 2;
+      const footprint = [
+        project(left, top),
+        project(right, top),
+        project(right, bottom),
+        project(left, bottom),
+      ];
+      if (rectIntersectsPolygon(rect, footprint)) matches.push(entity.id);
+    }
+    return matches;
+  }
+
+  railEdgesInScreenRect(
+    startX: number,
+    startY: number,
+    endX: number,
+    endY: number,
+  ): readonly RailEdgeId[] {
+    const canvasRect = this.renderer.domElement.getBoundingClientRect();
+    if (canvasRect.width === 0 || canvasRect.height === 0) return [];
+    const rect = {
+      left: Math.min(startX, endX) - canvasRect.left,
+      top: Math.min(startY, endY) - canvasRect.top,
+      right: Math.max(startX, endX) - canvasRect.left,
+      bottom: Math.max(startY, endY) - canvasRect.top,
+    };
+    this.camera.updateMatrixWorld(true);
+    const project = (x: number, z: number): ScreenPoint => {
+      const point = new THREE.Vector3(x + 0.5, 0.24, z + 0.5).project(
+        this.camera,
+      );
+      return {
+        x: ((point.x + 1) * canvasRect.width) / 2,
+        y: ((1 - point.y) * canvasRect.height) / 2,
+      };
+    };
+    const matches: RailEdgeId[] = [];
+    for (const edge of this.snapshot.railEdges) {
+      let intersects = false;
+      for (let index = 1; index < edge.points.length && !intersects; index++) {
+        const from = edge.points[index - 1]!;
+        const to = edge.points[index]!;
+        const length = Math.abs(to.x - from.x) + Math.abs(to.y - from.y);
+        if (length === 0) continue;
+        const dx = Math.sign(to.x - from.x);
+        const dy = Math.sign(to.y - from.y);
+        for (let step = 0; step < length; step++) {
+          const startX = from.x + dx * step;
+          const startY = from.y + dy * step;
+          const endX = from.x + dx * (step + 1);
+          const endY = from.y + dy * (step + 1);
+          const middle = new THREE.Vector3(
+            (startX + endX + 1) / 2,
+            0.24,
+            (startY + endY + 1) / 2,
+          ).project(this.camera);
+          if (middle.z < -1 || middle.z > 1) continue;
+          const start = project(startX, startY);
+          const end = project(endX, endY);
+          if (rectIntersectsSegment(rect, start, end)) {
+            intersects = true;
+            break;
+          }
+        }
+      }
+      if (intersects) matches.push(edge.id);
+    }
+    return matches;
+  }
+
   pointAt(clientX: number, clientY: number): GridPoint | undefined {
     const point = this.groundPoint(clientX, clientY);
     if (point === undefined) return undefined;
@@ -2709,42 +3078,51 @@ export class WorldRenderer {
     readonly ghost?: GhostState;
     readonly selected?: GridPoint;
     readonly selectedEntityId?: WorldEntityId;
-    readonly railDraft: readonly GridPoint[];
-    readonly railPreview?: GridPoint;
+    readonly railGesture?: {
+      readonly start: GridPoint;
+      readonly end: GridPoint;
+    };
     readonly keyboardCursor?: GridPoint;
     readonly hoveredRailEdgeId?: RailEdgeId;
     readonly hoveredDismantleEntityId?: WorldEntityId;
+    readonly dismantleSelectionIds?: readonly WorldEntityId[];
+    readonly dismantleRailEdgeIds?: readonly RailEdgeId[];
     readonly selectedRailEdgeId?: RailEdgeId;
     readonly activeTool: string;
   }) {
     this.ghost = args.ghost;
     this.selected = args.selected;
     this.selectedEntityId = args.selectedEntityId;
-    this.railDraft = args.railDraft;
-    this.railPreview = args.railPreview;
+    this.railGesture = args.railGesture;
     this.keyboardCursor = args.keyboardCursor;
     this.hoveredRailEdgeId = args.hoveredRailEdgeId;
     this.hoveredDismantleEntityId = args.hoveredDismantleEntityId;
+    this.dismantleSelectionIds = args.dismantleSelectionIds ?? [];
+    this.dismantleRailEdgeIds = args.dismantleRailEdgeIds ?? [];
     this.selectedRailEdgeId = args.selectedRailEdgeId;
     this.activeTool = args.activeTool;
     this.updateOverlays();
   }
 
   private updateOverlays() {
-    const railClearance = validateRailPath(
-      this.snapshot.grid,
-      this.railPreview ? [...this.railDraft, this.railPreview] : this.railDraft,
-    );
+    const railClearance =
+      this.railGesture === undefined
+        ? undefined
+        : validateRailPath(this.snapshot.grid, [
+            this.railGesture.start,
+            this.railGesture.end,
+          ]);
     const nextSignature = signature([
       railClearance,
       this.ghost,
       this.selected,
       this.selectedEntityId,
-      this.railDraft,
-      this.railPreview,
+      this.railGesture,
       this.keyboardCursor,
       this.hoveredRailEdgeId,
       this.hoveredDismantleEntityId,
+      this.dismantleSelectionIds,
+      this.dismantleRailEdgeIds,
       this.selectedRailEdgeId,
       this.activeTool,
       this.snapshot.entities.find(
@@ -2869,9 +3247,16 @@ export class WorldRenderer {
         const centre = footprintCentre(entity.transform);
         outline.position.set(centre[0], 0.045, centre[2]);
         this.overlayLayer.add(outline);
-        if (entity.kind === 'station' || entity.kind === 'depot') {
-          const node = this.snapshot.railNodes.find(
-            (item) => item.id === entity.railNodeId,
+        if (
+          entity.kind === 'station' ||
+          entity.kind === 'depot' ||
+          (entity.kind === 'construction-site' && entity.targetKind === 'depot')
+        ) {
+          const hook = hookupCell(entity.transform);
+          const node = this.snapshot.railNodes.find((item) =>
+            entity.kind === 'construction-site'
+              ? item.position.x === hook.x && item.position.y === hook.y
+              : item.id === entity.railNodeId,
           );
           const cell = node?.position ?? hookupCell(entity.transform);
           const highlight = new THREE.LineSegments(
@@ -2908,66 +3293,38 @@ export class WorldRenderer {
       );
       this.overlayLayer.add(cursor);
     }
-    if (this.railDraft.length > 0) {
-      for (const point of this.railDraft)
-        this.addBox(
-          this.overlayLayer,
-          railClearance.valid ? this.materials.service : this.materials.error,
-          point.x + 0.5,
-          0.12,
-          point.y + 0.5,
-          0.24,
-          0.18,
-          0.24,
-          false,
-        );
-      for (let i = 1; i < this.railDraft.length; i += 1) {
-        const a = this.railDraft[i - 1]!;
-        const b = this.railDraft[i]!;
-        const horizontal = a.y === b.y;
+    if (this.railGesture !== undefined && railClearance !== undefined) {
+      const { start, end } = this.railGesture;
+      const material = railClearance.valid
+        ? this.materials.service
+        : this.materials.error;
+      const horizontal = start.y === end.y;
+      if (start.x !== end.x || start.y !== end.y) {
         const line = this.addBox(
           this.overlayLayer,
-          railClearance.valid ? this.materials.service : this.materials.error,
-          (a.x + b.x + 1) / 2,
+          material,
+          (start.x + end.x + 1) / 2,
           0.1,
-          (a.y + b.y + 1) / 2,
-          horizontal ? Math.abs(b.x - a.x) + 1 : 0.12,
+          (start.y + end.y + 1) / 2,
+          horizontal ? Math.abs(end.x - start.x) + 1 : 0.12,
           0.09,
-          horizontal ? 0.12 : Math.abs(b.y - a.y) + 1,
+          horizontal ? 0.12 : Math.abs(end.y - start.y) + 1,
           false,
         );
         line.userData.preview = true;
       }
-      const endpoint = this.railDraft.at(-1);
-      if (
-        endpoint !== undefined &&
-        this.railPreview !== undefined &&
-        (endpoint.x !== this.railPreview.x || endpoint.y !== this.railPreview.y)
-      ) {
-        const horizontal = endpoint.y === this.railPreview.y;
+      for (const point of [start, end])
         this.addBox(
           this.overlayLayer,
-          railClearance.valid ? this.materials.warning : this.materials.error,
-          (endpoint.x + this.railPreview.x + 1) / 2,
-          0.12,
-          (endpoint.y + this.railPreview.y + 1) / 2,
-          horizontal ? Math.abs(this.railPreview.x - endpoint.x) + 1 : 0.13,
-          0.09,
-          horizontal ? 0.13 : Math.abs(this.railPreview.y - endpoint.y) + 1,
+          material,
+          point.x + 0.5,
+          0.15,
+          point.y + 0.5,
+          0.28,
+          0.14,
+          0.28,
           false,
         );
-        this.addBox(
-          this.overlayLayer,
-          railClearance.valid ? this.materials.service : this.materials.error,
-          this.railPreview.x + 0.5,
-          0.17,
-          this.railPreview.y + 0.5,
-          0.34,
-          0.13,
-          0.34,
-          false,
-        );
-      }
     }
     const focusEdge = this.hoveredRailEdgeId ?? this.selectedRailEdgeId;
     if (focusEdge !== undefined) {
@@ -3016,6 +3373,43 @@ export class WorldRenderer {
         this.overlayLayer.add(line);
       }
     }
+    for (const id of this.dismantleSelectionIds) {
+      const entity = this.snapshot.entities.find((item) => item.id === id);
+      if (entity === undefined) continue;
+      const [width, depth] = footprintSize(entity.transform);
+      const centre = footprintCentre(entity.transform);
+      const line = new THREE.LineSegments(
+        new THREE.EdgesGeometry(
+          new THREE.BoxGeometry(width + 0.1, 0.1, depth + 0.1),
+        ),
+        new THREE.LineBasicMaterial({ color: '#f3d17b' }),
+      );
+      line.position.set(centre[0], 0.07, centre[2]);
+      this.overlayLayer.add(line);
+    }
+    for (const id of this.dismantleRailEdgeIds) {
+      const edge = this.snapshot.railEdges.find((item) => item.id === id);
+      if (edge === undefined) continue;
+      for (let index = 1; index < edge.points.length; index++) {
+        const from = edge.points[index - 1]!;
+        const to = edge.points[index]!;
+        const length = Math.abs(to.x - from.x) + Math.abs(to.y - from.y);
+        if (length === 0) continue;
+        const horizontal = from.y === to.y;
+        const highlight = this.addBox(
+          this.overlayLayer,
+          this.materials.error,
+          (from.x + to.x + 1) / 2,
+          0.3,
+          (from.y + to.y + 1) / 2,
+          horizontal ? length + 0.08 : 0.34,
+          0.08,
+          horizontal ? 0.34 : length + 0.08,
+          false,
+        );
+        highlight.userData.preview = true;
+      }
+    }
   }
 
   setMinimap(canvas: HTMLCanvasElement | undefined) {
@@ -3035,55 +3429,21 @@ export class WorldRenderer {
     this.lastMinimapDrawnAt = now;
     this.resizeMinimapPending = false;
     const canvas = this.minimapCanvas;
-    const width = canvas.width;
-    const height = canvas.height;
     const context = this.minimapContext;
-    context.clearRect(0, 0, width, height);
-    context.fillStyle = '#819778';
-    context.fillRect(0, 0, width, height);
-    const sx = width / this.snapshot.grid.width;
-    const sy = height / this.snapshot.grid.height;
-    for (let index = 0; index < this.snapshot.grid.terrain.length; index += 1)
-      if (this.snapshot.grid.terrain[index] === TerrainKind.OBSTACLE) {
-        context.fillStyle = '#68746b';
-        context.fillRect(
-          (index % this.snapshot.grid.width) * sx,
-          Math.floor(index / this.snapshot.grid.width) * sy,
-          Math.max(1, sx),
-          Math.max(1, sy),
-        );
-      }
-    if (this.showOre)
-      for (
-        let index = 0;
-        index < this.snapshot.grid.oreKinds.length;
-        index += 1
-      )
-        if (
-          this.snapshot.grid.oreKinds[index] !== OreKind.NONE &&
-          this.snapshot.grid.oreRemaining[index] !== 0
-        ) {
-          context.fillStyle =
-            this.snapshot.grid.oreKinds[index] === OreKind.IRON
-              ? '#b8754b'
-              : '#7ab3a5';
-          context.fillRect(
-            (index % this.snapshot.grid.width) * sx,
-            Math.floor(index / this.snapshot.grid.width) * sy,
-            Math.max(1, sx * 1.8),
-            Math.max(1, sy * 1.8),
-          );
-        }
+    this.minimapBackground.draw(context, this.snapshot.grid, this.showOre);
+    const sx = canvas.width / this.snapshot.grid.width;
+    const sy = canvas.height / this.snapshot.grid.height;
     context.fillStyle = '#263338';
     for (const entity of this.snapshot.entities) {
       const centre = footprintCentre(entity.transform);
       context.fillRect(centre[0] * sx - 1, centre[2] * sy - 1, 3, 3);
     }
+    this.camera.updateMatrixWorld(true);
     const corners = [
-      new THREE.Vector3(-1, 0, -1),
-      new THREE.Vector3(1, 0, -1),
-      new THREE.Vector3(1, 0, 1),
-      new THREE.Vector3(-1, 0, 1),
+      new THREE.Vector3(-1, -1, 0),
+      new THREE.Vector3(1, -1, 0),
+      new THREE.Vector3(1, 1, 0),
+      new THREE.Vector3(-1, 1, 0),
     ].map((point) => {
       point.unproject(this.camera);
       const direction = point.sub(this.camera.position).normalize();
@@ -3152,6 +3512,7 @@ export class WorldRenderer {
 
   dispose() {
     this.disposed = true;
+    if (this.profilingEnabled) this.setProfiling(false);
     this.buildingInstances.clear();
     this.railInstances.clear();
     this.hookupInstances.clear();
@@ -3205,6 +3566,7 @@ export class WorldRenderer {
 
   private disposeDetached(root: THREE.Object3D) {
     root.traverse((object) => {
+      if (object instanceof THREE.InstancedMesh) object.dispose();
       if (
         object instanceof THREE.Mesh ||
         object instanceof THREE.LineSegments

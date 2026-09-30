@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
+import type { SerializedWorldState } from '../../src/world/serialization';
+import type * as DatabaseModule from '../../src/persistence';
+import type * as ClientModule from '../../src/world/client';
+import type * as DomainModule from '../../src/domain';
 
 type HookupDraw = {
   nodeId: string;
@@ -40,11 +44,13 @@ const readCursor = async (page: Page): Promise<HookupCell> => {
 const moveCursor = async (page: Page, to: HookupCell): Promise<void> => {
   const surface = canvas(page);
   const from = await readCursor(page);
-  for (let x = from.x; x < to.x; x += 1) await surface.press('ArrowRight');
-  for (let x = from.x; x > to.x; x -= 1) await surface.press('ArrowLeft');
-  for (let y = from.y; y < to.y; y += 1) await surface.press('ArrowDown');
-  for (let y = from.y; y > to.y; y -= 1) await surface.press('ArrowUp');
-  expect(await readCursor(page)).toEqual(to);
+  await surface.focus();
+  for (let x = from.x; x < to.x; x += 1)
+    await page.keyboard.press('ArrowRight');
+  for (let x = from.x; x > to.x; x -= 1) await page.keyboard.press('ArrowLeft');
+  for (let y = from.y; y < to.y; y += 1) await page.keyboard.press('ArrowDown');
+  for (let y = from.y; y > to.y; y -= 1) await page.keyboard.press('ArrowUp');
+  await expect.poll(() => readCursor(page)).toEqual(to);
 };
 
 const enableKeyboardPlacement = async (page: Page): Promise<void> => {
@@ -102,29 +108,54 @@ const selectStation = async (
   );
 };
 
-const commitRailDraft = async (page: Page): Promise<void> => {
-  // A real mouse click at the map action bar's commit button: raw input at the
-  // button's coordinates, immune to the actionability scroll loop that hung on
-  // this bar and to keyboard-activation quirks.
-  const buildRail = page.getByRole('button', { name: 'Build rail' });
-  await expect(buildRail).toBeEnabled();
-  const box = await buildRail.boundingBox();
-  expect(box).not.toBeNull();
-  await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
-  // A cleared draft disables the button again; a rejected path leaves it armed.
-  await expect(buildRail).toBeDisabled();
-};
-
-const drawRailPath = async (
+const placeRailLines = async (
   page: Page,
   points: readonly HookupCell[],
 ): Promise<void> => {
-  await canvas(page).press('t');
-  for (const point of points) {
-    await moveCursor(page, point);
-    await canvas(page).press('Enter');
-  }
-  await commitRailDraft(page);
+  // Keep this topology test focused on connections: each straight section is
+  // one production worker command. Pointer release is exercised in world.spec.
+  await page.evaluate(async (path) => {
+    const databasePath = '/src/persistence/index.ts';
+    const clientPath = '/src/world/client.ts';
+    const domainPath = '/src/domain/index.ts';
+    const { database } = (await import(databasePath)) as typeof DatabaseModule;
+    const { WorldClient } = (await import(clientPath)) as typeof ClientModule;
+    const { parseExact } = (await import(domainPath)) as typeof DomainModule;
+    const saved = await database.worlds.get('main');
+    if (!saved) throw new Error('World save is missing');
+    const client = new WorldClient();
+    try {
+      await client.load(parseExact<SerializedWorldState>(saved.payload));
+      for (let index = 1; index < path.length; index += 1) {
+        const start = path[index - 1]!;
+        const end = path[index]!;
+        if (start.x !== end.x && start.y !== end.y)
+          throw new Error('Each test rail line must be cardinal');
+        await client.command({
+          type: 'PLACE_RAIL_PATH',
+          points: [start, end],
+        });
+      }
+      const checkpoint = await client.save(true);
+      if (checkpoint.payload === undefined)
+        throw new Error('World worker did not return a save payload');
+      await database.worlds.put({
+        ...saved,
+        revision: checkpoint.snapshot.revision,
+        savedAt: new Date().toISOString(),
+        payload: checkpoint.payload,
+      });
+    } finally {
+      client.dispose();
+    }
+  }, points);
+};
+
+const reopenWorld = async (page: Page): Promise<void> => {
+  await page.reload();
+  await page.getByRole('button', { name: 'World', exact: true }).click();
+  await expect(canvas(page)).toBeVisible({ timeout: 30_000 });
+  await enableKeyboardPlacement(page);
 };
 
 const drawDeliveryRail = async (
@@ -140,24 +171,28 @@ const drawDeliveryRail = async (
   const hubDepot = draws.find((draw) => draw.kind === 'depot');
   expect(hubStation).toBeDefined();
   expect(hubDepot).toBeDefined();
-  // Delivery direction: hub depot -> hub station -> this hookup cell.
-  await drawRailPath(page, [
+  // Keep the trunk south of the starter buildings and approach the new
+  // station from its eastern side, outside both occupied footprints.
+  const delivery = [
     { x: hubDepot!.x, y: hubDepot!.y },
     { x: hubStation!.x, y: hubDepot!.y },
     { x: hubStation!.x, y: hubStation!.y },
-    { x: hook.x, y: hubStation!.y },
+    { x: hubStation!.x, y: hubDepot!.y },
+    { x: hook.x + 1, y: hubDepot!.y },
+    { x: hook.x + 1, y: hook.y },
     hook,
-  ]);
-  // Return leg: rails are one-way, so pods need a route back to the hub
-  // provider to reload. Runs one lane clear of the forward path.
-  await drawRailPath(page, [
+  ];
+  await saveWorld(page);
+  await placeRailLines(page, delivery);
+  // The return direction shares the same clear corridor.
+  await placeRailLines(page, [
     hook,
     { x: hook.x + 1, y: hook.y },
-    { x: hook.x + 1, y: hubStation!.y - 1 },
-    { x: hubStation!.x - 1, y: hubStation!.y - 1 },
-    { x: hubStation!.x - 1, y: hubStation!.y },
+    { x: hook.x + 1, y: hubDepot!.y },
+    { x: hubStation!.x, y: hubDepot!.y },
     { x: hubStation!.x, y: hubStation!.y },
   ]);
+  await reopenWorld(page);
 };
 
 test('station hookup renders crane and marker outside its footprint', async ({
@@ -198,7 +233,7 @@ test('depot shows its own hookup and blocked hookup reports the reason', async (
   const { site, hook } = await placeStation(page);
   await drawDeliveryRail(page, hook);
   const spawn = { x: site.x - 8, y: site.y - 8 };
-  const depotSite = { x: spawn.x + 6, y: spawn.y + 10 };
+  const depotSite = { x: spawn.x + 4, y: spawn.y + 8 };
   const depotHook = { x: depotSite.x + 2, y: depotSite.y + 4 };
   await canvas(page).press('p');
   await moveCursor(page, depotSite);
@@ -211,6 +246,17 @@ test('depot shows its own hookup and blocked hookup reports the reason', async (
     fullPage: true,
   });
   await canvas(page).press('Enter');
+  await expect
+    .poll(async () =>
+      (await hookupDraws(page)).find(
+        (draw) => draw.x === depotHook.x && draw.y === depotHook.y,
+      ),
+    )
+    .toMatchObject({ kind: 'construction-site', crane: true });
+  await saveWorld(page);
+  await placeRailLines(page, [hook, { x: hook.x, y: depotHook.y }, depotHook]);
+  await placeRailLines(page, [depotHook, { x: hook.x, y: depotHook.y }, hook]);
+  await reopenWorld(page);
   await page.getByRole('button', { name: 'Play world' }).click();
   await page
     .locator('.world-time-controls')

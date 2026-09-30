@@ -33,6 +33,7 @@ describe('world animation clock', () => {
       state: 'TO_PROVIDER',
       nodeId: asId<RailNodeId>('from'),
       motion: {
+        edgeId: asId('motion-edge'),
         from: gridPoint(0, 0),
         to: gridPoint(10, 0),
         startsAt: 1_000_000n,

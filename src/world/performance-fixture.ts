@@ -1,5 +1,10 @@
 import { asId, gridPoint, gridSize, worldContent } from '../domain';
-import type { StationId, ResourceId } from '../domain';
+import type {
+  StationId,
+  ResourceId,
+  RailNodeId,
+  WorldEntityId,
+} from '../domain';
 import { compileBlueprint, isContract, serializeContract } from '../compiler';
 import { createDemoBlueprint } from '../ui/demo-blueprint';
 import { WorldBuffer } from '../simulation';
@@ -22,11 +27,12 @@ export function createPerformanceFixture() {
   if (!isContract(contract))
     throw new Error('Performance factory must compile');
   const resource = asId<ResourceId>('ironPlate');
+  const podHomes: { index: number; nodeId: RailNodeId }[] = [];
   for (let i = 0; i < 100; i++) {
     const x = 3 + (i % 10) * 25,
       y = 3 + Math.floor(i / 10) * 25;
     for (let dy = 0; dy < 25; dy++)
-      for (let dx = 0; dx < 25; dx++) {
+      for (let dx = -2; dx < 25; dx++) {
         const index = (y + dy) * 256 + x + dx;
         runtime.world.grid.terrain[index] = TerrainKind.BUILDABLE;
         runtime.world.grid.oreKinds[index] = OreKind.NONE;
@@ -59,7 +65,7 @@ export function createPerformanceFixture() {
     const storage = runtime.createConstructionSite({
       targetKind: 'storage',
       transform: {
-        position: gridPoint(x + 4, y + 6),
+        position: gridPoint(x - 2, y + 8),
         size: gridSize(4, 4),
         rotation: 0,
       },
@@ -67,7 +73,7 @@ export function createPerformanceFixture() {
       cost: [],
     });
     runtime.storageInventories.get(storage.id)!.add(resource, 500);
-    runtime.configureStation(storage.id, resource, 'provide', 0, 0);
+    runtime.configureStation(storage.id, resource, 'passive-provider', 0, 0);
     if (i < 90) {
       const factory = runtime.createConstructionSite({
         targetKind: 'factory',
@@ -101,7 +107,6 @@ export function createPerformanceFixture() {
         kind: 'depot',
         railNodeId: asId(`fixture-depot-node-${i}`),
         podCapacity: 2,
-        podIds: [],
         transform: depotTransform,
         createdAt: 0n,
       });
@@ -121,10 +126,11 @@ export function createPerformanceFixture() {
         cost: [],
         resourceId: asId('ironOre'),
       });
-      runtime.placeDrill(mine.id, asId(`fixture-drill-${i}`), point);
+      const drillId = asId<WorldEntityId>(`fixture-drill-${i}`);
+      runtime.placeDrill(mine.id, drillId, point);
       for (const cost of worldContent.drill.buildCost)
         runtime.traffic.stations
-          .get(`drill-build:${mine.id}:${cost.resourceId}`)!
+          .get(`drill-build:${drillId}:${cost.resourceId}`)!
           .buffer!.add(cost.quantity);
     }
     runtime.addTrafficStation({
@@ -147,13 +153,17 @@ export function createPerformanceFixture() {
       maxBatch: 0,
       depotCapacity: 2,
     });
+    podHomes.push({ index: i, nodeId: b.id });
+  }
+  // Start traffic after topology is complete so construction does not repeatedly
+  // invalidate route caches while adding the remaining disconnected districts.
+  for (const { index, nodeId } of podHomes)
     for (let pod = 0; pod < 2; pod++)
       runtime.addPod(
-        `fixture-pod-${i}-${pod}`,
-        b.id,
-        `fixture-depot-station-${i}`,
+        `fixture-pod-${index}-${pod}`,
+        nodeId,
+        `fixture-depot-station-${index}`,
       );
-  }
   runtime.setTimeControl(false, 1);
   runtime.advanceTo(1n);
   runtime.takeGridChanges();

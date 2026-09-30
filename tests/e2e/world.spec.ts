@@ -117,6 +117,53 @@ test('missing assets retry and WebGL capability fallback keep world controls usa
   await expect(page.locator('.world-save-state')).not.toHaveText('Save failed');
 });
 
+test('releases a hidden world renderer after 30 seconds and restores it on return', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.clock.install();
+  await page.goto('/');
+  await page.getByRole('button', { name: 'World', exact: true }).click();
+  const canvas = page.locator('canvas[data-renderer-ready="true"]');
+  await expect(canvas).toBeVisible({ timeout: 30_000 });
+
+  await page.getByRole('button', { name: 'Rotate camera right' }).click();
+  await page.getByRole('button', { name: 'World settings' }).click();
+  await page.getByLabel('Graphics quality').selectOption('high');
+  await page.clock.fastForward(200);
+  const cameraKey = await page.evaluate(() =>
+    Object.keys(localStorage).find((key) =>
+      key.startsWith('factory-world-camera-v1:'),
+    ),
+  );
+  expect(cameraKey).toBeDefined();
+  const cameraBeforeRelease = await page.evaluate((key) => {
+    if (key === undefined) return null;
+    return localStorage.getItem(key);
+  }, cameraKey);
+
+  await page.getByRole('button', { name: 'Factory', exact: true }).click();
+  await page.clock.fastForward(5_000);
+  await expect(canvas).toHaveCount(1);
+  await page.getByRole('button', { name: 'World', exact: true }).click();
+  await expect(canvas).toBeVisible();
+
+  await page.getByRole('button', { name: 'Factory', exact: true }).click();
+  await page.clock.fastForward(30_000);
+  await expect(canvas).toHaveCount(0);
+  await page.getByRole('button', { name: 'World', exact: true }).click();
+  await expect(canvas).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByLabel('Graphics quality')).toHaveValue('high');
+  await page.clock.fastForward(200);
+  const cameraAfterReturn = await page.evaluate((key) => {
+    if (key === undefined) return null;
+    return localStorage.getItem(key);
+  }, cameraKey);
+  expect(JSON.parse(cameraAfterReturn!)).toEqual(
+    JSON.parse(cameraBeforeRelease!),
+  );
+});
+
 test('real worker sends extraction and place/remove/rebuild occupancy deltas', async ({
   page,
 }) => {
@@ -480,26 +527,48 @@ test('real worker connects explicit junctions, deduplicates paths and rolls back
   });
 });
 
-test('rail drawing exposes confirmation on the map and submits each path once', async ({
+test('each rail drag places one line immediately and leaves the rail tool active', async ({
   page,
+  context,
 }) => {
   test.setTimeout(60_000);
+  await page.addInitScript(() => {
+    const trackedWindow = window as unknown as Window & {
+      railPaths: { x: number; y: number }[][];
+    };
+    trackedWindow.railPaths = [];
+    const workerPrototype = Worker.prototype as unknown as {
+      postMessage: (...args: unknown[]) => void;
+    };
+    const original = workerPrototype.postMessage;
+    workerPrototype.postMessage = function (this: Worker, ...args: unknown[]) {
+      const message = args[0] as
+        | {
+            type?: string;
+            points?: { x: number; y: number }[];
+          }
+        | undefined;
+      if (message?.type === 'PLACE_RAIL_PATH')
+        trackedWindow.railPaths.push(message.points ?? []);
+      return Reflect.apply(original, this, args);
+    };
+  });
   await page.goto('/');
   await page.getByRole('button', { name: 'World', exact: true }).click();
   const canvas = page.locator('canvas[data-renderer-ready="true"]');
   await expect(canvas).toBeVisible({ timeout: 30_000 });
   await page.getByRole('button', { name: 'Close inspector' }).click();
-  await page
+  const rail = page
     .getByRole('navigation', { name: 'Build tools' })
-    .getByRole('button', { name: 'Rail T' })
-    .click();
-  const actions = page.getByRole('group', { name: 'Rail construction' });
-  const build = actions.getByRole('button', {
-    name: 'Build rail',
-    exact: true,
-  });
-  await expect(actions).toBeVisible();
-  await expect(build).toBeDisabled();
+    .getByRole('button', { name: 'Rail T' });
+  await rail.click();
+  await expect(rail).toHaveAttribute('aria-pressed', 'true');
+  await expect(
+    page.getByRole('group', { name: 'Rail construction' }),
+  ).toHaveCount(0);
+  await expect(page.locator('.world-map-caption')).toContainText(
+    'Drag to draw · release to place',
+  );
   const edges = async () =>
     page.evaluate(async () => {
       const path = '/src/persistence/index.ts';
@@ -507,37 +576,108 @@ test('rail drawing exposes confirmation on the map and submits each path once', 
       return JSON.parse((await database.worlds.get('main')).payload).railEdges
         .length as number;
     });
+  const railCommands = () =>
+    page.evaluate(
+      () =>
+        (window as unknown as Window & { railPaths: unknown[] }).railPaths
+          .length,
+    );
+  const railPaths = () =>
+    page.evaluate(
+      () =>
+        (
+          window as unknown as Window & {
+            railPaths: { x: number; y: number }[][];
+          }
+        ).railPaths,
+    );
   const before = await edges();
   const box = (await canvas.boundingBox())!;
-  const x = box.x + box.width * 0.4,
-    y = box.y + box.height * 0.5;
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x + 120, y + 30, { steps: 5 });
-  await page.mouse.up();
-  await expect(build).toBeEnabled();
-  await page.screenshot({
-    path: 'docs/visual-baselines/world/rail-build-actions.png',
+  const startX = box.x + box.width * 0.4;
+  const startY = box.y + box.height * 0.5;
+  const endX = startX + 120;
+  const endY = startY + 30;
+  const dragRail = async (
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+  ) => {
+    await page.mouse.move(fromX, fromY);
+    await page.mouse.down();
+    await page.mouse.move(toX, toY, { steps: 5 });
+    await page.mouse.up();
+  };
+  await dragRail(startX, startY, endX, endY);
+  await expect.poll(railCommands).toBe(1);
+  await expect.poll(edges).toBeGreaterThan(before);
+  const firstPath = (await railPaths())[0]!;
+  expect(firstPath).toHaveLength(2);
+  expect(
+    firstPath[0]!.x === firstPath[1]!.x || firstPath[0]!.y === firstPath[1]!.y,
+  ).toBe(true);
+  const afterFirstLine = await edges();
+  await dragRail(endX, endY, startX, startY);
+  await expect.poll(railCommands).toBe(2);
+  await expect.poll(edges).toBeGreaterThan(afterFirstLine);
+  await expect(rail).toHaveAttribute('aria-pressed', 'true');
+
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x: startX, y: startY, id: 1 }],
   });
-  await build.dblclick();
-  await expect.poll(edges).toBe(before + 1);
-  await expect(build).toBeDisabled();
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchMove',
+    touchPoints: [{ x: endX, y: endY, id: 1 }],
+  });
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: [],
+  });
+  await expect.poll(railCommands).toBe(3);
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x: startX, y: startY, id: 1 }],
+  });
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchMove',
+    touchPoints: [{ x: endX, y: endY, id: 1 }],
+  });
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchCancel',
+    touchPoints: [],
+  });
+  await expect.poll(railCommands).toBe(3);
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [
+      { x: startX, y: startY, id: 1 },
+      { x: startX + 40, y: startY, id: 2 },
+    ],
+  });
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchMove',
+    touchPoints: [
+      { x: startX - 20, y: startY + 10, id: 1 },
+      { x: startX + 60, y: startY + 10, id: 2 },
+    ],
+  });
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: [],
+  });
+  await expect.poll(railCommands).toBe(3);
+  await cdp.detach();
+
   await page
     .getByRole('button', { name: 'Keyboard placement', exact: true })
     .click();
   await canvas.press('Enter');
   for (let i = 0; i < 4; i++) await canvas.press('ArrowRight');
   await canvas.press('Enter');
-  await expect(build).toBeEnabled();
-  await build.click();
-  await expect.poll(edges).toBe(before + 2);
-  await actions.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(actions).toHaveCount(0);
-  await expect(
-    page
-      .getByRole('navigation', { name: 'Build tools' })
-      .getByRole('button', { name: 'Select S' }),
-  ).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(railCommands).toBe(2);
+  await expect.poll(edges).toBeGreaterThan(afterFirstLine);
 });
 
 test('late real-worker ghost validation is ignored after rotation, cancellation and world replacement', async ({

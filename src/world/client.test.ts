@@ -10,7 +10,9 @@ import { WorldRuntime } from './runtime';
 import { defaultWorldGenerationConfig } from './model';
 import { serializeWorldRuntime } from './serialization';
 import { createReviewFixture } from './review-fixture';
-import type { WorldDelta, WorldSnapshot } from './protocol';
+import type { WorldDelta } from './protocol';
+import type { WorldSnapshot } from './model';
+import { gridPoint } from '../domain';
 
 function transport(
   reply: (command: WorldCommand) => WorldWorkerResponse | undefined,
@@ -288,6 +290,37 @@ const unchangedDelta = (snapshot: WorldSnapshot): WorldDelta =>
   );
 
 describe('world client grid delta sharing', () => {
+  it('shares cloned unchanged rails but publishes edited nodes and paths', () => {
+    const { runtime } = createReviewFixture();
+    runtime.placeRailPath([gridPoint(18, 18), gridPoint(22, 18)]);
+    const snapshot = runtime.snapshot();
+    expect(snapshot.railEdges.length).toBeGreaterThan(0);
+    const delta = structuredClone(unchangedDelta(snapshot));
+    const clockUpdate = applyWorldDelta(snapshot, delta);
+    expect(clockUpdate.railNodes).toBe(snapshot.railNodes);
+    expect(clockUpdate.railEdges).toBe(snapshot.railEdges);
+    expect(clockUpdate.railBlocks).toBe(delta.railBlocks);
+
+    const edited = {
+      ...delta,
+      railNodes: delta.railNodes.map((node, index) =>
+        index === 0 ? { ...node, kind: 'junction' as const } : node,
+      ),
+      railEdges: delta.railEdges.map((edge, index) =>
+        index === 0
+          ? {
+              ...edge,
+              from: edge.to,
+              to: edge.from,
+              points: [...edge.points].reverse(),
+            }
+          : edge,
+      ),
+    };
+    const topologyUpdate = applyWorldDelta(snapshot, edited);
+    expect(topologyUpdate.railNodes).toBe(edited.railNodes);
+    expect(topologyUpdate.railEdges).toBe(edited.railEdges);
+  });
   it('preserves the grid when a clock delta changes no cells', () => {
     const snapshot = WorldRuntime.generate({
       ...defaultWorldGenerationConfig('client-grid-sharing'),
