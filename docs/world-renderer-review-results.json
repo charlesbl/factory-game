@@ -564,29 +564,29 @@
   "drawingRatio": 2,
   "reloads": [
     {
-      "geometries": 27,
+      "geometries": 32,
       "textures": 3,
-      "objects": 16
+      "objects": 18
     },
     {
-      "geometries": 27,
+      "geometries": 32,
       "textures": 3,
-      "objects": 16
+      "objects": 18
     },
     {
-      "geometries": 27,
+      "geometries": 32,
       "textures": 3,
-      "objects": 16
+      "objects": 18
     },
     {
-      "geometries": 27,
+      "geometries": 32,
       "textures": 3,
-      "objects": 16
+      "objects": 18
     },
     {
-      "geometries": 27,
+      "geometries": 32,
       "textures": 3,
-      "objects": 16
+      "objects": 18
     }
   ],
   "unchangedTopology": true,

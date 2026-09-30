@@ -23,6 +23,12 @@ missions on directional rail.
 7. Publish structured mission, route, queue, reservation, cargo, and gridlock
    diagnostics for the world inspector.
 
+Stations expose three logistics modes: Request maintains a target amount,
+Passive provider offers available stock only to requests, and Active provider
+first serves all matching requests, then ships remaining stock to storage with
+free capacity. Storage space is reserved across all incoming missions so
+multiple active providers cannot overfill the same inventory.
+
 ## Tests and acceptance
 
 - No block can have two occupants or reservations in any generated event trace.

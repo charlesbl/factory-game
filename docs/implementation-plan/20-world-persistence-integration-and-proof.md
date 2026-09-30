@@ -16,8 +16,8 @@ the V1 scale.
 2. Version every command and response, attach world revisions, return snapshots
    or deltas, and reject stale UI responses.
 3. Save the complete grid, remaining ore, entities, contracts, inventories, rail,
-   blocks, pods, missions, reservations, construction states, and logical time in
-   one IndexedDB transaction.
+   blocks, pods, missions, reservations, construction and dismantling states, and
+   logical time in one IndexedDB transaction.
 4. Accept only the current save schema. Remove legacy migrations, recovery
    adapters, and partial legacy imports; reject incompatible data before writes.
 5. Advance live and offline play through the same event handlers with a resumable

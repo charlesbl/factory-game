@@ -1,40 +1,50 @@
-# Priority 1 — Final qualification of the 3D world and interface
+# Priority 1 — 3D world and interface qualification
 
-Status as of 2026-09-28: the Three.js implementation is in place; final 1F/1G qualification remains open.
+Status as of 2026-09-29: integration and final qualification are complete.
+Functional acceptance (1F) passes. The performance record (1G) is complete with
+measured exceptions; strict compliance with every original budget is **not**
+achieved. No change to those budgets or user acceptance of exceptions is assumed.
 
-This plan contains only unfinished work. Completed implementation, migration, and acceptance work has been removed. Automated test work is omitted as requested.
+## Integration completed
 
-## Remaining work
+- Connected depot pod production and cancellation to the world commands.
+- Restored keyboard previews, overlays and minimap after renderer recreation;
+  cleaned up camera persistence listeners when renderer creation fails.
+- Corrected the minimap viewport projection and retained camera persistence.
+- Avoided unnecessary logistics route searches when no idle pod or unmet demand
+  exists. Updated the representative fixtures for the current building footprints.
 
-### 1. Refresh the production performance profile
+## Qualification record
 
-Run the isolated production-browser profile after the 2026-09-28 rail and lifecycle corrections. Use the existing 256 × 256 fixture (500 entities, 200 moving pods, 2,000 rail cells) and fixed camera/build route. Record Standard, Low, and High results in [performance.md](../performance.md) and refresh its raw report.
+| Area | Result and evidence |
+|---|---|
+| Production performance | Isolated Standard, Low and High profiles on the 256 × 256 world: 500 entities, 200 moving pods and 2,000 directed rail cells. Hardware and all exceptions are recorded in [performance.md](../performance.md). |
+| Large world | Refreshed 1024 × 1024 working and overview metrics after readiness, with [raw evidence](../world-qualification-results.json). |
+| Exterior hookups and rail clearance | Station/depot markers remain outside rotated footprints. Connection flows and footprint rejection pass; a rejected crossing retains its editable draft and reason. [Integration evidence](../world-integration-review-results.json). |
+| Models and LOD | All 69 GLBs load. Same-camera before/after captures and three-LOD inspection cover straight rails, corners, junctions, hookups, station, depot and factory. [Model evidence](../world-model-review-results.json). |
+| Final captures | Refreshed desktop/narrow HUD, close/normal/overview, construction, blocked traffic, previews and rail/model captures. [Capture index](../visual-baselines/world/README.md). |
+| Placed factory editing | Selecting a placed factory opens its blueprint even when the catalogue selection differs; edits preserve the placed instance until explicit replacement and its footprint/cost/recovery confirmation. Targeted browser scenarios passed. |
+| Stopped machinery | Waiting/output-blocked factories and a drill with full output retain stationary animation transforms; inspectors use the worker's known state. Model report and state browser scenarios passed. |
+| Renderer lifecycle | Twenty world/editor switches retain identical geometry/texture/object counts. Five renderer reloads retain stable resources. Forced WebGL loss/restoration restores the same ghost and visible minimap. |
 
-Resolve or explicitly document the outstanding budget exceptions from the previous sample: main-thread tasks above 50 ms, the 10 publications/s target, and draw calls above the original 200/350 targets. Compare frame pacing and interaction feedback with their stated budgets.
+## Validation scope
 
-Refresh the 1024 × 1024 overview measurement and capture after renderer readiness reports its final metrics. The current working-view evidence predates that readiness correction.
+Production build, TypeScript, asset validation (23 assets / 69 GLBs), targeted
+lint/format checks, 46 focused unit tests and the 500-entity performance fixture
+passed. Ten targeted browser scenarios passed across separate runs: placed
+factory selection/edit/replacement, camera persistence, exterior hookups,
+construction, dismantling, paused save/load and stopped machinery. The camera
+scenario uses CPU minimap readback to avoid a Chromium GPU/CPU rasterizer switch
+changing its image hash. The full repository suite was not run.
 
-### 2. Keep station/depot hookups visible and prevent rails from crossing buildings
+## Performance exceptions
 
-The 3D hookup crane and marker already exist. Preserve and qualify them as the clear connection point for each Station and Depot. The marker plate itself must sit fully outside the rotated building footprint, beside the exterior on the rail-connection side, aligned with the hookup cell used by the worker; it must never appear inside or overlap the building volume. The crane arm may reach from the building to this exterior marker. Keep the marker clearly readable at normal zoom.
+The original 200 main / 350 total draw submissions, routine main-thread tasks
+below 50 ms and sustained 10 publications/s targets remain the reference.
+Standard/High frame pacing, task outliers, publication cadence and draw submissions
+have explicit measured exceptions in [performance.md](../performance.md).
+The 1024 × 1024 overview is reported separately as a visibility stress case.
 
-Add rail-path clearance validation against occupied building cells. Check every cell traversed by each orthogonal segment, including segments whose endpoints are outside the building. Apply the same rule to the placement preview and the worker's final command so no new rail can pass through any building footprint. A Station or Depot may be connected only at its external hookup cell. Keep a rejected draft editable and show why it was rejected.
-
-### 3. Check model fidelity after loading and during LOD changes
-
-Compare representative production models at the same camera and zoom before and after asset loading, then inspect them at close, normal, and overview distances as LOD changes. Include straight rails, turns, junctions, and station/depot hookups.
-
-Confirm that loading or LOD selection does not replace a detailed model with the wrong or incomplete shape. Rails must remain continuous and recognisable; a reduction in detail at distance is acceptable only when the intended LOD preserves their silhouette and connection geometry. If the reported loss of detail reproduces, correct the asset selection, LOD transition, or model assembly and capture the before/after result.
-
-### 4. Refresh final ready-state captures
-
-Regenerate the primary production captures that predate the 2026-09-28 interface and rail changes. Cover the normal world view, close/normal/overview cameras, desktop and narrow HUD, construction, blocked traffic, and valid/invalid previews. Include a valid rail connection at a station/depot hookup, showing the marker beside and outside the building; a rejected rail crossing through a building; and the representative models after loading at the tested LODs. Keep the already refreshed rail-action and station/depot hookup captures. Update the [capture index](../visual-baselines/world/README.md).
-
-### 5. Finish the remaining in-app acceptance flows
-
-- Select and open a placed factory that differs from the catalogue selection, edit its blueprint, verify the placed instance stays unchanged, then explicitly replace it and review the footprint, cost, and recovery confirmation.
-- Show a factory waiting on input or blocked on output, and a drill whose mine output is full. Confirm machinery animation stops and the inspector reports only the state the worker knows.
-
-### 6. Close the 1F/1G qualification record
-
-After the items above, record the final gate status and any accepted performance exceptions here and in the performance report.
+The requested qualification work is closed with these exceptions documented.
+Further optimization is required before claiming a strict performance-budget pass;
+no budget relaxation has been approved.

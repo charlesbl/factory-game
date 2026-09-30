@@ -1,13 +1,23 @@
 /* global indexedDB, document, requestAnimationFrame, getComputedStyle */
-import { chromium } from '@playwright/test';
+import { launchWorldBrowser } from './world-browser.mjs';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 const origin = process.env.WORLD_URL ?? 'http://127.0.0.1:4173';
 const directory = 'docs/visual-baselines/world';
 await mkdir(directory, { recursive: true });
-const browser = await chromium.launch({
-  args: ['--use-angle=d3d11', '--enable-gpu'],
-});
-const results = { browser: browser.version() };
+const browser = await launchWorldBrowser();
+const results = {
+  recordedAt: new Date().toISOString(),
+  browser: browser.version(),
+  platform: process.platform,
+};
+const checkpoint = async (stage) => {
+  results.stage = stage;
+  await writeFile(
+    'docs/world-qualification-results.json',
+    JSON.stringify(results, null, 2) + '\n',
+  );
+  console.log(stage);
+};
 async function enter(fixtureName, cold = false) {
   const context = await browser.newContext({
     viewport: { width: 1366, height: 768 },
@@ -67,12 +77,21 @@ async function enter(fixtureName, cold = false) {
     .locator('canvas[data-renderer-ready="true"]')
     .waitFor({ timeout: 120_000 });
   const assetsReadyMs = Date.now() - start;
+  const gpu = await page
+    .locator('canvas[data-renderer-ready="true"]')
+    .evaluate((canvas) => {
+      const gl = canvas.getContext('webgl2');
+      const extension = gl.getExtension('WEBGL_debug_renderer_info');
+      return extension
+        ? gl.getParameter(extension.UNMASKED_RENDERER_WEBGL)
+        : 'unreported';
+    });
   await page.waitForFunction(() => {
     const value = document.querySelector('canvas[data-world-stats]')?.dataset
       .worldStats;
     return value && JSON.parse(value).ready;
   });
-  return { context, page, firstFrameMs, assetsReadyMs, transferredBytes };
+  return { context, page, firstFrameMs, assetsReadyMs, transferredBytes, gpu };
 }
 const stats = (page) =>
   page
@@ -81,12 +100,14 @@ const stats = (page) =>
 try {
   const cold = await enter(undefined, true);
   results.cold = {
+    gpu: cold.gpu,
     firstFrameMs: cold.firstFrameMs,
     assetsReadyMs: cold.assetsReadyMs,
     transferredBytes: cold.transferredBytes,
   };
   await cold.page.screenshot({ path: `${directory}/starter-1366.png` });
   await cold.context.close();
+  await checkpoint('cold-ready');
   const standard = await enter('world-performance-v1');
   let page = standard.page;
   await page.getByRole('button', { name: 'Pause world' }).click();
@@ -100,8 +121,10 @@ try {
     await page.locator('canvas[data-renderer-ready="true"]').waitFor();
     await page.waitForTimeout(1100);
     results.switches.push(await stats(page));
+    console.log(`Workspace switch ${i}/20`);
   }
   await standard.context.close();
+  await checkpoint('workspace-switches-ready');
   const visual = await enter('world-visual-v1');
   page = visual.page;
   await page.getByRole('button', { name: /^factory.*128, 128$/i }).click();
@@ -119,6 +142,7 @@ try {
           exact: true,
         })
         .click();
+    await page.waitForTimeout(700);
     await page.screenshot({ path: `${directory}/finished-${label}-1366.png` });
   }
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -197,6 +221,7 @@ try {
     });
   });
   await visual.context.close();
+  await checkpoint('visual-captures-ready');
   const large = await enter('world-large-v1');
   results.large = {
     firstFrameMs: large.firstFrameMs,
@@ -212,6 +237,7 @@ try {
   results.large.overview = await stats(large.page);
   await large.page.screenshot({ path: `${directory}/large-overview.png` });
   await large.context.close();
+  await checkpoint('large-overview-ready');
   const gallery = await browser.newPage({
     viewport: { width: 700, height: 520 },
   });
@@ -219,8 +245,12 @@ try {
   await gallery
     .locator('canvas[data-renderer-ready="true"]')
     .waitFor({ timeout: 60_000 });
+  const manifest = await (
+    await gallery.request.get(origin + '/assets/world/manifest.json')
+  ).json();
   await gallery.waitForFunction(
-    () => document.querySelectorAll('select')[0]?.options.length === 21,
+    (count) => document.querySelectorAll('select')[0]?.options.length === count,
+    manifest.assets.length,
   );
   const ids = await gallery
     .getByLabel('Asset', { exact: true })
@@ -254,10 +284,7 @@ try {
   });
   results.gallery = { assets: ids, lods: 3, rotations: 4 };
   await gallery.close();
-  await writeFile(
-    'docs/world-qualification-results.json',
-    JSON.stringify(results, null, 2) + '\n',
-  );
+  await checkpoint('complete');
   console.log(
     JSON.stringify({
       cold: results.cold,

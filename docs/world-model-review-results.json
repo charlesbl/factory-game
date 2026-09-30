@@ -1,0 +1,86 @@
+{
+  "recordedAt": "2026-09-28T21:06:57.993Z",
+  "browser": "149.0.7827.55",
+  "assembly": {
+    "loadedModels": 69,
+    "hookups": [
+      {
+        "nodeId": "rail-node-1",
+        "kind": "station",
+        "x": 11,
+        "y": 12,
+        "crane": true
+      },
+      {
+        "nodeId": "rail-starter-depot",
+        "kind": "depot",
+        "x": 38,
+        "y": 34,
+        "crane": true
+      },
+      {
+        "nodeId": "rail-starter-storage",
+        "kind": "station",
+        "x": 27,
+        "y": 33,
+        "crane": true
+      }
+    ]
+  },
+  "stoppedMachinery": {
+    "before": {
+      "fans": [
+        [
+          "site-13-5",
+          0
+        ],
+        [
+          "site-19-6",
+          0
+        ]
+      ],
+      "drills": [
+        [
+          "states-drill",
+          1.1200000047683716
+        ]
+      ]
+    },
+    "after": {
+      "fans": [
+        [
+          "site-13-5",
+          0
+        ],
+        [
+          "site-19-6",
+          0
+        ]
+      ],
+      "drills": [
+        [
+          "states-drill",
+          1.1200000047683716
+        ]
+      ]
+    },
+    "runningEntities": [],
+    "extractingDrills": []
+  },
+  "models": [
+    "rail-straight",
+    "rail-corner",
+    "rail-junction",
+    "hookup-marker",
+    "hookup-crane",
+    "station",
+    "depot",
+    "factory"
+  ],
+  "lods": [
+    0,
+    1,
+    2
+  ],
+  "errors": []
+}

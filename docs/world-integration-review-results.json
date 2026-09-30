@@ -1,0 +1,13 @@
+{
+  "recordedAt": "2026-09-28T21:07:34.835Z",
+  "browser": "149.0.7827.55",
+  "podQueueAndCancel": true,
+  "railRejection": "Rail crosses a building at 118, 128. Route around its footprint; connect stations and depots at their exterior hookup.",
+  "draftPreserved": true,
+  "contextRestoration": {
+    "ghostBefore": "127,130,valid",
+    "ghostAfter": "127,130,valid",
+    "minimap": true
+  },
+  "errors": []
+}

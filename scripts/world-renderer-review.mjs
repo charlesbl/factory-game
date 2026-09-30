@@ -1,8 +1,6 @@
-﻿import { chromium } from '@playwright/test';
+import { launchWorldBrowser } from './world-browser.mjs';
 import { writeFile } from 'node:fs/promises';
-const browser = await chromium.launch({
-  args: ['--use-angle=d3d11', '--enable-gpu'],
-});
+const browser = await launchWorldBrowser();
 try {
   const page = await browser.newPage({
     viewport: { width: 900, height: 700 },
@@ -73,7 +71,6 @@ try {
         renderer.setSnapshot(snapshot);
         renderer.setTransient({
           activeTool: 'factory',
-          railDraft: [],
           selectedEntityId: entity.id,
           ghost: { kind: 'factory', transform: entity.transform, valid: false },
         });
@@ -185,7 +182,7 @@ try {
       ) === undefined,
       'Outside hit clamped into map',
     );
-    renderer.setTransient({ activeTool: 'select', railDraft: [] });
+    renderer.setTransient({ activeTool: 'select' });
     const reloads = [];
     for (let i = 0; i < 5; i++) {
       renderer.setSnapshot({ ...base, worldId: base.worldId + ':' + i });

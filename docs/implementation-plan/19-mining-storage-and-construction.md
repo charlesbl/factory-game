@@ -18,9 +18,11 @@ materials transported by pods.
 3. Implement mine-head placement outside deposits and connected drill ghosts on
    matching ore, including closest-first construction and per-tile exhaustion.
 4. Implement shared-capacity multi-resource storage with per-resource limits and
-   manual request/provider rules.
-5. Implement exact dismantling, priority recovery buffers, request-first salvage,
-   and forced nearest-storage fallback.
+   Request, Passive provider, and Active provider station modes.
+5. Implement exact dismantling, request-first active salvage, then delivery to
+   any storage with free capacity. Dismantling remains cancellable: the building
+   returns as a construction site, requests materials for rebuilding, and
+   retains materials not yet recovered.
 6. Preserve the external station during factory replacement and forbid implicit
    updates from changed blueprint drafts.
 

@@ -1,15 +1,21 @@
-import { chromium } from '@playwright/test';
+import { launchWorldBrowser } from './world-browser.mjs';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { cpus, totalmem, platform, release } from 'node:os';
 
 const origin = process.env.WORLD_URL ?? 'http://127.0.0.1:4173';
 const fixture = JSON.parse(
   await readFile('benchmarks/generated/world-performance-v1.json', 'utf8'),
 );
-const browser = await chromium.launch({
-  args: ['--use-angle=d3d11', '--enable-gpu'],
-});
+const browser = await launchWorldBrowser();
 const results = {
   recordedAt: new Date().toISOString(),
+  machine: {
+    platform: platform(),
+    release: release(),
+    cpu: cpus()[0]?.model,
+    memoryBytes: totalmem(),
+    node: process.version,
+  },
   browser: browser.version(),
   viewport: { width: 1366, height: 768 },
   runs: [],

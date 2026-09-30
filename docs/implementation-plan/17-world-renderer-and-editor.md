@@ -15,7 +15,13 @@ without coupling render frames to simulation state.
 2. Maintain terrain, ore, rail, entity, pod, reservation, selection, and ghost
    layers. Chunk terrain into 32 × 32 containers and cull invisible chunks.
 3. Implement pan, bounded zoom, inverse-camera tile picking, keyboard camera
-   controls, selection, and an accessible entity list.
+   controls, selection, and an accessible entity list. Dismantling uses a mouse
+   drag box that highlights eligible entities whose projected footprints
+   intersect the box and individual rail cells whose projected segments cross
+   it, then dismantles them with one worker command and save on release; Escape
+   cancels it. Active factory dismantling is marked in red and can always be
+   cancelled from its inspector; it returns as a construction site that requests
+   the recovered materials needed to rebuild. Touch dismantling is unsupported.
 4. Interpolate pod motion from logical start/end timestamps. Never send a world
    command from the ticker or derive authoritative position from wall time.
 5. Add tools and previews for directional orthogonal rail, explicit junctions,

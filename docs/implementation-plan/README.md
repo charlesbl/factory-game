@@ -2,9 +2,10 @@
 
 ## Current priority: 3D world and interface overhaul
 
-[1 — 3D world view and game interface](1-3d-world-view-and-interface.md) now
-tracks only the remaining final qualification work for the Three.js migration.
-Completed implementation and acceptance work has been removed from that plan.
+[1 — 3D world view and game interface](1-3d-world-view-and-interface.md) records
+the completed integration and September 29 qualification. Functional acceptance
+is complete; measured performance exceptions remain documented against the
+original budgets. This does not close the independent V1 roadmap below.
 
 ## Earlier roadmap
 
