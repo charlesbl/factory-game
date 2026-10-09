@@ -48,6 +48,7 @@ export type WorldCommand =
     })
   | (RevisionRequest & {
       readonly type: 'VALIDATE_GHOST';
+      readonly replacingEntityId?: WorldEntityId;
       readonly targetKind:
         | 'factory'
         | 'mine'

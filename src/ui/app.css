@@ -786,7 +786,8 @@ button:focus-visible {
 }
 .ports {
   position: absolute;
-  inset: 0;
+  /* Anchors use the outer footprint, including the node's one-pixel border. */
+  inset: -1px;
   pointer-events: none;
 }
 .port-row {

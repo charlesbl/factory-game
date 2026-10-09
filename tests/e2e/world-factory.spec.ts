@@ -12,9 +12,9 @@ import type { Page } from '@playwright/test';
  * definition so the catalogue selection can differ from the placed factory.
  */
 
-const seedWorld = async (page: Page): Promise<void> => {
+const seedWorld = async (page: Page, eastStation = false): Promise<void> => {
   await page.goto('/');
-  await page.evaluate(async () => {
+  await page.evaluate(async (eastStation) => {
     // Dynamic imports cannot be static: these Vite-served modules must load
     // inside the page (same module graph as the app's worker), not in Node.
     const runtimePath = '/src/world/runtime.ts';
@@ -63,15 +63,23 @@ const seedWorld = async (page: Page): Promise<void> => {
       return node;
     };
 
+    const demo = createDemoBlueprint();
+    const compiled = compileBlueprint(demo);
+    if (!isContract(compiled))
+      throw new Error('demo blueprint did not compile');
+    // On the east side, a smaller replacement no longer touches its station.
+    const stationAPosition = eastStation
+      ? gridPoint(11 + compiled.footprint.width, 10)
+      : gridPoint(9, 9);
     // External station A: serves the placed factory and its replacement.
-    const stationANode = runtime.placeControlNode('station', gridPoint(9, 9));
+    const stationANode = runtime.placeControlNode('station', stationAPosition);
     runtime.place({
       id: asId('e2e-station-a'),
       kind: 'station',
       stationId: asId('e2e-station'),
       railNodeId: stationANode.id,
       transform: {
-        position: gridPoint(9, 9),
+        position: stationAPosition,
         size: gridSize(2, 2),
         rotation: 0,
       },
@@ -80,10 +88,6 @@ const seedWorld = async (page: Page): Promise<void> => {
 
     // Placed factory: a `factory-main` instance built through the real
     // construction path with an empty bill (instant completion -> ACTIVE).
-    const demo = createDemoBlueprint();
-    const compiled = compileBlueprint(demo);
-    if (!isContract(compiled))
-      throw new Error('demo blueprint did not compile');
     runtime.createConstructionSite({
       targetKind: 'factory',
       transform: {
@@ -176,7 +180,7 @@ const seedWorld = async (page: Page): Promise<void> => {
       savedAt: new Date().toISOString(),
       payload: stringifyExact(serializeWorldRuntime(runtime)),
     });
-  });
+  }, eastStation);
   await page.reload();
 };
 
@@ -189,6 +193,208 @@ const openWorld = async (page: Page): Promise<void> => {
 
 const listButton = (page: Page, name: string) =>
   page.getByRole('button', { name, exact: true });
+
+test('upgrades a placed factory to the chosen published version and persists its contract', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await seedWorld(page, true);
+  const { targetHash, targetPosition } = await page.evaluate(async () => {
+    const factoriesPath = '/src/factories/index.ts';
+    const compilerPath = '/src/compiler/index.ts';
+    const editorPath = '/src/editor/index.ts';
+    const domainPath = '/src/domain/index.ts';
+    const demoPath = '/src/ui/demo-blueprint.ts';
+    const { loadFactoryLibrary, publishFactoryVersion } = await import(
+      factoriesPath
+    );
+    const { compileBlueprint, isContract } = await import(compilerPath);
+    const { createBlueprint } = await import(editorPath);
+    const { asId } = await import(domainPath);
+    const { createDemoBlueprint } = await import(demoPath);
+    const library = await loadFactoryLibrary();
+    let definition = library.definitions.find(
+      (item: { id: string }) => item.id === 'factory-main',
+    )!;
+    let targetHash = '';
+    // v2 is deliberately neither the latest version nor the active draft.
+    for (const blueprint of [
+      createDemoBlueprint(),
+      createBlueprint(asId('factory-main')),
+      createDemoBlueprint(),
+    ]) {
+      const contract = compileBlueprint(blueprint);
+      if (!isContract(contract)) throw new Error('Version did not compile');
+      const published = await publishFactoryVersion(
+        definition,
+        {
+          factoryId: definition.id,
+          blueprint,
+          autosavedAt: new Date().toISOString(),
+        },
+        contract,
+      );
+      definition = published.definition;
+      if (published.version.version === 2) targetHash = contract.blueprintHash;
+    }
+    const other = library.definitions.find(
+      (item: { id: string }) => item.id === 'factory-b',
+    )!;
+    const otherBlueprint = createBlueprint(other.id);
+    const otherContract = compileBlueprint(otherBlueprint);
+    if (!isContract(otherContract))
+      throw new Error('Other factory did not compile');
+    await publishFactoryVersion(
+      other,
+      {
+        factoryId: other.id,
+        blueprint: otherBlueprint,
+        autosavedAt: new Date().toISOString(),
+      },
+      otherContract,
+    );
+    const demoContract = compileBlueprint(createDemoBlueprint());
+    if (!isContract(demoContract)) throw new Error('Demo did not compile');
+    return {
+      targetHash,
+      targetPosition: { x: 10 + demoContract.footprint.width, y: 10 },
+    };
+  });
+  await page.reload();
+  await page.getByRole('button', { name: 'World', exact: true }).click();
+  await expect(page.locator('.world-three-host canvas')).toBeVisible();
+  // Stop GPU work in software-rendered test environments.
+  await page.locator('.world-three-host canvas').evaluate((element) => {
+    (element as HTMLCanvasElement)
+      .getContext('webgl2')!
+      .getExtension('WEBGL_lose_context')!
+      .loseContext();
+  });
+  await page.locator('.world-object-browser summary').click();
+  await listButton(page, 'Starter iron line · 11, 10').click();
+  const card = page.locator('.world-building-card');
+  const versionSelect = card.getByLabel('Target version');
+  await expect(versionSelect.locator('option')).toHaveCount(3);
+  await expect(
+    card.getByRole('button', { name: 'Upgrade to v3', exact: true }),
+  ).toBeDisabled();
+  await versionSelect.selectOption('2');
+  await card
+    .getByRole('button', { name: 'Upgrade to v2', exact: true })
+    .click();
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.world-replacement-controls')).toBeVisible();
+  await expect(card).toContainText('Current version · v3');
+  // Starting and cancelling placement leave the old factory untouched.
+  await page
+    .getByRole('button', { name: 'Cancel placement', exact: true })
+    .click();
+  await expect(page.locator('.world-replacement-controls')).toHaveCount(0);
+  await card
+    .getByRole('button', { name: 'Upgrade to v2', exact: true })
+    .click();
+  const canvas = page.locator('.world-three-host canvas');
+  await canvas.press('Escape');
+  await expect(page.locator('.world-replacement-controls')).toHaveCount(0);
+  await expect(card).toContainText('Current version · v3');
+  await card
+    .getByRole('button', { name: 'Upgrade to v2', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Keyboard placement', exact: true })
+    .click();
+  const moveCursor = async (to: { x: number; y: number }) => {
+    const text = await page
+      .getByText(/^Cursor \d+, \d+/)
+      .first()
+      .innerText();
+    const [, x, y] = /(\d+), (\d+)/.exec(text)!;
+    await canvas.focus();
+    for (let n = Number(x); n < to.x; n++) await canvas.press('ArrowRight');
+    for (let n = Number(x); n > to.x; n--) await canvas.press('ArrowLeft');
+    for (let n = Number(y); n < to.y; n++) await canvas.press('ArrowDown');
+    for (let n = Number(y); n > to.y; n--) await canvas.press('ArrowUp');
+    await expect(page.locator('.world-keyboard-cursor')).toContainText(
+      `Cursor ${to.x}, ${to.y}`,
+    );
+  };
+  // The old origin becomes disconnected when the version shrinks.
+  await moveCursor({ x: 11, y: 10 });
+  await expect(page.locator('.world-placement-feedback')).toHaveClass(
+    /is-invalid/,
+  );
+  await canvas.press('Enter');
+  await expect(dialog).toHaveCount(0);
+  await expect(card).toContainText('Current version · v3');
+  // Its own occupied cells may be reused, but the station may not be covered.
+  await moveCursor({ x: targetPosition.x + 1, y: targetPosition.y });
+  await expect(page.locator('.world-placement-feedback')).toHaveClass(
+    /is-invalid/,
+  );
+  await canvas.press('Enter');
+  await expect(dialog).toHaveCount(0);
+  await moveCursor(targetPosition);
+  await expect(page.locator('.world-placement-feedback')).toHaveClass(
+    /is-valid/,
+  );
+  await canvas.press('r');
+  await expect(page.locator('.world-placement-feedback')).toContainText('90°');
+  await canvas.press('Enter');
+  await expect(dialog).toContainText('Build factory v2?');
+  await expect(dialog).toContainText('1 × 1 tiles');
+  await expect(dialog).toContainText(
+    `at ${targetPosition.x}, ${targetPosition.y}, rotated 90°`,
+  );
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(card).toContainText('Current version · v3');
+  await canvas.press('Enter');
+  await dialog
+    .getByRole('button', { name: 'Upgrade to v2', exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.world-replacement-controls')).toHaveCount(0);
+  await listButton(
+    page,
+    `Starter iron line · ${targetPosition.x}, ${targetPosition.y}`,
+  ).click();
+  await expect(card).toContainText('Current version · v2');
+  await expect(card).toContainText('1 × 1');
+  await expect(card).toContainText('No external contract rates');
+  await versionSelect.selectOption('2');
+  await expect(
+    card.getByRole('button', { name: 'Upgrade to v2', exact: true }),
+  ).toBeDisabled();
+  await page.getByRole('button', { name: 'Save world now' }).click();
+  await expect(page.locator('.world-save-state')).toHaveText('Saved');
+  const saved = await page.evaluate(async () => {
+    const persistencePath = '/src/persistence/index.ts';
+    const domainPath = '/src/domain/index.ts';
+    const { database } = await import(persistencePath);
+    const { parseExact } = await import(domainPath);
+    return parseExact((await database.worlds.get('main'))!.payload);
+  });
+  expect(
+    saved.factories.find(
+      (item: { contract: { blueprintHash: string } }) =>
+        item.contract.blueprintHash === targetHash,
+    ),
+  ).toBeDefined();
+  expect(
+    saved.entities.find((item: { id: string }) => item.id === 'e2e-station-a'),
+  ).toMatchObject({
+    stationId: 'e2e-station',
+    transform: { position: { y: 10 } },
+  });
+  await page.reload();
+  await page.getByRole('button', { name: 'World', exact: true }).click();
+  await page.locator('.world-object-browser summary').click();
+  await listButton(
+    page,
+    `Starter iron line · ${targetPosition.x}, ${targetPosition.y}`,
+  ).click();
+  await expect(card).toContainText('Current version · v2');
+});
 
 test.describe('placed factory edit/replace and save continuity', () => {
   test.beforeEach(async ({ page }) => {

@@ -1330,6 +1330,7 @@ const App = () => {
             session={worldSession}
             blueprint={blueprint}
             factories={definitions}
+            versions={versions}
             activeFactoryId={activeFactoryId}
             factoryName={activeDefinition?.name ?? 'Factory'}
             contract={contract}

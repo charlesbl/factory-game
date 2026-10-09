@@ -878,3 +878,55 @@ test('blocks an identity cycle and shows the exact published dependency DAG', as
     page.locator('.dependency-canvas').getByText('Factory A · v1'),
   ).toBeVisible();
 });
+
+test('places straight graph segments only on release and cancels outside the canvas', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.getByText('Contract ready')).toBeVisible();
+  await page.getByRole('button', { name: /Intake/ }).click();
+  await placePreview(page, -160, 140);
+  await page.getByRole('button', { name: 'Fit View' }).click();
+  const source = page
+    .locator('.graph-node--external-input')
+    .last()
+    .getByLabel('output Iron ore');
+  const box = await source.boundingBox();
+  expect(box).not.toBeNull();
+  const x = box!.x + box!.width / 2;
+  const y = box!.y + box!.height / 2;
+  await source.click();
+  await expect(page.locator('.route-preview')).toHaveCount(0);
+  await expect(page.locator('.loose-route')).toHaveCount(0);
+  await expect(page.locator('.connection-error')).toHaveCount(0);
+  await source.click({ button: 'right' });
+  await expect(page.locator('.route-preview')).toHaveCount(0);
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 100, y + 60, { steps: 5 });
+  const preview = page.locator('.route-preview');
+  await expect(preview).toBeAttached();
+  await expect(page.locator('.loose-route')).toHaveCount(0);
+  const points = await preview.getAttribute('points');
+  const positions = points!
+    .split(' ')
+    .map((point) => point.split(',').map(Number));
+  expect(positions).toHaveLength(2);
+  expect(positions[0]![1]).toBe(positions[1]![1]);
+  await page.mouse.up();
+  await expect(page.locator('.loose-route')).toHaveAttribute('points', points!);
+  await expect(preview).toHaveCount(0);
+
+  const endpoint = page.getByLabel('Free route endpoint');
+  const free = await endpoint.boundingBox();
+  expect(free).not.toBeNull();
+  await page.mouse.move(free!.x + free!.width / 2, free!.y + free!.height / 2);
+  await page.mouse.down();
+  const canvas = await page.getByLabel('Factory graph editor').boundingBox();
+  expect(canvas).not.toBeNull();
+  await page.mouse.move(canvas!.x - 20, y, { steps: 5 });
+  await page.mouse.up();
+  await expect(preview).toHaveCount(0);
+  await expect(page.locator('.loose-route')).toHaveAttribute('points', points!);
+  await expect(endpoint).toHaveCount(1);
+});

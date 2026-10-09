@@ -78,6 +78,7 @@ export const occupiedCells = (
 export const validatePlacement = (
   grid: WorldGrid,
   transform: WorldTransform,
+  ignoredOccupancySlot?: number,
 ): PlacementResult => {
   if (!validTransform(transform))
     return { valid: false, reason: 'INVALID_TRANSFORM' };
@@ -86,7 +87,10 @@ export const validatePlacement = (
     if (index < 0) return { valid: false, reason: 'OUT_OF_BOUNDS' };
     if (grid.terrain[index] === TerrainKind.OBSTACLE)
       return { valid: false, reason: 'OBSTACLE' };
-    if (grid.occupancy[index] !== 0)
+    if (
+      grid.occupancy[index] !== 0 &&
+      grid.occupancy[index] !== ignoredOccupancySlot
+    )
       return { valid: false, reason: 'OCCUPIED' };
   }
   return { valid: true };

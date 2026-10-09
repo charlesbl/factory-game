@@ -134,6 +134,8 @@ export const FactoryNodeView = ({
                 data-route-node-id={node.id}
                 data-route-port-id={port.id}
                 onPointerDown={(event) => {
+                  if (event.button !== 0) return;
+                  event.preventDefault();
                   event.stopPropagation();
                   data.onPortPointerDown?.(node.id, port.id);
                 }}

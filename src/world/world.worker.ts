@@ -141,6 +141,8 @@ self.onmessage = (event: MessageEvent<WorldCommand>) => {
               },
               command.stationId,
               command.resourceId,
+              false,
+              command.replacingEntityId,
             );
       respond({
         protocolVersion: WORLD_PROTOCOL_VERSION,

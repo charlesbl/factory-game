@@ -162,6 +162,8 @@ export const FactoryGraphEditor = ({
     ConveyorFlowEdge
   > | null>(null);
   const graph = useRef<HTMLDivElement>(null);
+  const connectionPointer = useRef<number | undefined>(undefined);
+  const suppressConnectionClick = useRef(false);
   const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, zoom: 1 });
   const [connectionDrag, setConnectionDrag] = useState<ConnectionDrag>();
   const [handleDrag, setHandleDrag] = useState<HandleDrag>();
@@ -252,10 +254,10 @@ export const FactoryGraphEditor = ({
   }): PortReference | undefined => {
     const instance = flow.current;
     if (instance === null) return undefined;
-    const position = instance.screenToFlowPosition({
-      x: event.clientX,
-      y: event.clientY,
-    });
+    const position = instance.screenToFlowPosition(
+      { x: event.clientX, y: event.clientY },
+      { snapToGrid: false },
+    );
     const threshold = 14 / viewport.zoom;
     return [...blueprint.nodes.values()]
       .flatMap((node) =>
@@ -267,7 +269,18 @@ export const FactoryGraphEditor = ({
           ),
         })),
       )
-      .filter((candidate) => candidate.distance <= threshold)
+      .filter((candidate) => {
+        if (candidate.distance > threshold) return false;
+        const node = blueprint.nodes.get(candidate.reference.nodeId)!;
+        const port = node.ports.find(
+          (port) => port.id === candidate.reference.portId,
+        )!;
+        return (
+          connectionDrag !== undefined &&
+          (node.position.x + port.anchor.x === connectionDrag.start.x ||
+            node.position.y + port.anchor.y === connectionDrag.start.y)
+        );
+      })
       .sort((a, b) => a.distance - b.distance)[0]?.reference;
   };
   const dragOrigin = (drag: ConnectionDrag): PortReference | undefined =>
@@ -658,8 +671,30 @@ export const FactoryGraphEditor = ({
     [controlledSelection, onSelection],
   );
   const commitConnectionDrop = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (connectionDrag === undefined) return;
+    if (
+      connectionDrag === undefined ||
+      connectionPointer.current !== event.pointerId
+    )
+      return;
+    connectionPointer.current = undefined;
+    const bounds = graph.current?.getBoundingClientRect();
+    if (
+      bounds === undefined ||
+      event.clientX < bounds.left ||
+      event.clientX >= bounds.right ||
+      event.clientY < bounds.top ||
+      event.clientY >= bounds.bottom
+    ) {
+      setConnectionDrag(undefined);
+      setPointer(undefined);
+      return;
+    }
     const drop = pointFromEvent(event);
+    if (drop === undefined || samePoint(drop, connectionDrag.start)) {
+      setConnectionDrag(undefined);
+      setPointer(undefined);
+      return;
+    }
     const target = portAtPointer(event);
     if (target !== undefined) {
       const error = validateTarget(connectionDrag, target);
@@ -734,6 +769,7 @@ export const FactoryGraphEditor = ({
         }
         if (connectionDrag !== undefined) {
           event.preventDefault();
+          connectionPointer.current = undefined;
           setConnectionDrag(undefined);
           setPointer(undefined);
           return;
@@ -841,6 +877,10 @@ export const FactoryGraphEditor = ({
   ) => {
     event.preventDefault();
     event.stopPropagation();
+    if (event.button !== 0) return;
+    graph.current?.setPointerCapture(event.pointerId);
+    connectionPointer.current = event.pointerId;
+    suppressConnectionClick.current = true;
     const route = looseConnectionRoute(blueprint, loose);
     const start = route.points.at(-1);
     if (start === undefined) return;
@@ -865,7 +905,30 @@ export const FactoryGraphEditor = ({
       ref={graph}
       className={`graph-canvas${placement === undefined ? '' : ' is-placing'}`}
       aria-label="Factory graph editor"
+      onPointerDownCapture={(event) => {
+        if (connectionPointer.current === undefined)
+          suppressConnectionClick.current = false;
+        const port = (event.target as Element).closest<HTMLElement>(
+          '[data-route-port-id]',
+        );
+        if (
+          event.button === 0 &&
+          placement === undefined &&
+          port?.dataset.routePortId !== undefined &&
+          !isPortOccupied(blueprint, asId<PortId>(port.dataset.routePortId))
+        ) {
+          event.currentTarget.setPointerCapture(event.pointerId);
+          connectionPointer.current = event.pointerId;
+          suppressConnectionClick.current = true;
+        }
+      }}
       onClickCapture={(event) => {
+        if (suppressConnectionClick.current) {
+          suppressConnectionClick.current = false;
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
         if (placement === undefined) return;
         const position = pointFromEvent(event);
         if (position === undefined) return;
@@ -882,6 +945,7 @@ export const FactoryGraphEditor = ({
         }
       }}
       onPointerUpCapture={(event) => {
+        if (connectionDrag === undefined) connectionPointer.current = undefined;
         if (handleDrag !== undefined) {
           const next = pointFromEvent(event) ?? handleDrag.start;
           if (!samePoint(next, handleDrag.start)) {
@@ -901,6 +965,7 @@ export const FactoryGraphEditor = ({
         commitConnectionDrop(event);
       }}
       onPointerCancelCapture={() => {
+        connectionPointer.current = undefined;
         setConnectionDrag(undefined);
         setHandleDrag(undefined);
         setPointer(undefined);
@@ -990,15 +1055,17 @@ export const FactoryGraphEditor = ({
         snapToGrid
         snapGrid={[GRID_SIZE, GRID_SIZE]}
         deleteKeyCode={null}
-        selectionOnDrag
+        selectionOnDrag={connectionDrag === undefined}
         selectionMode={SelectionMode.Partial}
         panOnDrag={[1]}
         panActivationKeyCode="Space"
         minZoom={0.25}
         maxZoom={1.7}
-        nodesDraggable={placement === undefined}
+        nodesDraggable={placement === undefined && connectionDrag === undefined}
         nodesConnectable={false}
-        elementsSelectable={placement === undefined}
+        elementsSelectable={
+          placement === undefined && connectionDrag === undefined
+        }
       >
         <Background
           variant={BackgroundVariant.Dots}
@@ -1278,8 +1345,8 @@ export const FactoryGraphEditor = ({
         )}
         {preview !== undefined && (
           <div className="route-drag-hint">
-            Release on empty space to place a handle · release on a compatible
-            connector to finish · Esc to cancel
+            Drag a straight segment · release to place · release on an aligned
+            compatible connector to finish · Esc to cancel
           </div>
         )}
       </div>

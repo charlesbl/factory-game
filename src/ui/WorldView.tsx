@@ -25,6 +25,7 @@ import type {
 } from '../domain';
 import { serializeContract, type FactoryContract } from '../compiler';
 import type { FactoryBlueprint } from '../editor';
+import type { FactoryVersion } from '../factories';
 import type { WorldSession } from '../application/world/WorldSession';
 import {
   occupiedCells,
@@ -56,6 +57,7 @@ interface Props {
     readonly name: string;
   }[];
   readonly activeFactoryId: FactoryId;
+  readonly versions: readonly FactoryVersion[];
   readonly factoryName: string;
   readonly contract: FactoryContract | undefined;
   readonly compileState: 'compiling' | 'ready' | 'invalid';
@@ -106,6 +108,7 @@ export const WorldView = ({
   hidden = false,
   session,
   factories,
+  versions,
   activeFactoryId,
   factoryName,
   contract,
@@ -133,6 +136,33 @@ export const WorldView = ({
   const [seed, setSeed] = useState('starter-world');
   const [selected, setSelected] = useState<GridPoint>();
   const [selectedEntityId, setSelectedEntityId] = useState<WorldEntity['id']>();
+  const [upgradeSelection, setUpgradeSelection] = useState<{
+    readonly entityId: WorldEntity['id'];
+    readonly version: number;
+  }>();
+  const [replacement, setReplacement] = useState<{
+    readonly entityId: WorldEntity['id'];
+    readonly factoryId: FactoryId;
+    readonly contract: FactoryContract;
+    readonly label: string;
+    readonly confirmText: string;
+    readonly generation: number;
+  }>();
+  const placementContract = replacement?.contract ?? contract;
+  const replacedEntity = snapshot?.entities.find(
+    (entity) => entity.id === replacement?.entityId,
+  );
+  const replacedCells = useMemo(
+    () =>
+      new Set(
+        replacedEntity
+          ? occupiedCells(replacedEntity.transform).map(
+              (cell) => `${cell.x}:${cell.y}`,
+            )
+          : [],
+      ),
+    [replacedEntity],
+  );
   const [selectedPodId, setSelectedPodId] = useState<string>();
   const [showSettings, setShowSettings] = useState(false);
   const [showCatalogue, setShowCatalogue] = useState(false);
@@ -169,10 +199,13 @@ export const WorldView = ({
   const transformFor = useCallback(
     (activeTool: WorldTool, point: GridPoint): WorldTransform | undefined => {
       if (activeTool === 'factory') {
-        if (contract === undefined) return undefined;
+        if (placementContract === undefined) return undefined;
         return {
           position: point,
-          size: gridSize(contract.footprint.width, contract.footprint.height),
+          size: gridSize(
+            placementContract.footprint.width,
+            placementContract.footprint.height,
+          ),
           rotation,
         };
       }
@@ -198,7 +231,7 @@ export const WorldView = ({
         };
       return undefined;
     },
-    [contract, rotation],
+    [placementContract, rotation],
   );
   const stationFor = useCallback(
     (
@@ -207,10 +240,13 @@ export const WorldView = ({
       snapshot?.entities
         .filter(
           (entity): entity is Extract<WorldEntity, { kind: 'station' }> =>
-            entity.kind === 'station' && entity.linkedEntityId === undefined,
+            entity.kind === 'station' &&
+            (replacement
+              ? entity.linkedEntityId === replacement.entityId
+              : entity.linkedEntityId === undefined),
         )
         .find((station) => adjacent(transform, station.transform)),
-    [snapshot],
+    [snapshot, replacement],
   );
   const effectiveBoundMineId = snapshot?.entities.some(
     (entity) => entity.id === boundMineId && entity.kind === 'mine',
@@ -238,13 +274,24 @@ export const WorldView = ({
             valid: false,
             reason: 'Rock obstacles block this footprint.',
           };
-        if (snapshot.grid.occupancy[index] !== 0)
+        if (
+          snapshot.grid.occupancy[index] !== 0 &&
+          !(
+            replacement &&
+            activeTool === 'factory' &&
+            replacedCells.has(`${cell.x}:${cell.y}`)
+          )
+        )
           return {
             valid: false,
             reason: 'Another building occupies this footprint.',
           };
       }
-      if (activeTool === 'factory' && (compileState !== 'ready' || !contract))
+      if (
+        activeTool === 'factory' &&
+        !replacement &&
+        (compileState !== 'ready' || !contract)
+      )
         return {
           valid: false,
           reason: 'Wait for a valid compilation of the current factory draft.',
@@ -255,8 +302,9 @@ export const WorldView = ({
       )
         return {
           valid: false,
-          reason:
-            'A free adjacent station is required for construction deliveries.',
+          reason: replacement
+            ? 'Place the new factory next to its existing station.'
+            : 'A free adjacent station is required for construction deliveries.',
         };
       if (
         activeTool === 'mine' &&
@@ -392,6 +440,8 @@ export const WorldView = ({
       stationFor,
       effectiveBoundMineId,
       mineResource,
+      replacement,
+      replacedCells,
     ],
   );
   const ghostTransform =
@@ -406,7 +456,8 @@ export const WorldView = ({
         ghostTransform,
         effectiveBoundMineId,
         mineResource,
-        contract?.blueprintHash,
+        placementContract?.blueprintHash,
+        replacement?.entityId,
         compileState,
         stationFor(ghostTransform)?.stationId,
       ])
@@ -435,6 +486,7 @@ export const WorldView = ({
     return session.validateLatest(
       {
         type: 'VALIDATE_GHOST',
+        ...(replacement ? { replacingEntityId: replacement.entityId } : {}),
         targetKind: tool as
           | 'factory'
           | 'mine'
@@ -497,6 +549,31 @@ export const WorldView = ({
       ? undefined
       : snapshot.entities.find((entity) => entity.id === selectedEntityId);
   const selectedPod = snapshot?.pods.find((pod) => pod.id === selectedPodId);
+  const placedVersions = useMemo(
+    () =>
+      selectedEntity?.kind === 'factory'
+        ? versions
+            .filter((version) => version.factoryId === selectedEntity.factoryId)
+            .sort((a, b) => b.version - a.version)
+        : [],
+    [selectedEntity, versions],
+  );
+  const placedFactoryState = snapshot?.buildings.find(
+    (building) => building.entityId === selectedEntityId,
+  );
+  const placedContractHash =
+    placedFactoryState?.kind === 'factory'
+      ? placedFactoryState.contract.blueprintHash
+      : undefined;
+  const currentVersion = placedVersions.find(
+    (version) => version.contract.blueprintHash === placedContractHash,
+  );
+  const upgradeVersion =
+    (upgradeSelection && upgradeSelection.entityId === selectedEntityId
+      ? placedVersions.find(
+          (version) => version.version === upgradeSelection.version,
+        )
+      : undefined) ?? placedVersions[0];
   const factoryOptions = useMemo(() => {
     const query = catalogueQuery.trim().toLowerCase();
     return factories.filter(
@@ -593,6 +670,7 @@ export const WorldView = ({
         setBoundMineId(mineId);
       } else setBoundMineId(undefined);
       setTool(next);
+      setReplacement(undefined);
       setError(undefined);
     },
     [selectedEntity],
@@ -601,6 +679,28 @@ export const WorldView = ({
     selectedRailEdgeId === undefined || snapshot === undefined
       ? undefined
       : snapshot.railEdges.find((e) => e.id === selectedRailEdgeId);
+  const beginReplacement = (
+    entity: Extract<WorldEntity, { kind: 'factory' }>,
+    targetContract: FactoryContract,
+    factoryId: FactoryId,
+    label: string,
+    confirmText: string,
+  ) => {
+    setReplacement({
+      entityId: entity.id,
+      factoryId,
+      contract: targetContract,
+      label,
+      confirmText,
+      generation: sessionState.generation,
+    });
+    setTool('factory');
+    setRotation(entity.transform.rotation);
+    setHovered(entity.transform.position);
+    setShowCatalogue(false);
+    setError(undefined);
+    workspaceRef.current?.focus();
+  };
 
   const placementContext = JSON.stringify([
     tool,
@@ -609,6 +709,8 @@ export const WorldView = ({
     effectiveBoundMineId,
     activeFactoryId,
     contract?.blueprintHash,
+    replacement?.entityId,
+    replacement?.contract.blueprintHash,
     compileState,
     sessionState.generation,
   ]);
@@ -646,13 +748,23 @@ export const WorldView = ({
       if (pendingPlacementsRef.current.has(key)) return;
       pendingPlacementsRef.current.add(key);
       try {
+        if (
+          replacement &&
+          (replacement.generation !== sessionState.generation ||
+            replacedEntity?.kind !== 'factory' ||
+            replacedEntity.state === 'DISMANTLING')
+        ) {
+          chooseTool('select');
+          setError('The factory being replaced is no longer available.');
+          return;
+        }
         setSelected(point);
         if (tool === 'select') {
           if (snapshot !== undefined)
             setSelectedEntityId(entityAt(snapshot, point)?.id);
           return;
         }
-        setSelectedEntityId(undefined);
+        if (!replacement) setSelectedEntityId(undefined);
         setSelectedPodId(undefined);
         setSelectedRailEdgeId(undefined);
         if (tool === 'rail-erase') {
@@ -703,7 +815,11 @@ export const WorldView = ({
         if (transform === undefined) return;
         const station = stationFor(transform);
         if (station === undefined && tool !== 'depot') {
-          setError('Place one free adjacent station first.');
+          setError(
+            replacement
+              ? 'Place the new factory next to its existing station.'
+              : 'Place one free adjacent station first.',
+          );
           return;
         }
         if (tool === 'mine') {
@@ -713,7 +829,11 @@ export const WorldView = ({
             return;
           }
         }
-        if (tool === 'factory' && (compileState !== 'ready' || !contract)) {
+        if (
+          tool === 'factory' &&
+          !replacement &&
+          (compileState !== 'ready' || !contract)
+        ) {
           setError('The current factory draft needs a valid compilation.');
           return;
         }
@@ -722,6 +842,9 @@ export const WorldView = ({
           (client) =>
             client.command({
               type: 'VALIDATE_GHOST',
+              ...(replacement
+                ? { replacingEntityId: replacement.entityId }
+                : {}),
               targetKind,
               position: transform.position,
               size: transform.size,
@@ -749,6 +872,34 @@ export const WorldView = ({
           setError(
             'Placement cancelled because the building or factory design changed.',
           );
+          return;
+        }
+        if (replacement) {
+          askConfirmation({
+            title: `Build ${replacement.label}?`,
+            message: `The new footprint will be ${transform.size.width} × ${transform.size.height} tiles at ${point.x}, ${point.y}, rotated ${transform.rotation * 90}°, using the existing station. Existing contents will be routed to salvage; the new factory will be rebuilt with ${replacement.contract.billOfMaterials?.reduce((sum, item) => sum + item.quantity, 0) ?? 0} construction items.`,
+            confirmText: replacement.confirmText,
+            action: async () => {
+              const result = await run((client) =>
+                client.command({
+                  type: 'REPLACE_FACTORY',
+                  entityId: replacement.entityId,
+                  position: transform.position,
+                  size: transform.size,
+                  rotation: transform.rotation,
+                  cost: replacement.contract.billOfMaterials ?? [],
+                  factoryId: replacement.factoryId,
+                  instanceId: asId<InstanceId>(`instance-${Date.now()}`),
+                  contract: serializeContract(replacement.contract),
+                }),
+              );
+              if (result !== undefined) {
+                chooseTool('select');
+                setSelectedEntityId(undefined);
+                setHovered(undefined);
+              }
+            },
+          });
           return;
         }
         await run((client) =>
@@ -789,6 +940,11 @@ export const WorldView = ({
       localValidation,
       tool,
       transformFor,
+      replacement,
+      askConfirmation,
+      chooseTool,
+      sessionState.generation,
+      replacedEntity,
     ],
   );
   const regenerate = async () => {
@@ -811,6 +967,8 @@ export const WorldView = ({
       defaultWorldGenerationConfig(seed.trim() || 'starter-world'),
     );
     if (result !== undefined) {
+      setReplacement(undefined);
+      setTool('select');
       setSelected(undefined);
       setSelectedEntityId(undefined);
       setSelectedPodId(undefined);
@@ -818,6 +976,7 @@ export const WorldView = ({
   };
   const reloadLastSavedWorld = async () => {
     await session.replace();
+    setReplacement(undefined);
     setError(undefined);
     setSelected(undefined);
     setSelectedEntityId(undefined);
@@ -908,6 +1067,7 @@ export const WorldView = ({
       }
       if (event.key === 'Delete' || event.key === 'Backspace') {
         event.preventDefault();
+        if (replacement) return;
         if (selectedRailEdgeId !== undefined) {
           const edgeId = selectedRailEdgeId;
           askConfirmation({
@@ -986,6 +1146,7 @@ export const WorldView = ({
       selectedEntity,
       askConfirmation,
       run,
+      replacement,
     ],
   );
   useEffect(() => {
@@ -1054,12 +1215,13 @@ export const WorldView = ({
         item.id,
       ) && matchesQuery(item),
   );
-  const activeToolLabel =
-    tool === 'factory'
+  const activeToolLabel = replacement
+    ? `Place ${replacement.label}`
+    : tool === 'factory'
       ? factoryName
       : (tools.find((item) => item.id === tool)?.label ?? 'Select');
   const toolFootprint = (id: WorldTool) => {
-    if (id === 'factory') return contract?.footprint;
+    if (id === 'factory') return placementContract?.footprint;
     if (id === 'station') return worldContent.stationFootprint;
     if (id === 'drill') return worldContent.drill.footprint;
     if (id === 'junction') return undefined;
@@ -1067,7 +1229,7 @@ export const WorldView = ({
       ?.footprint;
   };
   const toolCost = (id: WorldTool) => {
-    if (id === 'factory') return contract?.billOfMaterials ?? [];
+    if (id === 'factory') return placementContract?.billOfMaterials ?? [];
     if (id === 'drill') return worldContent.drill.buildCost;
     return (
       worldContent.buildings.find((building) => building.kind === id)
@@ -1075,25 +1237,27 @@ export const WorldView = ({
     );
   };
   const toolRequirement = (id: WorldTool) =>
-    ['factory', 'mine', 'storage'].includes(id)
-      ? 'Requires an adjacent free station'
-      : id === 'depot'
-        ? 'Autonomous depot; connect its rail hookup for construction deliveries'
-        : id === 'drill'
-          ? `Bound mine: ${effectiveBoundMineId ?? 'select a mine first'}`
-          : id === 'rail'
-            ? 'Connect endpoints in one straight or orthogonal path'
-            : id === 'junction'
-              ? 'Places a control node; it does not occupy a tile'
-              : id === 'station'
-                ? '2 × 2 station anchor'
-                : id === 'select'
-                  ? 'Click a building to inspect it'
-                  : id === 'rail-erase'
-                    ? 'Click a segment to remove it'
-                    : id === 'dismantle'
-                      ? 'Drag over objects and rail cells · release to dismantle · Esc to cancel'
-                      : '';
+    replacement && id === 'factory'
+      ? 'Move the ghost next to the existing station · R to rotate · Esc to cancel'
+      : ['factory', 'mine', 'storage'].includes(id)
+        ? 'Requires an adjacent free station'
+        : id === 'depot'
+          ? 'Autonomous depot; connect its rail hookup for construction deliveries'
+          : id === 'drill'
+            ? `Bound mine: ${effectiveBoundMineId ?? 'select a mine first'}`
+            : id === 'rail'
+              ? 'Connect endpoints in one straight or orthogonal path'
+              : id === 'junction'
+                ? 'Places a control node; it does not occupy a tile'
+                : id === 'station'
+                  ? '2 × 2 station anchor'
+                  : id === 'select'
+                    ? 'Click a building to inspect it'
+                    : id === 'rail-erase'
+                      ? 'Click a segment to remove it'
+                      : id === 'dismantle'
+                        ? 'Drag over objects and rail cells · release to dismantle · Esc to cancel'
+                        : '';
   return (
     <div
       ref={workspaceRef}
@@ -1702,6 +1866,25 @@ export const WorldView = ({
                 </button>
               </section>
             )}
+            {replacement !== undefined && (
+              <section className="inspector-card world-replacement-controls">
+                <h3>Place {replacement.label}</h3>
+                <p>
+                  Move the ghost next to the existing station. The old factory
+                  remains until you confirm a valid placement.
+                </p>
+                <p>R to rotate · Click or Enter to place · Escape to cancel</p>
+                <button
+                  className="button button--block"
+                  onClick={() => {
+                    chooseTool('select');
+                    setHovered(undefined);
+                  }}
+                >
+                  Cancel placement
+                </button>
+              </section>
+            )}
             {selectedEntity !== undefined && snapshot !== undefined && (
               <section className="inspector-card world-building-card">
                 <h3>
@@ -1768,6 +1951,71 @@ export const WorldView = ({
                     Open placed factory blueprint
                   </button>
                 )}
+                {selectedEntity.kind === 'factory' &&
+                  selectedEntity.state !== 'DISMANTLING' && (
+                    <div className="world-buffer-group">
+                      <h4>Factory version</h4>
+                      <p>
+                        {currentVersion
+                          ? `Current version · v${currentVersion.version}`
+                          : 'Current design · unpublished'}
+                      </p>
+                      {upgradeVersion === undefined ? (
+                        <p className="world-empty-state">
+                          Publish a factory version to upgrade this building.
+                        </p>
+                      ) : (
+                        <>
+                          <label>
+                            Target version
+                            <select
+                              value={upgradeVersion.version}
+                              disabled={busy || replacement !== undefined}
+                              onChange={(event) =>
+                                setUpgradeSelection({
+                                  entityId: selectedEntity.id,
+                                  version: Number(event.target.value),
+                                })
+                              }
+                            >
+                              {placedVersions.map((version) => (
+                                <option
+                                  key={version.version}
+                                  value={version.version}
+                                >
+                                  v{version.version}
+                                  {version.contract.blueprintHash ===
+                                  placedContractHash
+                                    ? ' · current design'
+                                    : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <button
+                            className="button button--primary button--block"
+                            disabled={
+                              busy ||
+                              replacement !== undefined ||
+                              upgradeVersion.contract.blueprintHash ===
+                                placedContractHash
+                            }
+                            onClick={() =>
+                              beginReplacement(
+                                selectedEntity,
+                                upgradeVersion.contract,
+                                selectedEntity.factoryId,
+                                `factory v${upgradeVersion.version}`,
+                                `Upgrade to v${upgradeVersion.version}`,
+                              )
+                            }
+                          >
+                            Upgrade to v{upgradeVersion.version}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 {isEntityDismantling(selectedEntity) ? (
                   <>
                     <button
@@ -1863,32 +2111,15 @@ export const WorldView = ({
                   compileState === 'ready' && (
                     <button
                       className="button button--primary button--block"
+                      disabled={busy || replacement !== undefined}
                       onClick={() =>
-                        askConfirmation({
-                          title: 'Replace placed factory?',
-                          message: `The new footprint will be ${contract.footprint.width} × ${contract.footprint.height} tiles at the same position, orientation and station. Existing contents will be routed to salvage; the new factory will be rebuilt with ${contract.billOfMaterials?.reduce((sum, item) => sum + item.quantity, 0) ?? 0} construction items.`,
-                          confirmText: 'Replace factory',
-                          action: async () => {
-                            await run((client) =>
-                              client.command({
-                                type: 'REPLACE_FACTORY',
-                                entityId: selectedEntity.id,
-                                position: selectedEntity.transform.position,
-                                size: gridSize(
-                                  contract.footprint.width,
-                                  contract.footprint.height,
-                                ),
-                                rotation: selectedEntity.transform.rotation,
-                                cost: contract.billOfMaterials ?? [],
-                                factoryId: activeFactoryId,
-                                instanceId: asId<InstanceId>(
-                                  `instance-${Date.now()}`,
-                                ),
-                                contract: serializeContract(contract),
-                              }),
-                            );
-                          },
-                        })
+                        beginReplacement(
+                          selectedEntity,
+                          contract,
+                          activeFactoryId,
+                          factoryName,
+                          'Replace factory',
+                        )
                       }
                     >
                       Replace with {factoryName}
@@ -1927,7 +2158,7 @@ export const WorldView = ({
                   Select a building, rail segment or tile to see its details.
                 </p>
               )}
-            {tool === 'factory' && (
+            {tool === 'factory' && replacement === undefined && (
               <section className="inspector-card world-contract">
                 <h3>Design · {factoryName}</h3>
                 <p>

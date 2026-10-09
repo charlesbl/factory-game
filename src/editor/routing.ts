@@ -18,12 +18,11 @@ const inside = (
     readonly width: number;
     readonly height: number;
   },
-  clearance = 0,
 ): boolean =>
-  point.x >= rect.x - clearance &&
-  point.x <= rect.x + rect.width + clearance &&
-  point.y >= rect.y - clearance &&
-  point.y <= rect.y + rect.height + clearance;
+  point.x >= rect.x &&
+  point.x <= rect.x + rect.width &&
+  point.y >= rect.y &&
+  point.y <= rect.y + rect.height;
 
 export const orthogonalLength = (points: readonly GridPoint[]): number => {
   if (points.length < 2)
@@ -161,16 +160,23 @@ export const validatePhysicalRouting = (
         );
     }
     const ownerNodes = new Set([edge.sourceNodeId, edge.targetNodeId]);
-    let clearanceReported = false;
     for (const point of cells.slice(1, -1))
       for (const node of blueprint.nodes.values()) {
-        if (ownerNodes.has(node.id)) continue;
         const rect = {
           x: node.position.x + node.footprint.x,
           y: node.position.y + node.footprint.y,
           width: node.footprint.width,
           height: node.footprint.height,
         };
+        // A connector may follow its owner's boundary, but never its interior.
+        if (
+          ownerNodes.has(node.id) &&
+          (point.x <= rect.x ||
+            point.x >= rect.x + rect.width ||
+            point.y <= rect.y ||
+            point.y >= rect.y + rect.height)
+        )
+          continue;
         if (inside(point, rect)) {
           diagnostics.push(
             diagnostic('MACHINE_KEEPOUT', edge.id, {
@@ -180,12 +186,6 @@ export const validatePhysicalRouting = (
             }),
           );
           break;
-        }
-        if (!clearanceReported && inside(point, rect, 1)) {
-          diagnostics.push(
-            diagnostic('INSUFFICIENT_CLEARANCE', edge.id, { nodeId: node.id }),
-          );
-          clearanceReported = true;
         }
       }
   }

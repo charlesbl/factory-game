@@ -899,8 +899,27 @@ export class WorldRuntime {
     stationId?: StationId,
     resourceId?: ResourceId,
     restoringExistingMine = false,
+    replacingEntityId?: WorldEntityId,
   ): WorldValidationResult {
-    const placement = validatePlacement(this.world.grid, transform);
+    const replaced =
+      replacingEntityId === undefined
+        ? undefined
+        : this.entities.get(replacingEntityId);
+    if (
+      replacingEntityId !== undefined &&
+      (targetKind !== 'factory' ||
+        replaced?.kind !== 'factory' ||
+        replaced.state === 'DISMANTLING')
+    )
+      return { valid: false, reason: 'NOT_CONNECTED' };
+    if (replaced?.kind === 'factory') stationId = replaced.stationId;
+    const placement = validatePlacement(
+      this.world.grid,
+      transform,
+      replacingEntityId === undefined
+        ? undefined
+        : this.#slots.get(replacingEntityId),
+    );
     if (!placement.valid) return placement;
     if (targetKind === 'depot') {
       const hookup = this.validateHookup(transform);
@@ -946,7 +965,10 @@ export class WorldRuntime {
         stationId === undefined ? undefined : this.stationEntity(stationId);
       if (station === undefined || !adjacentTo(transform, station.transform))
         return { valid: false, reason: 'MISSING_STATION' };
-      if (station.linkedEntityId !== undefined)
+      if (
+        station.linkedEntityId !== undefined &&
+        station.linkedEntityId !== replacingEntityId
+      )
         return { valid: false, reason: 'STATION_IN_USE' };
     }
     if (targetKind === 'mine' && resourceId === undefined)
@@ -1007,14 +1029,17 @@ export class WorldRuntime {
   createConstructionSite(
     target: Omit<ConstructionTargetRecord, 'siteId'>,
   ): ConstructionSiteWorldEntity {
-    const id = asId<WorldEntityId>(
+    return this.createConstructionSiteAt(this.nextConstructionSiteId(), target);
+  }
+  private nextConstructionSiteId(): WorldEntityId {
+    return asId<WorldEntityId>(
       `site-${this.revision + 1}-${this.entities.size + 1}`,
     );
-    return this.createConstructionSiteAt(id, target);
   }
   private createConstructionSiteAt(
     id: WorldEntityId,
     target: Omit<ConstructionTargetRecord, 'siteId'>,
+    preserveFactoryStationConnection = false,
   ): ConstructionSiteWorldEntity {
     if (this.entities.has(id)) throw new Error('Construction site ID exists');
     const validation = this.validateGhost(
@@ -1024,7 +1049,17 @@ export class WorldRuntime {
       target.resourceId,
       target.buildingRestoration?.mine !== undefined,
     );
-    if (!validation.valid)
+    // Restoring a dismantle keeps the original logistics link, including old
+    // saves where a factory no longer touches its station. New placements and
+    // replacements must be adjacent to their station.
+    const existingStation = this.stationEntity(target.stationId);
+    const keepsFactoryStation =
+      preserveFactoryStationConnection &&
+      target.targetKind === 'factory' &&
+      validation.reason === 'MISSING_STATION' &&
+      existingStation !== undefined &&
+      existingStation.linkedEntityId === undefined;
+    if (!validation.valid && !keepsFactoryStation)
       throw new Error(`Invalid construction site: ${validation.reason}`);
     const siteId = asId<ConstructionSiteId>(`construction-${id}`);
     const entity: ConstructionSiteWorldEntity = {
@@ -1466,19 +1501,23 @@ export class WorldRuntime {
       // flight keep their station addresses; the construction request pulls the
       // full recovered amount back through normal logistics without minting it.
       this.remove(entityId);
-      this.createConstructionSiteAt(entityId, {
-        targetKind: 'factory',
-        transform: entity.transform,
-        stationId: entity.stationId,
-        cost: record.recovered,
-        factoryId: entity.factoryId,
-        instanceId: entity.instanceId,
-        contract: record.contract,
-        factoryRestoration: {
-          ...record,
-          returnedSalvageMissionIds: [],
+      this.createConstructionSiteAt(
+        entityId,
+        {
+          targetKind: 'factory',
+          transform: entity.transform,
+          stationId: entity.stationId,
+          cost: record.recovered,
+          factoryId: entity.factoryId,
+          instanceId: entity.instanceId,
+          contract: record.contract,
+          factoryRestoration: {
+            ...record,
+            returnedSalvageMissionIds: [],
+          },
         },
-      });
+        true,
+      );
       this.dispatch();
       this.changed();
       return;
@@ -1623,8 +1662,19 @@ export class WorldRuntime {
       'siteId' | 'stationId' | 'targetKind'
     >,
   ): void {
-    if (this.entities.get(entityId)?.kind !== 'factory')
+    const entity = this.entities.get(entityId);
+    if (entity?.kind !== 'factory')
       throw new Error('Replacement requires a factory');
+    const validation = this.validateGhost(
+      'factory',
+      target.transform,
+      entity.stationId,
+      undefined,
+      false,
+      entityId,
+    );
+    if (!validation.valid)
+      throw new Error(`Invalid factory replacement: ${validation.reason}`);
     const stationId = this.dismantleEntity(entityId);
     // Recovery remains at the external station; replacement needs the old
     // footprint released before authoritative construction validation.
@@ -1633,7 +1683,7 @@ export class WorldRuntime {
     const { linkedEntityId, ...unlinked } = station;
     void linkedEntityId;
     this.entities.set(station.id, unlinked);
-    this.createConstructionSite({
+    this.createConstructionSiteAt(this.nextConstructionSiteId(), {
       ...target,
       targetKind: 'factory',
       stationId,
